@@ -1,0 +1,3 @@
+[submodule "lib/bulloak"]
+	path = lib/bulloak
+	url = git@github.com:alexfertel/bulloak.git
