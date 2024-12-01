@@ -9,25 +9,6 @@ import {ISavingsCircle, SavingsCircle} from 'contracts/SavingsCircle.sol';
 import {Test} from 'forge-std/Test.sol';
 
 contract SavingsCircleTest is Test {
-  function test_AllowlistTokenWhenCallerIsNotOwner() external {
-    // it reverts
-  }
-
-  function test_AllowlistTokenWhenCallerIsOwner() external {
-    // it allowslists the token
-    // it emits token allowedlisted event
-  }
-
-  function test_DenylistTokenWhenCallerIsNotOwner() external {
-    // it reverts
-  }
-
-  function test_DenylistTokenWhenCallerIsOwner() external {
-    // it denylists the token
-    // it emits token deniedlisted event
-  }
-  // Constants
-
   uint256 constant DEPOSIT_AMOUNT = 1 ether;
   uint256 constant DEPOSIT_INTERVAL = 1 days;
 
@@ -72,6 +53,24 @@ contract SavingsCircleTest is Test {
     // Create initial test circle
     vm.prank(alice);
     circle.addCircle('Test Circle', members, address(token), DEPOSIT_AMOUNT, DEPOSIT_INTERVAL);
+  }
+
+  function test_AllowlistTokenWhenCallerIsNotOwner() external {
+    // it reverts
+  }
+
+  function test_AllowlistTokenWhenCallerIsOwner() external {
+    // it allowslists the token
+    // it emits token allowedlisted event
+  }
+
+  function test_DenylistTokenWhenCallerIsNotOwner() external {
+    // it reverts
+  }
+
+  function test_DenylistTokenWhenCallerIsOwner() external {
+    // it denylists the token
+    // it emits token deniedlisted event
   }
 
   function test_WhitelistTokenWhenCallerIsNotOwner() external {
