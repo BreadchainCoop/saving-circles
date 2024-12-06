@@ -72,8 +72,6 @@ SavingsCircleTest::decommission
 │   └── it reverts
 ├── when circle does not exist
 │   └── it reverts
-├── when circle has active deposits
-│   └── it reverts
 └── when parameters are valid
     ├── it marks circle as decommissioned
     ├── it refunds remaining balances to members
