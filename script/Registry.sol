@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.28;
 
 /// @dev Example of addresses that may be stored in the Registry for use throughout the repository
 

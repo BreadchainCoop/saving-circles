@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.23;
+pragma solidity 0.8.28;
 
 import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
 import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
@@ -13,19 +13,20 @@ contract SavingsCircleTest is Test {
   uint256 public constant DEPOSIT_INTERVAL = 1 days;
   uint256 public constant CIRCLE_DURATION = 30 days;
 
+  SavingsCircle public savingcircles;
+  IERC20 public token;
+
   // Test addresses
   address public owner;
   address public alice;
   address public bob;
   address public carol;
-  address immutable stranger = makeAddr('stranger');
-  IERC20 token;
-  SavingsCircle savingcircles;
+  address public immutable STRANGER = makeAddr('stranger');
 
   // Test data
-  bytes32 baseCircleId;
-  address[] members;
-  ISavingsCircle.Circle baseCircle;
+  bytes32 public baseCircleId;
+  address[] public members;
+  ISavingsCircle.Circle public baseCircle;
 
   function setUp() external {
     // Setup test addresses
@@ -114,7 +115,7 @@ contract SavingsCircleTest is Test {
 
   function test_DepositWhenMemberHasAlreadyDeposited() external {
     // First deposit
-    vm.startPrank(stranger);
+    vm.startPrank(STRANGER);
     vm.mockCall(address(token), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
     savingcircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
@@ -126,7 +127,7 @@ contract SavingsCircleTest is Test {
   }
 
   function test_DepositWhenParametersAreValid() external {
-    vm.startPrank(stranger);
+    vm.startPrank(STRANGER);
 
     // Mock token transfer
     vm.mockCall(address(token), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));

@@ -3,14 +3,15 @@
     "style-guide-casing": [
       "warn",
       {
-        "ignorePublicFunctions":true,
-        "ignoreExternalFunctions":true,
-        "ignoreContracts":true
+        "ignorePublicFunctions": true,
+        "ignoreExternalFunctions": true,
+        "ignoreContracts": true
       }
     ],
     "no-global-import": "off",
     "max-states-count": "off",
     "ordering": "off",
-    "one-contract-per-file": "off"
+    "one-contract-per-file": "off",
+    "func-name-mixedcase": "off"
   }
 }
