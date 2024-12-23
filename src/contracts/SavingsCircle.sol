@@ -1,212 +1,256 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {ISavingsCircle} from '../interfaces/ISavingsCircle.sol';
 import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
 import {ReentrancyGuard} from '@openzeppelin/utils/ReentrancyGuard.sol';
 
-contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
-  mapping(bytes32 circleIdentifier => Circle circle) public circles;
-  mapping(bytes32 circleIdentifier => mapping(address => uint256)) public circleBalances;
-  mapping(address token => bool status) public allowlistedTokens;
-  mapping(bytes32 circleIdentifier => mapping(address member => bool status)) public isMember;
+import {ISavingsCircle} from '../interfaces/ISavingsCircle.sol';
 
-  modifier validDeposit(bytes32 circleIdentifier, uint256 value, address member) {
+/**
+ * @title Savings Circle
+ * @notice TODO
+ * @author Breadchain Collective
+ * @author @RonTuretzky
+ * @author @bagelface
+ */
+contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
+  mapping(bytes32 id => Circle circle) public circles;
+  mapping(bytes32 id => mapping(address => uint256)) public circleBalances;
+  mapping(address token => bool status) public allowedTokens;
+  mapping(bytes32 id => mapping(address member => bool status)) public isMember;
+
+  modifier validDeposit(bytes32 _id, uint256 _value, address _member) {
     if (
-      block.timestamp
-        >= circles[circleIdentifier].circleStart
-          + (circles[circleIdentifier].depositInterval * circles[circleIdentifier].currentIndex)
-        || block.timestamp
-          >= circles[circleIdentifier].circleStart
-            + (circles[circleIdentifier].depositInterval * circles[circleIdentifier].maxDeposits)
-        || circleBalances[circleIdentifier][member] + value >= circles[circleIdentifier].depositAmount
+      block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].currentIndex)
+        || block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].maxDeposits)
+        || circleBalances[_id][_member] + _value >= circles[_id].depositAmount
     ) revert InvalidDeposit();
     _;
   }
-  /// @custom:oz-upgrades-unsafe-allow constructor
 
+  /// @custom:oz-upgrades-unsafe-allow constructor
   constructor() {
     _disableInitializers();
   }
 
-  function initialize() external override initializer {
-    __Ownable_init_unchained(msg.sender);
+  function initialize(address _owner) external override initializer {
+    __Ownable_init_unchained(_owner);
   }
 
-  function addCircle(Circle memory circle) external override {
-    bytes32 circleIdentifier = keccak256(abi.encodePacked(circle.name));
-    if (circles[circleIdentifier].members.length != 0) revert CircleExists();
-    if (!allowlistedTokens[circle.tokenAddress]) revert InvalidToken();
-    if (circle.depositInterval == 0) revert InvalidInterval();
-    if (circle.depositAmount == 0) revert InvalidDeposit();
-    if (circle.members.length < 2) revert InvalidMembers();
-    if (circle.maxDeposits == 0) revert InvalidDeposit();
-    if (circle.circleStart == 0) revert InvalidStart();
-    if (circle.currentIndex != 0) revert InvalidIndex();
+  /**
+   * @notice Commission a new savings circle
+   * @param _circle A new savings circle
+   */
+  function addCircle(Circle memory _circle) external override {
+    bytes32 _id = keccak256(abi.encodePacked(_circle.name));
+    if (circles[_id].members.length != 0) revert CircleExists();
+    if (!allowedTokens[_circle.token]) revert InvalidToken();
+    if (_circle.depositInterval == 0) revert InvalidInterval();
+    if (_circle.depositAmount == 0) revert InvalidDeposit();
+    if (_circle.members.length < 2) revert InvalidMembers();
+    if (_circle.maxDeposits == 0) revert InvalidDeposit();
+    if (_circle.circleStart == 0) revert InvalidStart();
+    if (_circle.currentIndex != 0) revert InvalidIndex();
 
-    circles[circleIdentifier] = circle;
-    Circle storage newCircle = circles[circleIdentifier];
-    for (uint256 i = 0; i < newCircle.members.length; i++) {
-      isMember[circleIdentifier][newCircle.members[i]] = true;
+    circles[_id] = _circle;
+    Circle storage _newCircle = circles[_id];
+    for (uint256 i = 0; i < _newCircle.members.length; i++) {
+      isMember[_id][_newCircle.members[i]] = true;
     }
 
     emit CircleCreated(
-      circleIdentifier, circle.name, circle.members, circle.tokenAddress, circle.depositAmount, circle.depositInterval
+      _id, _circle.name, _circle.members, _circle.token, _circle.depositAmount, _circle.depositInterval
     );
   }
 
-  function allowlistToken(address token) external override onlyOwner {
-    allowlistedTokens[token] = true;
-    emit TokenAllowlisted(token);
+  /**
+   * @notice Make a deposit into a specified circle
+   * @param _id Identifier of the circle
+   * @param _value Amount of the token to deposit
+   */
+  function deposit(bytes32 _id, uint256 _value) external override nonReentrant validDeposit(_id, _value, msg.sender) {
+    if (!isMember[_id][msg.sender]) revert NotMember();
+
+    _deposit(_id, msg.sender, _value);
   }
 
-  function denylistToken(address token) external override onlyOwner {
-    allowlistedTokens[token] = false;
-    emit TokenDenylisted(token);
-  }
-
-  function deposit(
-    bytes32 circleIdentifier,
-    uint256 value
-  ) external override nonReentrant validDeposit(circleIdentifier, value, msg.sender) {
-    if (!isMember[circleIdentifier][msg.sender]) revert NotMember();
-    _deposit(circleIdentifier, msg.sender, value);
-  }
-
+  /**
+   * @notice Make a deposit on behalf of another member
+   * @param _id Identifier of the circle
+   * @param _member Address to make a deposit for
+   * @param _value Amount of the token to deposit
+   */
   function depositFor(
-    bytes32 circleIdentifier,
-    address member,
-    uint256 value
-  ) external override nonReentrant validDeposit(circleIdentifier, value, member) {
-    _deposit(circleIdentifier, member, value);
+    bytes32 _id,
+    address _member,
+    uint256 _value
+  ) external override nonReentrant validDeposit(_id, _value, _member) {
+    _deposit(_id, _member, _value);
   }
 
-  function withdraw(bytes32 circleIdentifier) external override nonReentrant {
-    if (!circleWithdrawable(circleIdentifier)) revert NotWithdrawable();
-    Circle storage circle = circles[circleIdentifier];
-    if (circle.members.length == 0) revert CircleNotFound();
-    if (circle.members[circle.currentIndex] != msg.sender) revert NotWithdrawable();
+  /**
+   * @notice Make a withdrawal from a specified circle
+   * @param _id Identifier of the circle
+   */
+  function withdraw(bytes32 _id) external override nonReentrant {
+    Circle storage _circle = circles[_id];
 
-    uint256 withdrawAmount = circle.depositAmount * (circle.members.length);
+    if (!_circleWithdrawable(_id)) revert NotWithdrawable();
+    if (_circle.members.length == 0) revert CircleNotFound();
+    if (_circle.members[_circle.currentIndex] != msg.sender) revert NotWithdrawable();
 
-    for (uint256 i = 0; i < circle.members.length; i++) {
-      circleBalances[circleIdentifier][circle.members[i]] = 0;
+    uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
+
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      circleBalances[_id][_circle.members[i]] = 0;
     }
 
-    circle.currentIndex = (circle.currentIndex + 1) % circle.members.length;
-    IERC20(circle.tokenAddress).transfer(msg.sender, withdrawAmount);
-    emit WithdrawalMade(circleIdentifier, msg.sender, withdrawAmount);
+    _circle.currentIndex = (_circle.currentIndex + 1) % _circle.members.length;
+    bool success = IERC20(_circle.token).transfer(msg.sender, _withdrawAmount);
+    if (!success) revert TransferFailed();
+
+    emit WithdrawalMade(_id, msg.sender, _withdrawAmount);
   }
 
-  function decommissionCircle(bytes32 circleIdentifier) external override onlyOwner {
-    Circle storage circle = circles[circleIdentifier];
-    if (circle.members.length == 0) revert CircleNotFound();
-    if (circle.owner != msg.sender) revert NotOwner();
+  /**
+   * @notice Set if a token can be used for savings circles
+   * @param _token Token to update the status of
+   * @param _allowed Can be used for savings circles
+   */
+  function setTokenAllowed(address _token, bool _allowed) external override onlyOwner {
+    allowedTokens[_token] = _allowed;
 
-    // Return all deposits to members
-    for (uint256 i = 0; i < circle.members.length; i++) {
-      address member = circle.members[i];
-      uint256 balance = circleBalances[circleIdentifier][member];
-      if (balance > 0) {
-        circleBalances[circleIdentifier][member] = 0;
-        IERC20(circle.tokenAddress).transfer(member, balance);
+    emit TokenAllowed(_token, _allowed);
+  }
+
+  /**
+   * @notice Decommission an existing savings circle
+   * @dev Returns all deposits to members
+   * @param _id Identifier of the circle
+   */
+  function decommissionCircle(bytes32 _id) external override onlyOwner {
+    Circle storage _circle = circles[_id];
+    if (_circle.members.length == 0) revert CircleNotFound();
+    if (_circle.owner != msg.sender) revert NotOwner();
+
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      address _member = _circle.members[i];
+      uint256 _balance = circleBalances[_id][_member];
+      if (_balance > 0) {
+        circleBalances[_id][_member] = 0;
+        IERC20(_circle.token).transfer(_member, _balance);
       }
     }
 
-    delete circles[circleIdentifier];
-    emit CircleDecommissioned(circleIdentifier);
+    delete circles[_id];
+
+    emit CircleDecommissioned(_id);
   }
 
-  function isTokenAllowlisted(address token) external view override returns (bool) {
-    return allowlistedTokens[token];
+  /**
+   * @notice Return if a token is allowed to be used for saving circles
+   * @param _token Address of a token
+   * @return bool Token allowed
+   */
+  function isTokenAllowed(address _token) external view override returns (bool) {
+    return allowedTokens[_token];
   }
 
-  function circleMembers(bytes32 circleIdentifier) external view override returns (address[] memory) {
-    return circles[circleIdentifier].members;
+  /**
+   * @notice Return the members of a specified circle
+   * @param _id Identifier of the circle
+   * @return _members Members of the circle
+   */
+  function circleMembers(bytes32 _id) external view override returns (address[] memory _members) {
+    return circles[_id].members;
   }
 
-  function circleInfo(bytes32 circleIdentifier)
+  /**
+   * @notice Return the info of a specified savings circle
+   * @param _id Identifier of the circle
+   * @return _circle Savings circle
+   */
+  function circle(bytes32 _id) external view override returns (Circle memory _circle) {
+    _circle = circles[_id];
+
+    if (_circle.members.length == 0) revert CircleNotFound();
+
+    return _circle;
+  }
+
+  /**
+   * @notice TODO
+   * @param _id TODO
+   */
+  function balancesForCircle(bytes32 _id)
     external
     view
     override
-    returns (
-      string memory name,
-      address[] memory members,
-      address tokenAddress,
-      uint256 depositAmount,
-      uint256 depositInterval,
-      uint256 circleStart,
-      uint256 numWithdrawals,
-      uint256 currentIndex
-    )
+    returns (address[] memory _members, uint256[] memory _balances)
   {
-    Circle storage circle = circles[circleIdentifier];
-    if (circle.members.length == 0) revert CircleNotFound();
-    return (
-      circle.name,
-      circle.members,
-      circle.tokenAddress,
-      circle.depositAmount,
-      circle.depositInterval,
-      circle.circleStart,
-      circle.currentIndex,
-      circle.maxDeposits
-    );
-  }
+    Circle storage _circle = circles[_id];
+    if (_circle.members.length == 0) revert CircleNotFound();
 
-  function balancesForCircle(bytes32 circleIdentifier)
-    external
-    view
-    override
-    returns (address[] memory, uint256[] memory)
-  {
-    Circle storage circle = circles[circleIdentifier];
-    if (circle.members.length == 0) revert CircleNotFound();
-
-    uint256[] memory balances = new uint256[](circle.members.length);
-    for (uint256 i = 0; i < circle.members.length; i++) {
-      balances[i] = circleBalances[circleIdentifier][circle.members[i]];
+    _balances = new uint256[](_circle.members.length);
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      _balances[i] = circleBalances[_id][_circle.members[i]];
     }
 
-    return (circle.members, balances);
+    return (_circle.members, _balances);
   }
 
-  function withdrawable(bytes32 circleIdentifier, address member) external view override returns (bool) {
-    if (!isMember[circleIdentifier][member]) revert NotMember();
-    Circle storage circle = circles[circleIdentifier];
-    if (circle.members.length == 0) revert CircleNotFound();
-    uint256 currentIndex = circle.currentIndex;
-    return circle.members[currentIndex] == member;
+  /**
+   * @notice TODO
+   * @param _id TODO
+   * @param _member TODO
+   */
+  function withdrawable(bytes32 _id, address _member) external view override returns (bool) {
+    Circle storage _circle = circles[_id];
+
+    if (!isMember[_id][_member]) revert NotMember();
+    if (_circle.members.length == 0) revert CircleNotFound();
+
+    return _circle.members[_circle.currentIndex] == _member;
   }
 
-  function circleWithdrawable(bytes32 hashedName) public view override returns (bool) {
-    Circle storage circle = circles[hashedName];
-    if (circle.members.length == 0) revert CircleNotFound();
+  /**
+   * @notice TODO
+   * @param _id TODO
+   */
+  function circleWithdrawable(bytes32 _id) external view override returns (bool) {
+    return _circleWithdrawable(_id);
+  }
+
+  function _deposit(bytes32 _id, address _member, uint256 _value) internal {
+    Circle storage _circle = circles[_id];
+
+    if (_circle.members.length == 0) revert CircleNotFound();
+    if (!isMember[_id][_member]) revert NotMember();
+
+    IERC20(_circle.token).transferFrom(msg.sender, address(this), _value);
+
+    circleBalances[_id][_member] = circleBalances[_id][_member] + _value;
+    emit DepositMade(_id, _member, _value);
+  }
+
+  function _circleWithdrawable(bytes32 _id) internal view returns (bool) {
+    Circle storage _circle = circles[_id];
+
+    if (_circle.members.length == 0) revert CircleNotFound();
 
     // Check if enough time has passed since circle start for current withdrawal
-    if (block.timestamp < circle.circleStart + (circle.depositInterval * circle.currentIndex)) {
+    if (block.timestamp < _circle.circleStart + (_circle.depositInterval * _circle.currentIndex)) {
       return false;
     }
 
     // Check if all members have made their initial deposit
-    for (uint256 i = 0; i < circle.members.length; i++) {
-      if (circleBalances[hashedName][circle.members[i]] < circle.depositAmount) {
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      if (circleBalances[_id][_circle.members[i]] < _circle.depositAmount) {
         return false;
       }
     }
 
     return true;
-  }
-
-  function _deposit(bytes32 circleIdentifier, address member, uint256 value) internal {
-    Circle storage circle = circles[circleIdentifier];
-    if (circle.members.length == 0) revert CircleNotFound();
-    if (!isMember[circleIdentifier][member]) revert NotMember();
-
-    IERC20(circle.tokenAddress).transferFrom(msg.sender, address(this), value);
-
-    circleBalances[circleIdentifier][member] = circleBalances[circleIdentifier][member] + value;
-    emit DepositMade(circleIdentifier, member, value);
   }
 }

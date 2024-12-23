@@ -8,66 +8,48 @@ interface ISavingsCircle {
     address[] members;
     uint256 currentIndex;
     uint256 depositAmount;
-    address tokenAddress;
+    address token;
     uint256 depositInterval;
     uint256 circleStart;
     uint256 maxDeposits;
   }
 
   event CircleCreated(
-    bytes32 indexed circleIdentifier,
-    string name,
-    address[] members,
-    address tokenAddress,
-    uint256 depositAmount,
-    uint256 depositInterval
+    bytes32 indexed id, string name, address[] members, address token, uint256 depositAmount, uint256 depositInterval
   );
-  event DepositMade(bytes32 indexed circleIdentifier, address indexed contributor, uint256 amount);
-  event WithdrawalMade(bytes32 indexed circleIdentifier, address indexed withdrawer, uint256 amount);
-  event TokenAllowlisted(address indexed token);
-  event TokenDenylisted(address indexed token);
-  event CircleDecommissioned(bytes32 indexed circleIdentifier);
+  event CircleDecommissioned(bytes32 indexed id);
+  event DepositMade(bytes32 indexed id, address indexed contributor, uint256 amount);
+  event WithdrawalMade(bytes32 indexed id, address indexed withdrawer, uint256 amount);
+  event TokenAllowed(address indexed token, bool indexed allowed);
 
-  error InvalidToken();
-  error InvalidInterval();
-  error InvalidDeposit();
-  error InvalidMembers();
+  error AlreadyDeposited();
+  error CircleExists();
   error CircleNotFound();
+  error InvalidDeposit();
+  error InvalidIndex();
+  error InvalidInterval();
+  error InvalidMembers();
+  error InvalidStart();
+  error InvalidToken();
   error NotMember();
   error NotOwner();
   error NotWithdrawable();
-  error CircleExists();
-  error AlreadyDeposited();
-  error InvalidStart();
-  error InvalidIndex();
-  // External functions (state-changing)
+  error TransferFailed();
 
-  function initialize() external;
-  function allowlistToken(address token) external;
-  function denylistToken(address token) external;
+  // External functions (state-changing)
+  function initialize(address owner) external;
+  function setTokenAllowed(address token, bool allowed) external;
   function addCircle(Circle memory circle) external;
-  function deposit(bytes32 circleIdentifier, uint256 value) external;
-  function depositFor(bytes32 circleIdentifier, address member, uint256 value) external;
-  function withdraw(bytes32 circleIdentifier) external;
-  function decommissionCircle(bytes32 circleIdentifier) external;
+  function deposit(bytes32 id, uint256 value) external;
+  function depositFor(bytes32 id, address member, uint256 value) external;
+  function withdraw(bytes32 id) external;
+  function decommissionCircle(bytes32 id) external;
 
   // External view functions
-  function isTokenAllowlisted(address token) external view returns (bool);
-  function circleInfo(bytes32 circleIdentifier)
-    external
-    view
-    returns (
-      string memory name,
-      address[] memory members,
-      address tokenAddress,
-      uint256 depositAmount,
-      uint256 depositInterval,
-      uint256 circleStart,
-      uint256 numWithdrawals,
-      uint256 currentIndex
-    );
-  function balancesForCircle(bytes32 circleIdentifier) external view returns (address[] memory, uint256[] memory);
-  function circleWithdrawable(bytes32 circleIdentifier) external view returns (bool);
-  function circleMembers(bytes32 circleIdentifier) external view returns (address[] memory);
-  function withdrawable(bytes32 circleIdentifier, address member) external view returns (bool);
+  function circle(bytes32 id) external view returns (Circle memory);
+  function isTokenAllowed(address token) external view returns (bool);
+  function balancesForCircle(bytes32 id) external view returns (address[] memory, uint256[] memory);
+  function circleWithdrawable(bytes32 id) external view returns (bool);
+  function circleMembers(bytes32 id) external view returns (address[] memory);
+  function withdrawable(bytes32 id, address member) external view returns (bool);
 }

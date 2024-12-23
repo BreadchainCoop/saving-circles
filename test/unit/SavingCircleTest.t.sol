@@ -37,7 +37,7 @@ contract SavingsCircleTest is Test {
     token = IERC20(makeAddr('token'));
 
     // Setup test data
-    members = new address[](3);
+    members = new address[](4);
     members[0] = alice;
     members[1] = bob;
     members[2] = carol;
@@ -51,7 +51,7 @@ contract SavingsCircleTest is Test {
       members: members,
       currentIndex: 0,
       circleStart: block.timestamp,
-      tokenAddress: address(token),
+      token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
       depositInterval: DEPOSIT_INTERVAL,
       maxDeposits: 1000
@@ -61,11 +61,11 @@ contract SavingsCircleTest is Test {
     vm.startPrank(owner);
     SavingsCircle implementation = new SavingsCircle();
     ProxyAdmin proxyAdmin = new ProxyAdmin(owner);
-    bytes memory initData = abi.encodeWithSelector(SavingsCircle.initialize.selector);
+    bytes memory initData = abi.encodeWithSelector(SavingsCircle.initialize.selector, owner);
     TransparentUpgradeableProxy proxy =
       new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
     savingcircles = SavingsCircle(address(proxy));
-    savingcircles.allowlistToken(address(token));
+    savingcircles.setTokenAllowed(address(token), true);
     vm.stopPrank();
 
     // Create initial test savingcircles
@@ -73,36 +73,36 @@ contract SavingsCircleTest is Test {
     savingcircles.addCircle(baseCircle);
   }
 
-  function test_AllowlistTokenWhenCallerIsNotOwner() external {
+  function test_SetTokenAllowedWhenCallerIsNotOwner() external {
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
-    savingcircles.allowlistToken(address(0x1));
+    savingcircles.setTokenAllowed(address(0x1), true);
   }
 
-  function test_AllowlistTokenWhenCallerIsOwner() external {
+  function test_SetTokenAllowedWhenCallerIsOwner() external {
     address newToken = makeAddr('newToken');
 
     vm.prank(owner);
     vm.expectEmit(true, true, true, true);
-    emit ISavingsCircle.TokenAllowlisted(newToken);
-    savingcircles.allowlistToken(newToken);
+    emit ISavingsCircle.TokenAllowed(newToken, true);
+    savingcircles.setTokenAllowed(newToken, true);
 
-    assertTrue(savingcircles.isTokenAllowlisted(newToken));
+    assertTrue(savingcircles.isTokenAllowed(newToken));
   }
 
-  function test_DenylistTokenWhenCallerIsNotOwner() external {
+  function test_SetTokenNotAllowedWhenCallerIsNotOwner() external {
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
-    savingcircles.denylistToken(address(token));
+    savingcircles.setTokenAllowed(address(token), false);
   }
 
-  function test_DenylistTokenWhenCallerIsOwner() external {
+  function test_SetTokenNotAllowedWhenCallerIsOwner() external {
     vm.prank(owner);
     vm.expectEmit(true, true, true, true);
-    emit ISavingsCircle.TokenDenylisted(address(token));
-    savingcircles.denylistToken(address(token));
+    emit ISavingsCircle.TokenAllowed(address(token), false);
+    savingcircles.setTokenAllowed(address(token), false);
 
-    assertFalse(savingcircles.isTokenAllowlisted(address(token)));
+    assertFalse(savingcircles.isTokenAllowed(address(token)));
   }
 
   function test_DepositWhenCircleDoesNotExist() external {
@@ -225,18 +225,17 @@ contract SavingsCircleTest is Test {
     bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
 
     vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.CircleNotFound.selector));
-    savingcircles.circleInfo(nonExistentCircleId);
+    savingcircles.circle(nonExistentCircleId);
   }
 
   function test_CircleInfoWhenCircleExists() external {
-    (string memory name, address[] memory circleMembers, address tokenAddr, uint256 deposit, uint256 interval,,,) =
-      savingcircles.circleInfo(baseCircleId);
+    ISavingsCircle.Circle memory _circle = savingcircles.circle(baseCircleId);
 
-    assertEq(name, 'Test Circle');
-    assertEq(circleMembers.length, members.length);
-    assertEq(tokenAddr, address(token));
-    assertEq(deposit, DEPOSIT_AMOUNT);
-    assertEq(interval, DEPOSIT_INTERVAL);
+    assertEq(_circle.name, 'Test Circle');
+    assertEq(_circle.members.length, members.length);
+    assertEq(_circle.token, address(token));
+    assertEq(_circle.depositAmount, DEPOSIT_AMOUNT);
+    assertEq(_circle.depositInterval, DEPOSIT_INTERVAL);
   }
 
   function test_DecommissionWhenCallerIsNotOwner() external {
@@ -271,7 +270,7 @@ contract SavingsCircleTest is Test {
   function test_AddCircleWhenTokenIsNotWhitelisted() external {
     address nonWhitelistedToken = makeAddr('nonWhitelistedToken');
     ISavingsCircle.Circle memory invalidParams = baseCircle;
-    invalidParams.tokenAddress = nonWhitelistedToken;
+    invalidParams.token = nonWhitelistedToken;
 
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.InvalidToken.selector));

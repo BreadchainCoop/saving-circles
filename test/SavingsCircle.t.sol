@@ -1,20 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
+import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
+import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
+import {Test} from 'forge-std/Test.sol';
+
 import {SavingsCircle} from '../src/contracts/SavingsCircle.sol';
 import {ISavingsCircle} from '../src/interfaces/ISavingsCircle.sol';
 import {MockERC20} from './mocks/MockERC20.sol';
 
-import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
-import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
-import {Test, console} from 'forge-std/Test.sol';
-
 contract SavingsCircleTest is Test {
-  SavingsCircle public implementation;
   SavingsCircle public circle;
   MockERC20 public token;
-  ProxyAdmin public proxyAdmin;
-  TransparentUpgradeableProxy public proxy;
 
   address public alice = makeAddr('alice');
   address public bob = makeAddr('bob');
@@ -32,44 +29,38 @@ contract SavingsCircleTest is Test {
 
   function setUp() public {
     vm.startPrank(owner);
-    // Deploy implementation
-    implementation = new SavingsCircle();
-
-    // Deploy ProxyAdmin
-    proxyAdmin = new ProxyAdmin(owner);
-
-    // Deploy proxy
-    bytes memory initData = abi.encodeWithSelector(SavingsCircle.initialize.selector);
-
-    proxy = new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
-
-    // Get interface for proxy
-    circle = SavingsCircle(address(proxy));
+    circle = SavingsCircle(
+      address(
+        new TransparentUpgradeableProxy(
+          address(new SavingsCircle()),
+          address(new ProxyAdmin(owner)),
+          abi.encodeWithSelector(SavingsCircle.initialize.selector, owner)
+        )
+      )
+    );
 
     token = new MockERC20('Test Token', 'TEST');
-    circle.allowlistToken(address(token));
+    circle.setTokenAllowed(address(token), true);
     vm.stopPrank();
 
     // Setup test accounts
     vm.startPrank(alice);
     token.mint(alice, DEPOSIT_AMOUNT * 10);
     token.approve(address(circle), type(uint256).max);
+    members.push(alice);
     vm.stopPrank();
 
     vm.startPrank(bob);
     token.mint(bob, DEPOSIT_AMOUNT * 10);
     token.approve(address(circle), type(uint256).max);
+    members.push(bob);
     vm.stopPrank();
 
     vm.startPrank(carol);
     token.mint(carol, DEPOSIT_AMOUNT * 10);
     token.approve(address(circle), type(uint256).max);
+    members.push(carol);
     vm.stopPrank();
-
-    // Setup base circle parameters
-    members[0] = alice;
-    members[1] = bob;
-    members[2] = carol;
 
     baseCircle = ISavingsCircle.Circle({
       owner: alice,
@@ -77,36 +68,52 @@ contract SavingsCircleTest is Test {
       members: members,
       currentIndex: BASE_CURRENT_INDEX,
       circleStart: block.timestamp,
-      tokenAddress: address(token),
+      token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
       depositInterval: DEPOSIT_INTERVAL,
       maxDeposits: BASE_MAX_DEPOSITS
     });
   }
 
-  function test_AllowlistToken() public {
-    address newToken = makeAddr('newToken');
-    vm.prank(owner);
-    circle.allowlistToken(newToken);
-    assertTrue(circle.isTokenAllowlisted(newToken));
-  }
+  function test_SetTokenAllowed() public {
+    // Check initial state
+    assertFalse(circle.isTokenAllowed(address(token)));
 
-  function test_DenylistToken() public {
+    // Test enabling token
+    vm.prank(owner);
+    circle.setTokenAllowed(address(token), true);
+    assertTrue(circle.isTokenAllowed(address(token)));
+
+    // Test disabling token
+    vm.prank(owner);
+    circle.setTokenAllowed(address(token), false);
+    assertFalse(circle.isTokenAllowed(address(token)));
+
+    // Test enabling multiple tokens
+    address newToken = makeAddr('newToken');
     vm.startPrank(owner);
-    circle.allowlistToken(address(token));
-    circle.denylistToken(address(token));
+    circle.setTokenAllowed(address(token), true);
+    circle.setTokenAllowed(newToken, true);
     vm.stopPrank();
-    assertFalse(circle.isTokenAllowlisted(address(token)));
+
+    assertTrue(circle.isTokenAllowed(address(token)));
+    assertTrue(circle.isTokenAllowed(newToken));
+
+    // Test emitted events
+    vm.prank(owner);
+    vm.expectEmit(true, true, false, true);
+    emit ISavingsCircle.TokenAllowed(address(token), false);
+    circle.setTokenAllowed(address(token), false);
   }
 
   function testFail_NonOwnerAllowlist() public {
     vm.prank(alice);
-    circle.allowlistToken(address(token));
+    circle.setTokenAllowed(address(token), true);
   }
 
   function testFail_CreateCircleWithUnAllowlistedToken() public {
     address badToken = makeAddr('badToken');
-    baseCircle.tokenAddress = badToken;
+    baseCircle.token = badToken;
     vm.prank(alice);
     circle.addCircle(baseCircle);
   }
@@ -189,7 +196,7 @@ contract SavingsCircleTest is Test {
 
     // Check circle deleted
     vm.expectRevert(ISavingsCircle.CircleNotFound.selector);
-    circle.circleInfo(BASE_CIRCLE_ID);
+    circle.circle(BASE_CIRCLE_ID);
   }
 
   function testFail_NonOwnerDecommission() public {
