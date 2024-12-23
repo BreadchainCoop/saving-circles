@@ -116,7 +116,7 @@ contract SavingCirclesUnit is Test {
     bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleNotFound.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
     savingCircles.deposit(nonExistentCircleId, DEPOSIT_AMOUNT);
   }
 
@@ -169,7 +169,7 @@ contract SavingCirclesUnit is Test {
     bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleNotFound.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
     savingCircles.withdraw(nonExistentCircleId);
   }
 
@@ -268,11 +268,11 @@ contract SavingCirclesUnit is Test {
   function test_CircleInfoWhenCircleDoesNotExist() external {
     bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
 
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleNotFound.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
     savingCircles.circle(nonExistentCircleId);
   }
 
-  function test_CircleInfoWhenCircleExists() external {
+  function test_CircleInfoWhenCircleAlreadyExists() external {
     ISavingCircles.Circle memory _circle = savingCircles.circle(baseCircleId);
 
     assertEq(_circle.name, 'Test Circle');
@@ -288,14 +288,6 @@ contract SavingCirclesUnit is Test {
     savingCircles.decommissionCircle(baseCircleId);
   }
 
-  function test_DecommissionWhenCircleDoesNotExist() external {
-    bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
-
-    vm.prank(owner);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleNotFound.selector));
-    savingCircles.decommissionCircle(nonExistentCircleId);
-  }
-
   function test_DecommissionWhenParametersAreValid() external {
     vm.prank(owner);
     vm.expectEmit(true, true, true, true);
@@ -307,7 +299,7 @@ contract SavingCirclesUnit is Test {
 
   function test_AddCircleWhenCircleNameAlreadyExists() external {
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleExists.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyExists.selector));
     savingCircles.addCircle(baseCircle);
   }
 

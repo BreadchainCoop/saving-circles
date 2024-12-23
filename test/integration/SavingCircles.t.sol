@@ -215,7 +215,7 @@ contract SavingCirclesIntegration is Test {
     assertEq(token.balanceOf(bob) - bobBalanceBefore, DEPOSIT_AMOUNT);
 
     // Check circle deleted
-    vm.expectRevert(ISavingCircles.CircleNotFound.selector);
+    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
     circle.circle(BASE_CIRCLE_ID);
   }
 
@@ -246,7 +246,7 @@ contract SavingCirclesIntegration is Test {
   //     // Branch 1: Circle doesn't exist
   //     bytes32 nonExistentCircle = keccak256(abi.encodePacked("Non Existent"));
   //     vm.prank(alice);
-  //     vm.expectRevert(ISavingCircles.CircleNotFound.selector);
+  //     vm.expectRevert(ISavingCircles.NotCommissioned.selector);
   //     circle.withdraw(nonExistentCircle);
 
   //     // Setup circle for remaining tests

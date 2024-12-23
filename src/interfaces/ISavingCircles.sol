@@ -23,14 +23,14 @@ interface ISavingCircles {
   event TokenAllowed(address indexed token, bool indexed allowed);
 
   error AlreadyDeposited();
-  error CircleExists();
-  error CircleNotFound();
+  error AlreadyExists();
   error InvalidDeposit();
   error InvalidIndex();
   error InvalidInterval();
   error InvalidMembers();
   error InvalidStart();
   error InvalidToken();
+  error NotCommissioned();
   error NotMember();
   error NotOwner();
   error NotWithdrawable();
