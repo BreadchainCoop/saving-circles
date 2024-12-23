@@ -127,7 +127,7 @@ contract SavingCirclesIntegration is Test {
     address badToken = makeAddr('badToken');
     baseCircle.token = badToken;
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidToken.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidCircle.selector));
     circle.addCircle(baseCircle);
   }
 

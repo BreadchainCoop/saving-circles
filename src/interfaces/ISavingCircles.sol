@@ -25,11 +25,7 @@ interface ISavingCircles {
   error AlreadyDeposited();
   error AlreadyExists();
   error InvalidDeposit();
-  error InvalidIndex();
-  error InvalidInterval();
-  error InvalidMembers();
-  error InvalidStart();
-  error InvalidToken();
+  error InvalidCircle();
   error NotCommissioned();
   error NotMember();
   error NotOwner();
@@ -49,7 +45,6 @@ interface ISavingCircles {
   function circle(bytes32 id) external view returns (Circle memory);
   function isTokenAllowed(address token) external view returns (bool);
   function balancesForCircle(bytes32 id) external view returns (address[] memory, uint256[] memory);
-  function circleWithdrawable(bytes32 id) external view returns (bool);
-  function circleMembers(bytes32 id) external view returns (address[] memory);
-  function withdrawable(bytes32 id, address member) external view returns (bool);
+  function withdrawable(bytes32 id) external view returns (bool);
+  function withdrawableBy(bytes32 id, address member) external view returns (bool);
 }

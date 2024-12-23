@@ -15,9 +15,11 @@ import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
  * @author @bagelface
  */
 contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
+  uint256 public constant MINIMUM_MEMBERS = 2;
+
   mapping(bytes32 id => Circle circle) public circles;
-  mapping(bytes32 id => mapping(address => uint256)) public balances;
   mapping(address token => bool status) public allowedTokens;
+  mapping(bytes32 id => mapping(address token => uint256 balance)) public balances;
   mapping(bytes32 id => mapping(address member => bool status)) public isMember;
 
   /// @custom:oz-upgrades-unsafe-allow constructor
@@ -36,19 +38,19 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   function addCircle(Circle memory _circle) external override {
     bytes32 _id = keccak256(abi.encodePacked(_circle.name));
 
-    if (circles[_id].members.length != 0) revert AlreadyExists();
-    if (!allowedTokens[_circle.token]) revert InvalidToken();
-    if (_circle.depositInterval == 0) revert InvalidInterval();
-    if (_circle.depositAmount == 0) revert InvalidDeposit();
-    if (_circle.members.length < 2) revert InvalidMembers();
-    if (_circle.maxDeposits == 0) revert InvalidDeposit();
-    if (_circle.circleStart == 0) revert InvalidStart();
-    if (_circle.currentIndex != 0) revert InvalidIndex();
+    if (circles[_id].owner != address(0)) revert AlreadyExists();
+    if (
+      !allowedTokens[_circle.token] || _circle.depositInterval == 0 || _circle.depositAmount == 0
+        || _circle.maxDeposits == 0 || _circle.circleStart == 0 || _circle.currentIndex != 0
+        || _circle.owner == address(0) || _circle.members.length < MINIMUM_MEMBERS
+    ) revert InvalidCircle();
 
-    circles[_id] = _circle;
     for (uint256 i = 0; i < _circle.members.length; i++) {
-      isMember[_id][_circle.members[i]] = true;
+      address _member = _circle.members[i];
+      if (_member == address(0)) revert InvalidCircle();
+      isMember[_id][_member] = true;
     }
+    circles[_id] = _circle;
 
     emit CircleCreated(
       _id, _circle.name, _circle.members, _circle.token, _circle.depositAmount, _circle.depositInterval
@@ -81,7 +83,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   function withdraw(bytes32 _id) external override nonReentrant {
     Circle storage _circle = circles[_id];
 
-    if (!_circleWithdrawable(_id)) revert NotWithdrawable();
+    if (!_withdrawable(_id)) revert NotWithdrawable();
     if (_circle.members[_circle.currentIndex] != msg.sender) revert NotWithdrawable();
 
     uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
@@ -142,15 +144,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /**
-   * @notice Return the members of a specified circle
-   * @param _id Identifier of the circle
-   * @return _members Members of the circle
-   */
-  function circleMembers(bytes32 _id) external view override returns (address[] memory _members) {
-    return circles[_id].members;
-  }
-
-  /**
    * @notice Return the info of a specified saving circle
    * @param _id Identifier of the circle
    * @return _circle Saving circle
@@ -190,7 +183,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    * @param _id TODO
    * @param _member TODO
    */
-  function withdrawable(bytes32 _id, address _member) external view override returns (bool) {
+  function withdrawableBy(bytes32 _id, address _member) external view override returns (bool) {
     Circle memory _circle = circles[_id];
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
@@ -203,8 +196,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    * @notice TODO
    * @param _id TODO
    */
-  function circleWithdrawable(bytes32 _id) external view override returns (bool) {
-    return _circleWithdrawable(_id);
+  function withdrawable(bytes32 _id) external view override returns (bool) {
+    return _withdrawable(_id);
   }
 
   function _deposit(bytes32 _id, address _member, uint256 _value) internal {
@@ -212,23 +205,12 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
     if (!isMember[_id][_member]) revert NotMember();
-    if (block.timestamp < circles[_id].circleStart) revert InvalidDeposit();
-
-    // Check if deposit is within current interval window
-    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * (circles[_id].currentIndex + 1)))
-    {
-      revert InvalidDeposit();
-    }
-
-    // Check if circle has not exceeded max number of deposits
-    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].maxDeposits)) {
-      revert InvalidDeposit();
-    }
-
-    // Check if deposit amount does not exceed allowed deposit amount for member
-    if (balances[_id][_member] + _value > circles[_id].depositAmount) {
-      revert InvalidDeposit();
-    }
+    if (
+      block.timestamp < circles[_id].circleStart
+        || block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * (circles[_id].currentIndex + 1))
+        || block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].maxDeposits)
+        || balances[_id][_member] + _value > circles[_id].depositAmount
+    ) revert InvalidDeposit();
 
     balances[_id][_member] = balances[_id][_member] + _value;
 
@@ -238,7 +220,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     emit DepositMade(_id, _member, _value);
   }
 
-  function _circleWithdrawable(bytes32 _id) internal view returns (bool) {
+  function _withdrawable(bytes32 _id) internal view returns (bool) {
     Circle memory _circle = circles[_id];
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();

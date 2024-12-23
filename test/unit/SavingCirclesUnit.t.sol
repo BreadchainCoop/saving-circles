@@ -293,8 +293,9 @@ contract SavingCirclesUnit is Test {
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.CircleDecommissioned(baseCircleId);
     savingCircles.decommissionCircle(baseCircleId);
-    address[] memory emptyMembers = savingCircles.circleMembers(baseCircleId);
-    assertEq(emptyMembers.length, 0);
+
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
+    savingCircles.circle(baseCircleId);
   }
 
   function test_AddCircleWhenCircleNameAlreadyExists() external {
@@ -311,7 +312,7 @@ contract SavingCirclesUnit is Test {
     _invalidCircle.token = _notAllowedToken;
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidToken.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidCircle.selector));
     savingCircles.addCircle(_invalidCircle);
   }
 
@@ -321,7 +322,7 @@ contract SavingCirclesUnit is Test {
     _invalidCircle.depositInterval = 0;
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidInterval.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidCircle.selector));
     savingCircles.addCircle(_invalidCircle);
   }
 
@@ -331,7 +332,7 @@ contract SavingCirclesUnit is Test {
     _invalidCircle.depositAmount = 0;
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidDeposit.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidCircle.selector));
     savingCircles.addCircle(_invalidCircle);
   }
 
@@ -344,7 +345,7 @@ contract SavingCirclesUnit is Test {
     _invalidCircle.members = _oneMember;
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidMembers.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidCircle.selector));
     savingCircles.addCircle(_invalidCircle);
   }
 }
