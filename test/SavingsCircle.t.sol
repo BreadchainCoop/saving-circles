@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
+import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
 import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
 import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Test} from 'forge-std/Test.sol';
@@ -8,6 +9,8 @@ import {Test} from 'forge-std/Test.sol';
 import {SavingsCircle} from '../src/contracts/SavingsCircle.sol';
 import {ISavingsCircle} from '../src/interfaces/ISavingsCircle.sol';
 import {MockERC20} from './mocks/MockERC20.sol';
+
+/* solhint-disable func-name-mixedcase */
 
 contract SavingsCircleTest is Test {
   SavingsCircle public circle;
@@ -19,11 +22,12 @@ contract SavingsCircleTest is Test {
   address public owner = makeAddr('owner');
   address[] public members;
 
+  string public constant BASE_CIRCLE_NAME = 'Test Circle';
   uint256 public constant DEPOSIT_AMOUNT = 1000e18;
   uint256 public constant DEPOSIT_INTERVAL = 7 days;
   uint256 public constant BASE_CURRENT_INDEX = 0;
   uint256 public constant BASE_MAX_DEPOSITS = 1000;
-  bytes32 public constant BASE_CIRCLE_ID = keccak256(abi.encodePacked('Test Circle'));
+  bytes32 public constant BASE_CIRCLE_ID = keccak256(abi.encodePacked(BASE_CIRCLE_NAME));
 
   ISavingsCircle.Circle public baseCircle;
 
@@ -40,7 +44,6 @@ contract SavingsCircleTest is Test {
     );
 
     token = new MockERC20('Test Token', 'TEST');
-    circle.setTokenAllowed(address(token), true);
     vm.stopPrank();
 
     // Setup test accounts
@@ -64,7 +67,7 @@ contract SavingsCircleTest is Test {
 
     baseCircle = ISavingsCircle.Circle({
       owner: alice,
-      name: 'Test Circle',
+      name: BASE_CIRCLE_NAME,
       members: members,
       currentIndex: BASE_CURRENT_INDEX,
       circleStart: block.timestamp,
@@ -73,6 +76,14 @@ contract SavingsCircleTest is Test {
       depositInterval: DEPOSIT_INTERVAL,
       maxDeposits: BASE_MAX_DEPOSITS
     });
+  }
+
+  function createBaseCircle() public {
+    vm.prank(owner);
+    circle.setTokenAllowed(address(token), true);
+
+    vm.prank(alice);
+    circle.addCircle(baseCircle);
   }
 
   function test_SetTokenAllowed() public {
@@ -106,20 +117,23 @@ contract SavingsCircleTest is Test {
     circle.setTokenAllowed(address(token), false);
   }
 
-  function testFail_NonOwnerAllowlist() public {
-    vm.prank(alice);
+  function test_RevertWhen_NonOwnerAllowlistsToken() public {
+    vm.prank(bob);
+    vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, bob));
     circle.setTokenAllowed(address(token), true);
   }
 
-  function testFail_CreateCircleWithUnAllowlistedToken() public {
+  function test_RevertWhen_CreatingCircleWithUnallowlistedToken() public {
     address badToken = makeAddr('badToken');
     baseCircle.token = badToken;
     vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.InvalidToken.selector));
     circle.addCircle(baseCircle);
   }
 
-  function test_deposit() public {
-    // deposit
+  function test_Deposit() public {
+    createBaseCircle();
+
     vm.prank(alice);
     circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
 
@@ -128,6 +142,8 @@ contract SavingsCircleTest is Test {
   }
 
   function test_DepositFor() public {
+    createBaseCircle();
+
     // Bob deposits for Alice
     vm.prank(bob);
     circle.depositFor(BASE_CIRCLE_ID, alice, DEPOSIT_AMOUNT);
@@ -137,6 +153,8 @@ contract SavingsCircleTest is Test {
   }
 
   function test_WithdrawWithInterval() public {
+    createBaseCircle();
+
     vm.prank(alice);
     circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
 
@@ -175,6 +193,8 @@ contract SavingsCircleTest is Test {
   }
 
   function test_DecommissionCircle() public {
+    createBaseCircle();
+
     // Members deposit
     vm.prank(alice);
     circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
@@ -199,22 +219,25 @@ contract SavingsCircleTest is Test {
     circle.circle(BASE_CIRCLE_ID);
   }
 
-  function testFail_NonOwnerDecommission() public {
-    // Try to decommission as non-owner
+  function test_RevertWhen_NonOwnerDecommissions() public {
+    createBaseCircle();
+
     vm.prank(bob);
+    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.NotOwner.selector));
     circle.decommissionCircle(BASE_CIRCLE_ID);
   }
 
-  function testFail_WithdrawNotEnoughContributions() public {
-    // Only two members deposit
+  function test_RevertWhen_NotEnoughContributions() public {
+    createBaseCircle();
+
     vm.prank(alice);
     circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
 
     vm.prank(bob);
     circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
 
-    // Try to withdraw
     vm.prank(alice);
+    vm.expectRevert(ISavingsCircle.NotWithdrawable.selector);
     circle.withdraw(BASE_CIRCLE_ID);
   }
 

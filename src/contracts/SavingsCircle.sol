@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.28;
 
 import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
@@ -16,16 +16,36 @@ import {ISavingsCircle} from '../interfaces/ISavingsCircle.sol';
  */
 contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
   mapping(bytes32 id => Circle circle) public circles;
-  mapping(bytes32 id => mapping(address => uint256)) public circleBalances;
+  mapping(bytes32 id => mapping(address => uint256)) public balances;
   mapping(address token => bool status) public allowedTokens;
   mapping(bytes32 id => mapping(address member => bool status)) public isMember;
 
   modifier validDeposit(bytes32 _id, uint256 _value, address _member) {
-    if (
-      block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].currentIndex)
-        || block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].maxDeposits)
-        || circleBalances[_id][_member] + _value >= circles[_id].depositAmount
-    ) revert InvalidDeposit();
+    Circle memory _circle = circles[_id];
+
+    if (_circle.members.length == 0) revert CircleNotFound();
+
+    // Check if circle has started
+    if (block.timestamp < circles[_id].circleStart) {
+      revert InvalidDeposit();
+    }
+
+    // Check if deposit is within current interval window
+    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * (circles[_id].currentIndex + 1)))
+    {
+      revert InvalidDeposit();
+    }
+
+    // Check if circle has not exceeded max number of deposits
+    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].maxDeposits)) {
+      revert InvalidDeposit();
+    }
+
+    // Check if deposit amount does not exceed allowed deposit amount for member
+    if (balances[_id][_member] + _value > circles[_id].depositAmount) {
+      revert InvalidDeposit();
+    }
+
     _;
   }
 
@@ -97,13 +117,12 @@ contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
     Circle storage _circle = circles[_id];
 
     if (!_circleWithdrawable(_id)) revert NotWithdrawable();
-    if (_circle.members.length == 0) revert CircleNotFound();
     if (_circle.members[_circle.currentIndex] != msg.sender) revert NotWithdrawable();
 
     uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
 
     for (uint256 i = 0; i < _circle.members.length; i++) {
-      circleBalances[_id][_circle.members[i]] = 0;
+      balances[_id][_circle.members[i]] = 0;
     }
 
     _circle.currentIndex = (_circle.currentIndex + 1) % _circle.members.length;
@@ -129,16 +148,17 @@ contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
    * @dev Returns all deposits to members
    * @param _id Identifier of the circle
    */
-  function decommissionCircle(bytes32 _id) external override onlyOwner {
+  function decommissionCircle(bytes32 _id) external override {
     Circle storage _circle = circles[_id];
+
     if (_circle.members.length == 0) revert CircleNotFound();
     if (_circle.owner != msg.sender) revert NotOwner();
 
     for (uint256 i = 0; i < _circle.members.length; i++) {
       address _member = _circle.members[i];
-      uint256 _balance = circleBalances[_id][_member];
+      uint256 _balance = balances[_id][_member];
       if (_balance > 0) {
-        circleBalances[_id][_member] = 0;
+        balances[_id][_member] = 0;
         IERC20(_circle.token).transfer(_member, _balance);
       }
     }
@@ -194,7 +214,7 @@ contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
 
     _balances = new uint256[](_circle.members.length);
     for (uint256 i = 0; i < _circle.members.length; i++) {
-      _balances[i] = circleBalances[_id][_circle.members[i]];
+      _balances[i] = balances[_id][_circle.members[i]];
     }
 
     return (_circle.members, _balances);
@@ -230,7 +250,7 @@ contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
 
     IERC20(_circle.token).transferFrom(msg.sender, address(this), _value);
 
-    circleBalances[_id][_member] = circleBalances[_id][_member] + _value;
+    balances[_id][_member] = balances[_id][_member] + _value;
     emit DepositMade(_id, _member, _value);
   }
 
@@ -246,7 +266,7 @@ contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
 
     // Check if all members have made their initial deposit
     for (uint256 i = 0; i < _circle.members.length; i++) {
-      if (circleBalances[_id][_circle.members[i]] < _circle.depositAmount) {
+      if (balances[_id][_circle.members[i]] < _circle.depositAmount) {
         return false;
       }
     }
