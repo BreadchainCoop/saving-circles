@@ -5,16 +5,16 @@ import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgrad
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
 import {ReentrancyGuard} from '@openzeppelin/utils/ReentrancyGuard.sol';
 
-import {ISavingsCircle} from '../interfaces/ISavingsCircle.sol';
+import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
 
 /**
- * @title Savings Circle
+ * @title Saving Circles
  * @notice TODO
  * @author Breadchain Collective
  * @author @RonTuretzky
  * @author @bagelface
  */
-contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
+contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   mapping(bytes32 id => Circle circle) public circles;
   mapping(bytes32 id => mapping(address => uint256)) public balances;
   mapping(address token => bool status) public allowedTokens;
@@ -59,8 +59,8 @@ contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /**
-   * @notice Commission a new savings circle
-   * @param _circle A new savings circle
+   * @notice Commission a new saving circle
+   * @param _circle A new saving circle
    */
   function addCircle(Circle memory _circle) external override {
     bytes32 _id = keccak256(abi.encodePacked(_circle.name));
@@ -133,9 +133,9 @@ contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /**
-   * @notice Set if a token can be used for savings circles
+   * @notice Set if a token can be used for saving circles
    * @param _token Token to update the status of
-   * @param _allowed Can be used for savings circles
+   * @param _allowed Can be used for saving circles
    */
   function setTokenAllowed(address _token, bool _allowed) external override onlyOwner {
     allowedTokens[_token] = _allowed;
@@ -144,7 +144,7 @@ contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /**
-   * @notice Decommission an existing savings circle
+   * @notice Decommission an existing saving circle
    * @dev Returns all deposits to members
    * @param _id Identifier of the circle
    */
@@ -187,9 +187,9 @@ contract SavingsCircle is ISavingsCircle, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /**
-   * @notice Return the info of a specified savings circle
+   * @notice Return the info of a specified saving circle
    * @param _id Identifier of the circle
-   * @return _circle Savings circle
+   * @return _circle Saving circle
    */
   function circle(bytes32 _id) external view override returns (Circle memory _circle) {
     _circle = circles[_id];

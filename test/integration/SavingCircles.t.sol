@@ -6,14 +6,14 @@ import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
 import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Test} from 'forge-std/Test.sol';
 
-import {SavingsCircle} from '../src/contracts/SavingsCircle.sol';
-import {ISavingsCircle} from '../src/interfaces/ISavingsCircle.sol';
-import {MockERC20} from './mocks/MockERC20.sol';
+import {SavingCircles} from '../../src/contracts/SavingCircles.sol';
+import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
+import {MockERC20} from '../mocks/MockERC20.sol';
 
 /* solhint-disable func-name-mixedcase */
 
-contract SavingsCircleTest is Test {
-  SavingsCircle public circle;
+contract SavingCirclesIntegration is Test {
+  SavingCircles public circle;
   MockERC20 public token;
 
   address public alice = makeAddr('alice');
@@ -29,16 +29,16 @@ contract SavingsCircleTest is Test {
   uint256 public constant BASE_MAX_DEPOSITS = 1000;
   bytes32 public constant BASE_CIRCLE_ID = keccak256(abi.encodePacked(BASE_CIRCLE_NAME));
 
-  ISavingsCircle.Circle public baseCircle;
+  ISavingCircles.Circle public baseCircle;
 
   function setUp() public {
     vm.startPrank(owner);
-    circle = SavingsCircle(
+    circle = SavingCircles(
       address(
         new TransparentUpgradeableProxy(
-          address(new SavingsCircle()),
+          address(new SavingCircles()),
           address(new ProxyAdmin(owner)),
-          abi.encodeWithSelector(SavingsCircle.initialize.selector, owner)
+          abi.encodeWithSelector(SavingCircles.initialize.selector, owner)
         )
       )
     );
@@ -65,7 +65,7 @@ contract SavingsCircleTest is Test {
     members.push(carol);
     vm.stopPrank();
 
-    baseCircle = ISavingsCircle.Circle({
+    baseCircle = ISavingCircles.Circle({
       owner: alice,
       name: BASE_CIRCLE_NAME,
       members: members,
@@ -113,7 +113,7 @@ contract SavingsCircleTest is Test {
     // Test emitted events
     vm.prank(owner);
     vm.expectEmit(true, true, false, true);
-    emit ISavingsCircle.TokenAllowed(address(token), false);
+    emit ISavingCircles.TokenAllowed(address(token), false);
     circle.setTokenAllowed(address(token), false);
   }
 
@@ -127,7 +127,7 @@ contract SavingsCircleTest is Test {
     address badToken = makeAddr('badToken');
     baseCircle.token = badToken;
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.InvalidToken.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidToken.selector));
     circle.addCircle(baseCircle);
   }
 
@@ -175,7 +175,7 @@ contract SavingsCircleTest is Test {
 
     // Try to withdraw before interval
     vm.prank(bob);
-    vm.expectRevert(ISavingsCircle.NotWithdrawable.selector);
+    vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
     circle.withdraw(BASE_CIRCLE_ID);
 
     // Wait for interval (need to wait for index 1's interval)
@@ -215,7 +215,7 @@ contract SavingsCircleTest is Test {
     assertEq(token.balanceOf(bob) - bobBalanceBefore, DEPOSIT_AMOUNT);
 
     // Check circle deleted
-    vm.expectRevert(ISavingsCircle.CircleNotFound.selector);
+    vm.expectRevert(ISavingCircles.CircleNotFound.selector);
     circle.circle(BASE_CIRCLE_ID);
   }
 
@@ -223,7 +223,7 @@ contract SavingsCircleTest is Test {
     createBaseCircle();
 
     vm.prank(bob);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.NotOwner.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotOwner.selector));
     circle.decommissionCircle(BASE_CIRCLE_ID);
   }
 
@@ -237,7 +237,7 @@ contract SavingsCircleTest is Test {
     circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
 
     vm.prank(alice);
-    vm.expectRevert(ISavingsCircle.NotWithdrawable.selector);
+    vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
     circle.withdraw(BASE_CIRCLE_ID);
   }
 
@@ -246,7 +246,7 @@ contract SavingsCircleTest is Test {
   //     // Branch 1: Circle doesn't exist
   //     bytes32 nonExistentCircle = keccak256(abi.encodePacked("Non Existent"));
   //     vm.prank(alice);
-  //     vm.expectRevert(ISavingsCircle.CircleNotFound.selector);
+  //     vm.expectRevert(ISavingCircles.CircleNotFound.selector);
   //     circle.withdraw(nonExistentCircle);
 
   //     // Setup circle for remaining tests
@@ -261,7 +261,7 @@ contract SavingsCircleTest is Test {
 
   //     // Branch 2: Not enough time passed
   //     vm.prank(alice);
-  //     vm.expectRevert(ISavingsCircle.NotWithdrawable.selector);
+  //     vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
   //     circle.withdraw(hashedName);
 
   //     // Branch 3: Not all members contributed
@@ -271,14 +271,14 @@ contract SavingsCircleTest is Test {
   //     circle.deposit(hashedName, DEPOSIT_AMOUNT);
   //     // Carol hasn't contributed
   //     vm.prank(alice);
-  //     vm.expectRevert(ISavingsCircle.NotWithdrawable.selector);
+  //     vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
   //     circle.withdraw(hashedName);
 
   //     // Branch 4: Wrong member trying to withdraw
   //     vm.prank(carol);
   //     circle.deposit(hashedName, DEPOSIT_AMOUNT);
   //     vm.prank(bob);
-  //     vm.expectRevert(ISavingsCircle.NotWithdrawable.selector);
+  //     vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
   //     circle.withdraw(hashedName);
 
   //     // Branch 5: Successful withdrawal
@@ -287,7 +287,7 @@ contract SavingsCircleTest is Test {
 
   //     // Branch 6: Second withdrawal before interval
   //     vm.prank(bob);
-  //     vm.expectRevert(ISavingsCircle.NotWithdrawable.selector);
+  //     vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
   //     circle.withdraw(hashedName);
 
   //     // Branch 7: Second withdrawal after interval
@@ -303,7 +303,7 @@ contract SavingsCircleTest is Test {
   //     // Branch 9: Circle wraps around
   //     vm.warp(block.timestamp + DEPOSIT_INTERVAL);
   //     vm.prank(alice);
-  //     vm.expectRevert(ISavingsCircle.NotWithdrawable.selector); // Should fail as no new deposits made
+  //     vm.expectRevert(ISavingCircles.NotWithdrawable.selector); // Should fail as no new deposits made
   //     circle.withdraw(hashedName);
   // }
 }

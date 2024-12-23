@@ -8,16 +8,16 @@ import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
 import {Test} from 'forge-std/Test.sol';
 
 import {MockERC20} from '../mocks/MockERC20.sol';
-import {ISavingsCircle, SavingsCircle} from 'contracts/SavingsCircle.sol';
+import {ISavingCircles, SavingCircles} from 'contracts/SavingCircles.sol';
 
 /* solhint-disable func-name-mixedcase */
 
-contract SavingsCircleTest is Test {
+contract SavingCirclesUnit is Test {
   uint256 public constant DEPOSIT_AMOUNT = 1 ether;
   uint256 public constant DEPOSIT_INTERVAL = 1 days;
   uint256 public constant CIRCLE_DURATION = 30 days;
 
-  SavingsCircle public savingsCircle;
+  SavingCircles public savingCircles;
   MockERC20 public token;
 
   // Test addresses
@@ -30,7 +30,7 @@ contract SavingsCircleTest is Test {
   // Test data
   bytes32 public baseCircleId;
   address[] public members;
-  ISavingsCircle.Circle public baseCircle;
+  ISavingCircles.Circle public baseCircle;
 
   function setUp() external {
     // Setup test addresses
@@ -41,18 +41,18 @@ contract SavingsCircleTest is Test {
 
     // Deploy and initialize the contract
     vm.startPrank(owner);
-    savingsCircle = SavingsCircle(
+    savingCircles = SavingCircles(
       address(
         new TransparentUpgradeableProxy(
-          address(new SavingsCircle()),
+          address(new SavingCircles()),
           address(new ProxyAdmin(owner)),
-          abi.encodeWithSelector(SavingsCircle.initialize.selector, owner)
+          abi.encodeWithSelector(SavingCircles.initialize.selector, owner)
         )
       )
     );
 
     token = new MockERC20('Test Token', 'TEST');
-    savingsCircle.setTokenAllowed(address(token), true);
+    savingCircles.setTokenAllowed(address(token), true);
     vm.stopPrank();
 
     // Setup test data
@@ -63,7 +63,7 @@ contract SavingsCircleTest is Test {
     baseCircleId = keccak256(abi.encodePacked('Test Circle'));
 
     // Setup savingcircles parameters
-    baseCircle = ISavingsCircle.Circle({
+    baseCircle = ISavingCircles.Circle({
       owner: owner,
       name: 'Test Circle',
       members: members,
@@ -77,13 +77,13 @@ contract SavingsCircleTest is Test {
 
     // Create an initial test circle
     vm.prank(alice);
-    savingsCircle.addCircle(baseCircle);
+    savingCircles.addCircle(baseCircle);
   }
 
   function test_SetTokenAllowedWhenCallerIsNotOwner() external {
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
-    savingsCircle.setTokenAllowed(address(0x1), true);
+    savingCircles.setTokenAllowed(address(0x1), true);
   }
 
   function test_SetTokenAllowedWhenCallerIsOwner() external {
@@ -91,33 +91,33 @@ contract SavingsCircleTest is Test {
 
     vm.prank(owner);
     vm.expectEmit(true, true, true, true);
-    emit ISavingsCircle.TokenAllowed(newToken, true);
-    savingsCircle.setTokenAllowed(newToken, true);
+    emit ISavingCircles.TokenAllowed(newToken, true);
+    savingCircles.setTokenAllowed(newToken, true);
 
-    assertTrue(savingsCircle.isTokenAllowed(newToken));
+    assertTrue(savingCircles.isTokenAllowed(newToken));
   }
 
   function test_SetTokenNotAllowedWhenCallerIsNotOwner() external {
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
-    savingsCircle.setTokenAllowed(address(token), false);
+    savingCircles.setTokenAllowed(address(token), false);
   }
 
   function test_SetTokenNotAllowedWhenCallerIsOwner() external {
     vm.prank(owner);
     vm.expectEmit(true, true, true, true);
-    emit ISavingsCircle.TokenAllowed(address(token), false);
-    savingsCircle.setTokenAllowed(address(token), false);
+    emit ISavingCircles.TokenAllowed(address(token), false);
+    savingCircles.setTokenAllowed(address(token), false);
 
-    assertFalse(savingsCircle.isTokenAllowed(address(token)));
+    assertFalse(savingCircles.isTokenAllowed(address(token)));
   }
 
   function test_DepositWhenCircleDoesNotExist() external {
     bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.CircleNotFound.selector));
-    savingsCircle.deposit(nonExistentCircleId, DEPOSIT_AMOUNT);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleNotFound.selector));
+    savingCircles.deposit(nonExistentCircleId, DEPOSIT_AMOUNT);
   }
 
   function test_DepositWhenMemberHasAlreadyDeposited() external {
@@ -126,14 +126,14 @@ contract SavingsCircleTest is Test {
 
     // Mock token approval
     vm.startPrank(alice);
-    token.approve(address(savingsCircle), DEPOSIT_AMOUNT * 2);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT * 2);
 
     // First deposit
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     // Second deposit attempt should fail since member has already deposited max amount
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.InvalidDeposit.selector));
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidDeposit.selector));
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
   }
 
@@ -145,12 +145,12 @@ contract SavingsCircleTest is Test {
 
     // Expect deposit event
     vm.expectEmit(true, true, true, true);
-    emit ISavingsCircle.DepositMade(baseCircleId, alice, DEPOSIT_AMOUNT);
+    emit ISavingCircles.DepositMade(baseCircleId, alice, DEPOSIT_AMOUNT);
 
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     // Verify deposit was recorded
-    uint256 balance = savingsCircle.balances(baseCircleId, alice);
+    uint256 balance = savingCircles.balances(baseCircleId, alice);
     assertEq(balance, DEPOSIT_AMOUNT);
 
     vm.stopPrank();
@@ -161,30 +161,30 @@ contract SavingsCircleTest is Test {
     vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.InvalidDeposit.selector));
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidDeposit.selector));
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
   }
 
   function test_WithdrawWhenCircleDoesNotExist() external {
     bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.CircleNotFound.selector));
-    savingsCircle.withdraw(nonExistentCircleId);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleNotFound.selector));
+    savingCircles.withdraw(nonExistentCircleId);
   }
 
   function test_WithdrawWhenUserIsNotACircleMember() external {
     address nonMember = makeAddr('nonMember');
 
     vm.prank(nonMember);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.NotWithdrawable.selector));
-    savingsCircle.withdraw(baseCircleId);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector));
+    savingCircles.withdraw(baseCircleId);
   }
 
   function test_WithdrawWhenPayoutRoundHasNotEnded() external {
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.NotWithdrawable.selector));
-    savingsCircle.withdraw(baseCircleId);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector));
+    savingCircles.withdraw(baseCircleId);
   }
 
   function test_WithdrawWhenUserHasAlreadyClaimed() external {
@@ -192,15 +192,15 @@ contract SavingsCircleTest is Test {
     vm.mockCall(address(token), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
 
     vm.startPrank(alice);
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     vm.startPrank(bob);
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     vm.startPrank(carol);
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     // Move time past round
@@ -211,32 +211,32 @@ contract SavingsCircleTest is Test {
 
     // First withdrawal
     vm.prank(alice);
-    savingsCircle.withdraw(baseCircleId);
+    savingCircles.withdraw(baseCircleId);
 
     // Second withdrawal attempt should fail since currentIndex has moved to next member
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.NotWithdrawable.selector));
-    savingsCircle.withdraw(baseCircleId);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector));
+    savingCircles.withdraw(baseCircleId);
   }
 
   function test_WithdrawWhenParametersAreValid() external {
     // Complete deposits from all members
     vm.startPrank(alice);
     token.mint(alice, DEPOSIT_AMOUNT);
-    token.approve(address(savingsCircle), DEPOSIT_AMOUNT);
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     vm.startPrank(bob);
     token.mint(bob, DEPOSIT_AMOUNT);
-    token.approve(address(savingsCircle), DEPOSIT_AMOUNT);
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     vm.startPrank(carol);
     token.mint(carol, DEPOSIT_AMOUNT);
-    token.approve(address(savingsCircle), DEPOSIT_AMOUNT);
-    savingsCircle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     // Move time past first round
@@ -248,32 +248,32 @@ contract SavingsCircleTest is Test {
     // First member (alice) should be able to withdraw
     vm.prank(alice);
     vm.expectEmit(true, true, true, true);
-    emit ISavingsCircle.WithdrawalMade(baseCircleId, alice, withdrawAmount);
-    savingsCircle.withdraw(baseCircleId);
+    emit ISavingCircles.WithdrawalMade(baseCircleId, alice, withdrawAmount);
+    savingCircles.withdraw(baseCircleId);
 
     // Verify alice received the tokens
     assertEq(token.balanceOf(alice), withdrawAmount);
 
     // Verify all member balances were reset
-    (, uint256[] memory balances) = savingsCircle.balancesForCircle(baseCircleId);
+    (, uint256[] memory balances) = savingCircles.balancesForCircle(baseCircleId);
     for (uint256 i = 0; i < balances.length; i++) {
       assertEq(balances[i], 0);
     }
 
     // Verify current index moved to next member
-    ISavingsCircle.Circle memory circle = savingsCircle.circle(baseCircleId);
+    ISavingCircles.Circle memory circle = savingCircles.circle(baseCircleId);
     assertEq(circle.currentIndex, 1);
   }
 
   function test_CircleInfoWhenCircleDoesNotExist() external {
     bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
 
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.CircleNotFound.selector));
-    savingsCircle.circle(nonExistentCircleId);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleNotFound.selector));
+    savingCircles.circle(nonExistentCircleId);
   }
 
   function test_CircleInfoWhenCircleExists() external {
-    ISavingsCircle.Circle memory _circle = savingsCircle.circle(baseCircleId);
+    ISavingCircles.Circle memory _circle = savingCircles.circle(baseCircleId);
 
     assertEq(_circle.name, 'Test Circle');
     assertEq(_circle.members.length, members.length);
@@ -284,75 +284,75 @@ contract SavingsCircleTest is Test {
 
   function test_DecommissionWhenCallerIsNotOwner() external {
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.NotOwner.selector));
-    savingsCircle.decommissionCircle(baseCircleId);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotOwner.selector));
+    savingCircles.decommissionCircle(baseCircleId);
   }
 
   function test_DecommissionWhenCircleDoesNotExist() external {
     bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
 
     vm.prank(owner);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.CircleNotFound.selector));
-    savingsCircle.decommissionCircle(nonExistentCircleId);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleNotFound.selector));
+    savingCircles.decommissionCircle(nonExistentCircleId);
   }
 
   function test_DecommissionWhenParametersAreValid() external {
     vm.prank(owner);
     vm.expectEmit(true, true, true, true);
-    emit ISavingsCircle.CircleDecommissioned(baseCircleId);
-    savingsCircle.decommissionCircle(baseCircleId);
-    address[] memory emptyMembers = savingsCircle.circleMembers(baseCircleId);
+    emit ISavingCircles.CircleDecommissioned(baseCircleId);
+    savingCircles.decommissionCircle(baseCircleId);
+    address[] memory emptyMembers = savingCircles.circleMembers(baseCircleId);
     assertEq(emptyMembers.length, 0);
   }
 
   function test_AddCircleWhenCircleNameAlreadyExists() external {
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.CircleExists.selector));
-    savingsCircle.addCircle(baseCircle);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleExists.selector));
+    savingCircles.addCircle(baseCircle);
   }
 
   function test_AddCircleWhenTokenIsNotWhitelisted() external {
     address _notAllowedToken = makeAddr('notAllowedToken');
 
-    ISavingsCircle.Circle memory _invalidCircle = baseCircle;
+    ISavingCircles.Circle memory _invalidCircle = baseCircle;
     _invalidCircle.name = 'Invalid Circle';
     _invalidCircle.token = _notAllowedToken;
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.InvalidToken.selector));
-    savingsCircle.addCircle(_invalidCircle);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidToken.selector));
+    savingCircles.addCircle(_invalidCircle);
   }
 
   function test_AddCircleWhenIntervalIsZero() external {
-    ISavingsCircle.Circle memory _invalidCircle = baseCircle;
+    ISavingCircles.Circle memory _invalidCircle = baseCircle;
     _invalidCircle.name = 'Invalid Circle';
     _invalidCircle.depositInterval = 0;
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.InvalidInterval.selector));
-    savingsCircle.addCircle(_invalidCircle);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidInterval.selector));
+    savingCircles.addCircle(_invalidCircle);
   }
 
   function test_AddCircleWhenDepositAmountIsZero() external {
-    ISavingsCircle.Circle memory _invalidCircle = baseCircle;
+    ISavingCircles.Circle memory _invalidCircle = baseCircle;
     _invalidCircle.name = 'Invalid Circle';
     _invalidCircle.depositAmount = 0;
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.InvalidDeposit.selector));
-    savingsCircle.addCircle(_invalidCircle);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidDeposit.selector));
+    savingCircles.addCircle(_invalidCircle);
   }
 
   function test_AddCircleWhenMembersCountIsLessThanTwo() external {
     address[] memory _oneMember = new address[](1);
     _oneMember[0] = alice;
 
-    ISavingsCircle.Circle memory _invalidCircle = baseCircle;
+    ISavingCircles.Circle memory _invalidCircle = baseCircle;
     _invalidCircle.name = 'Invalid Circle';
     _invalidCircle.members = _oneMember;
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingsCircle.InvalidMembers.selector));
-    savingsCircle.addCircle(_invalidCircle);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidMembers.selector));
+    savingCircles.addCircle(_invalidCircle);
   }
 }

@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {SavingsCircle} from '../src/contracts/SavingsCircle.sol';
+import {SavingCircles} from '../src/contracts/SavingCircles.sol';
 
 import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
 import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Script} from 'forge-std/Script.sol';
 
-contract DeploySavingsCircle is Script {
+contract DeploySavingCircles is Script {
   function run() external returns (address proxy, address admin) {
     vm.startBroadcast();
 
     // Deploy implementation
-    SavingsCircle implementation = new SavingsCircle();
+    SavingCircles implementation = new SavingCircles();
 
     // Deploy ProxyAdmin
     ProxyAdmin proxyAdmin = new ProxyAdmin(msg.sender);
 
     // Encode initialization call
-    bytes memory initData = abi.encodeWithSelector(SavingsCircle.initialize.selector);
+    bytes memory initData = abi.encodeWithSelector(SavingCircles.initialize.selector);
 
     // Deploy proxy
     TransparentUpgradeableProxy transparentProxy =
