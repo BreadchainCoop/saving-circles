@@ -6,84 +6,14 @@ import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
 import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Test} from 'forge-std/Test.sol';
 
-import {SavingCircles} from '../../src/contracts/SavingCircles.sol';
 import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
-import {MockERC20} from '../mocks/MockERC20.sol';
+import {IntegrationBase} from 'test/integration/IntegrationBase.sol';
 
 /* solhint-disable func-name-mixedcase */
 
-contract SavingCirclesIntegration is Test {
-  SavingCircles public circle;
-  MockERC20 public token;
-
-  address public alice = makeAddr('alice');
-  address public bob = makeAddr('bob');
-  address public carol = makeAddr('carol');
-  address public owner = makeAddr('owner');
-  address[] public members;
-
-  string public constant BASE_CIRCLE_NAME = 'Test Circle';
-  uint256 public constant DEPOSIT_AMOUNT = 1000e18;
-  uint256 public constant DEPOSIT_INTERVAL = 7 days;
-  uint256 public constant BASE_CURRENT_INDEX = 0;
-  uint256 public constant BASE_MAX_DEPOSITS = 1000;
-  bytes32 public constant BASE_CIRCLE_ID = keccak256(abi.encodePacked(BASE_CIRCLE_NAME));
-
-  ISavingCircles.Circle public baseCircle;
-
-  function setUp() public {
-    vm.startPrank(owner);
-    circle = SavingCircles(
-      address(
-        new TransparentUpgradeableProxy(
-          address(new SavingCircles()),
-          address(new ProxyAdmin(owner)),
-          abi.encodeWithSelector(SavingCircles.initialize.selector, owner)
-        )
-      )
-    );
-
-    token = new MockERC20('Test Token', 'TEST');
-    vm.stopPrank();
-
-    // Setup test accounts
-    vm.startPrank(alice);
-    token.mint(alice, DEPOSIT_AMOUNT * 10);
-    token.approve(address(circle), type(uint256).max);
-    members.push(alice);
-    vm.stopPrank();
-
-    vm.startPrank(bob);
-    token.mint(bob, DEPOSIT_AMOUNT * 10);
-    token.approve(address(circle), type(uint256).max);
-    members.push(bob);
-    vm.stopPrank();
-
-    vm.startPrank(carol);
-    token.mint(carol, DEPOSIT_AMOUNT * 10);
-    token.approve(address(circle), type(uint256).max);
-    members.push(carol);
-    vm.stopPrank();
-
-    baseCircle = ISavingCircles.Circle({
-      owner: alice,
-      name: BASE_CIRCLE_NAME,
-      members: members,
-      currentIndex: BASE_CURRENT_INDEX,
-      circleStart: block.timestamp,
-      token: address(token),
-      depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL,
-      maxDeposits: BASE_MAX_DEPOSITS
-    });
-  }
-
-  function createBaseCircle() public {
-    vm.prank(owner);
-    circle.setTokenAllowed(address(token), true);
-
-    vm.prank(alice);
-    circle.create(baseCircle);
+contract SavingCirclesIntegration is IntegrationBase {
+  function setUp() public override {
+    super.setUp();
   }
 
   function test_SetTokenAllowed() public {
