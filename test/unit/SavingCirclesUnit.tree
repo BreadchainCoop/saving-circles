@@ -12,7 +12,7 @@ SavingCirclesUnit::DenylistToken
     ├── it denylists the token
     └── it emits token deniedlisted event
 
-SavingCirclesUnit::addCircle
+SavingCirclesUnit::create
 ├── when circle name already exists
 │   └── it reverts
 ├── when token is not whitelisted

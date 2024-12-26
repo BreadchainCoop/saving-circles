@@ -18,8 +18,8 @@ interface ISavingCircles {
     bytes32 indexed id, string name, address[] members, address token, uint256 depositAmount, uint256 depositInterval
   );
   event CircleDecommissioned(bytes32 indexed id);
-  event DepositMade(bytes32 indexed id, address indexed contributor, uint256 amount);
-  event WithdrawalMade(bytes32 indexed id, address indexed withdrawer, uint256 amount);
+  event FundsDeposited(bytes32 indexed id, address indexed member, uint256 amount);
+  event FundsWithdrawn(bytes32 indexed id, address indexed member, uint256 amount);
   event TokenAllowed(address indexed token, bool indexed allowed);
 
   error AlreadyDeposited();
@@ -28,23 +28,23 @@ interface ISavingCircles {
   error InvalidCircle();
   error NotCommissioned();
   error NotMember();
-  error NotOwner();
+  error NotDecommissionable();
   error NotWithdrawable();
   error TransferFailed();
 
   // External functions (state-changing)
   function initialize(address owner) external;
   function setTokenAllowed(address token, bool allowed) external;
-  function addCircle(Circle memory circle) external;
+  function create(Circle memory circle) external;
   function deposit(bytes32 id, uint256 value) external;
-  function depositFor(bytes32 id, address member, uint256 value) external;
+  function depositFor(bytes32 id, uint256 value, address member) external;
   function withdraw(bytes32 id) external;
-  function decommissionCircle(bytes32 id) external;
+  function decommission(bytes32 id) external;
 
   // External view functions
   function circle(bytes32 id) external view returns (Circle memory);
   function isTokenAllowed(address token) external view returns (bool);
-  function balancesForCircle(bytes32 id) external view returns (address[] memory, uint256[] memory);
+  function memberBalances(bytes32 id) external view returns (address[] memory, uint256[] memory);
   function withdrawable(bytes32 id) external view returns (bool);
-  function withdrawableBy(bytes32 id, address member) external view returns (bool);
+  function withdrawableBy(bytes32 id) external view returns (address);
 }

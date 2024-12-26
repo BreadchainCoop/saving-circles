@@ -9,7 +9,7 @@ import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
 
 /**
  * @title Saving Circles
- * @notice TODO
+ * @notice Simple implementation of a rotating savings and credit association (ROSCA) for ERC20 tokens
  * @author Breadchain Collective
  * @author @RonTuretzky
  * @author @bagelface
@@ -32,10 +32,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /**
-   * @notice Commission a new saving circle
+   * @notice Create a new saving circle
    * @param _circle A new saving circle
    */
-  function addCircle(Circle memory _circle) external override {
+  function create(Circle memory _circle) external override {
     bytes32 _id = keccak256(abi.encodePacked(_circle.name));
 
     if (circles[_id].owner != address(0)) revert AlreadyExists();
@@ -63,17 +63,17 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    * @param _value Amount of the token to deposit
    */
   function deposit(bytes32 _id, uint256 _value) external override nonReentrant {
-    _deposit(_id, msg.sender, _value);
+    _deposit(_id, _value, msg.sender);
   }
 
   /**
    * @notice Make a deposit on behalf of another member
    * @param _id Identifier of the circle
-   * @param _member Address to make a deposit for
    * @param _value Amount of the token to deposit
+   * @param _member Address to make a deposit for
    */
-  function depositFor(bytes32 _id, address _member, uint256 _value) external override nonReentrant {
-    _deposit(_id, _member, _value);
+  function depositFor(bytes32 _id, uint256 _value, address _member) external override nonReentrant {
+    _deposit(_id, _value, _member);
   }
 
   /**
@@ -85,6 +85,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
     if (!_withdrawable(_id)) revert NotWithdrawable();
     if (_circle.members[_circle.currentIndex] != msg.sender) revert NotWithdrawable();
+    if (_circle.currentIndex >= _circle.maxDeposits) revert NotWithdrawable();
 
     uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
 
@@ -96,7 +97,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     bool success = IERC20(_circle.token).transfer(msg.sender, _withdrawAmount);
     if (!success) revert TransferFailed();
 
-    emit WithdrawalMade(_id, msg.sender, _withdrawAmount);
+    emit FundsWithdrawn(_id, msg.sender, _withdrawAmount);
   }
 
   /**
@@ -115,17 +116,33 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    * @dev Returns all deposits to members
    * @param _id Identifier of the circle
    */
-  function decommissionCircle(bytes32 _id) external override {
+  function decommission(bytes32 _id) external override {
     Circle storage _circle = circles[_id];
 
-    if (_circle.owner != msg.sender) revert NotOwner();
+    if (_circle.owner != msg.sender) {
+      if (!isMember[_id][msg.sender]) revert NotMember();
+      if (block.timestamp <= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
+        revert NotDecommissionable();
+      }
 
+      bool hasIncompleteDeposits = false;
+      for (uint256 i = 0; i < _circle.members.length; i++) {
+        if (balances[_id][_circle.members[i]] < _circle.depositAmount) {
+          hasIncompleteDeposits = true;
+          break;
+        }
+      }
+      if (!hasIncompleteDeposits) revert NotDecommissionable();
+    }
+
+    // Return deposits to members
     for (uint256 i = 0; i < _circle.members.length; i++) {
       address _member = _circle.members[i];
       uint256 _balance = balances[_id][_member];
       if (_balance > 0) {
         balances[_id][_member] = 0;
-        IERC20(_circle.token).transfer(_member, _balance);
+        bool success = IERC20(_circle.token).transfer(_member, _balance);
+        if (!success) revert TransferFailed();
       }
     }
 
@@ -157,10 +174,12 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /**
-   * @notice TODO
-   * @param _id TODO
+   * @notice Return the balances of the members of a specified saving circle
+   * @param _id Identifier of the circle
+   * @return _members Members of the specified saving circle
+   * @return _balances Corresponding balances of the members of the circle
    */
-  function balancesForCircle(bytes32 _id)
+  function memberBalances(bytes32 _id)
     external
     view
     override
@@ -179,28 +198,33 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /**
-   * @notice TODO
-   * @param _id TODO
-   * @param _member TODO
+   * @notice Return the member address which is currently able to withdraw from a specified circle
+   * @param _id Identifier of the circle
+   * @return address Member that is currently able to withdraw from the circle
    */
-  function withdrawableBy(bytes32 _id, address _member) external view override returns (bool) {
+  function withdrawableBy(bytes32 _id) external view override returns (address) {
     Circle memory _circle = circles[_id];
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
-    if (!isMember[_id][_member]) revert NotMember();
 
-    return _circle.members[_circle.currentIndex] == _member;
+    return _circle.members[_circle.currentIndex];
   }
 
   /**
-   * @notice TODO
-   * @param _id TODO
+   * @notice Return if a circle can currently be withdrawn from
+   * @param _id Identifier of the circle
+   * @return bool If the circle is able to be withdrawn from
    */
   function withdrawable(bytes32 _id) external view override returns (bool) {
     return _withdrawable(_id);
   }
 
-  function _deposit(bytes32 _id, address _member, uint256 _value) internal {
+  /**
+   * @dev Make a deposit into a specified circle
+   *      A deposit must be made in specific time window and can be made partially so long as the final balance equals
+   *      the specified deposit amount for the circle.
+   */
+  function _deposit(bytes32 _id, uint256 _value, address _member) internal {
     Circle memory _circle = circles[_id];
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
@@ -217,20 +241,23 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     bool success = IERC20(_circle.token).transferFrom(msg.sender, address(this), _value);
     if (!success) revert TransferFailed();
 
-    emit DepositMade(_id, _member, _value);
+    emit FundsDeposited(_id, _member, _value);
   }
 
+  /**
+   * @dev Return if a specified circle is withdrawable
+   *      To be considered withdrawable, enough time must have passed since the deposit interval started
+   *      and all members must have made a deposit.
+   */
   function _withdrawable(bytes32 _id) internal view returns (bool) {
     Circle memory _circle = circles[_id];
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
 
-    // Check if enough time has passed since circle start for current withdrawal
     if (block.timestamp < _circle.circleStart + (_circle.depositInterval * _circle.currentIndex)) {
       return false;
     }
 
-    // Check if all members have made their initial deposit
     for (uint256 i = 0; i < _circle.members.length; i++) {
       if (balances[_id][_circle.members[i]] < _circle.depositAmount) {
         return false;
@@ -240,6 +267,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     return true;
   }
 
+  /**
+   * @dev Return if a specified circle is decommissioned by checking if an owner is set
+   */
   function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
     return _circle.owner == address(0);
   }

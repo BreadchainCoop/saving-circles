@@ -83,7 +83,7 @@ contract SavingCirclesIntegration is Test {
     circle.setTokenAllowed(address(token), true);
 
     vm.prank(alice);
-    circle.addCircle(baseCircle);
+    circle.create(baseCircle);
   }
 
   function test_SetTokenAllowed() public {
@@ -128,7 +128,7 @@ contract SavingCirclesIntegration is Test {
     baseCircle.token = badToken;
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidCircle.selector));
-    circle.addCircle(baseCircle);
+    circle.create(baseCircle);
   }
 
   function test_Deposit() public {
@@ -137,7 +137,7 @@ contract SavingCirclesIntegration is Test {
     vm.prank(alice);
     circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
 
-    (, uint256[] memory balances) = circle.balancesForCircle(BASE_CIRCLE_ID);
+    (, uint256[] memory balances) = circle.memberBalances(BASE_CIRCLE_ID);
     assertEq(balances[0], DEPOSIT_AMOUNT);
   }
 
@@ -146,9 +146,9 @@ contract SavingCirclesIntegration is Test {
 
     // Bob deposits for Alice
     vm.prank(bob);
-    circle.depositFor(BASE_CIRCLE_ID, alice, DEPOSIT_AMOUNT);
+    circle.depositFor(BASE_CIRCLE_ID, DEPOSIT_AMOUNT, alice);
 
-    (, uint256[] memory balances) = circle.balancesForCircle(BASE_CIRCLE_ID);
+    (, uint256[] memory balances) = circle.memberBalances(BASE_CIRCLE_ID);
     assertEq(balances[0], DEPOSIT_AMOUNT);
   }
 
@@ -208,7 +208,7 @@ contract SavingCirclesIntegration is Test {
 
     // Decommission circle
     vm.prank(alice);
-    circle.decommissionCircle(BASE_CIRCLE_ID);
+    circle.decommission(BASE_CIRCLE_ID);
 
     // Check balances returned
     assertEq(token.balanceOf(alice) - aliceBalanceBefore, DEPOSIT_AMOUNT);
@@ -219,12 +219,39 @@ contract SavingCirclesIntegration is Test {
     circle.circle(BASE_CIRCLE_ID);
   }
 
-  function test_RevertWhen_NonOwnerDecommissions() public {
+  function test_MemberDecommissionWhenIncompleteDeposits() public {
     createBaseCircle();
 
-    vm.prank(bob);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotOwner.selector));
-    circle.decommissionCircle(BASE_CIRCLE_ID);
+    // Only Alice deposits
+    vm.prank(alice);
+    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+
+    // Get initial balance
+    uint256 aliceBalanceBefore = token.balanceOf(alice);
+
+    // Wait until after deposit interval
+    vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
+
+    // Alice should be able to decommission since not all members deposited
+    vm.prank(alice);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.CircleDecommissioned(BASE_CIRCLE_ID);
+    circle.decommission(BASE_CIRCLE_ID);
+
+    // Check Alice got her deposit back
+    assertEq(token.balanceOf(alice) - aliceBalanceBefore, DEPOSIT_AMOUNT);
+
+    // Check circle was deleted
+    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
+    circle.circle(BASE_CIRCLE_ID);
+  }
+
+  function test_RevertWhen_NonMemberDecommissions() public {
+    createBaseCircle();
+
+    vm.prank(makeAddr('stranger'));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
+    circle.decommission(BASE_CIRCLE_ID);
   }
 
   function test_RevertWhen_NotEnoughContributions() public {
@@ -256,7 +283,7 @@ contract SavingCirclesIntegration is Test {
   //     members[2] = carol;
 
   //     vm.prank(alice);
-  //     circle.addCircle("Test Circle", members, address(token), DEPOSIT_AMOUNT, DEPOSIT_INTERVAL);
+  //     circle.create("Test Circle", members, address(token), DEPOSIT_AMOUNT, DEPOSIT_INTERVAL);
   //     bytes32 hashedName = keccak256(abi.encodePacked("Test Circle"));
 
   //     // Branch 2: Not enough time passed
