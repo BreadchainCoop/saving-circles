@@ -65,9 +65,9 @@ contract SavingCirclesIntegration is IntegrationBase {
     createBaseCircle();
 
     vm.prank(alice);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
-    (, uint256[] memory balances) = circle.memberBalances(BASE_CIRCLE_ID);
+    (, uint256[] memory balances) = circle.memberBalances(baseCircleId);
     assertEq(balances[0], DEPOSIT_AMOUNT);
   }
 
@@ -76,9 +76,9 @@ contract SavingCirclesIntegration is IntegrationBase {
 
     // Bob deposits for Alice
     vm.prank(bob);
-    circle.depositFor(BASE_CIRCLE_ID, DEPOSIT_AMOUNT, alice);
+    circle.depositFor(baseCircleId, DEPOSIT_AMOUNT, alice);
 
-    (, uint256[] memory balances) = circle.memberBalances(BASE_CIRCLE_ID);
+    (, uint256[] memory balances) = circle.memberBalances(baseCircleId);
     assertEq(balances[0], DEPOSIT_AMOUNT);
   }
 
@@ -86,18 +86,18 @@ contract SavingCirclesIntegration is IntegrationBase {
     createBaseCircle();
 
     vm.prank(alice);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     vm.prank(bob);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     vm.prank(carol);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     // First member withdraws
     uint256 balanceBefore = token.balanceOf(alice);
     vm.prank(alice);
-    circle.withdraw(BASE_CIRCLE_ID);
+    circle.withdraw(baseCircleId);
     uint256 balanceAfter = token.balanceOf(alice);
 
     // Alice should receive DEPOSIT_AMOUNT * 3 (from Bob and Carol)
@@ -106,20 +106,20 @@ contract SavingCirclesIntegration is IntegrationBase {
     // Try to withdraw before interval
     vm.prank(bob);
     vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
-    circle.withdraw(BASE_CIRCLE_ID);
+    circle.withdraw(baseCircleId);
 
     // Wait for interval (need to wait for index 1's interval)
     vm.warp(block.timestamp + DEPOSIT_INTERVAL);
     vm.prank(alice);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.prank(bob);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.prank(carol);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     // Bob should be able to withdraw
     vm.prank(bob);
-    circle.withdraw(BASE_CIRCLE_ID);
+    circle.withdraw(baseCircleId);
   }
 
   function test_DecommissionCircle() public {
@@ -127,10 +127,10 @@ contract SavingCirclesIntegration is IntegrationBase {
 
     // Members deposit
     vm.prank(alice);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     vm.prank(bob);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     // Get initial balances
     uint256 aliceBalanceBefore = token.balanceOf(alice);
@@ -138,7 +138,7 @@ contract SavingCirclesIntegration is IntegrationBase {
 
     // Decommission circle
     vm.prank(alice);
-    circle.decommission(BASE_CIRCLE_ID);
+    circle.decommission(baseCircleId);
 
     // Check balances returned
     assertEq(token.balanceOf(alice) - aliceBalanceBefore, DEPOSIT_AMOUNT);
@@ -146,7 +146,7 @@ contract SavingCirclesIntegration is IntegrationBase {
 
     // Check circle deleted
     vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-    circle.circle(BASE_CIRCLE_ID);
+    circle.circle(baseCircleId);
   }
 
   function test_MemberDecommissionWhenIncompleteDeposits() public {
@@ -154,7 +154,7 @@ contract SavingCirclesIntegration is IntegrationBase {
 
     // Only Alice deposits
     vm.prank(alice);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     // Get initial balance
     uint256 aliceBalanceBefore = token.balanceOf(alice);
@@ -165,15 +165,15 @@ contract SavingCirclesIntegration is IntegrationBase {
     // Alice should be able to decommission since not all members deposited
     vm.prank(alice);
     vm.expectEmit(true, true, true, true);
-    emit ISavingCircles.CircleDecommissioned(BASE_CIRCLE_ID);
-    circle.decommission(BASE_CIRCLE_ID);
+    emit ISavingCircles.CircleDecommissioned(baseCircleId);
+    circle.decommission(baseCircleId);
 
     // Check Alice got her deposit back
     assertEq(token.balanceOf(alice) - aliceBalanceBefore, DEPOSIT_AMOUNT);
 
     // Check circle was deleted
     vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-    circle.circle(BASE_CIRCLE_ID);
+    circle.circle(baseCircleId);
   }
 
   function test_RevertWhen_NonMemberDecommissions() public {
@@ -181,21 +181,21 @@ contract SavingCirclesIntegration is IntegrationBase {
 
     vm.prank(makeAddr('stranger'));
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
-    circle.decommission(BASE_CIRCLE_ID);
+    circle.decommission(baseCircleId);
   }
 
   function test_RevertWhen_NotEnoughContributions() public {
     createBaseCircle();
 
     vm.prank(alice);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     vm.prank(bob);
-    circle.deposit(BASE_CIRCLE_ID, DEPOSIT_AMOUNT);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
     vm.prank(alice);
     vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
-    circle.withdraw(BASE_CIRCLE_ID);
+    circle.withdraw(baseCircleId);
   }
 
   // // Withdraw function branching tests

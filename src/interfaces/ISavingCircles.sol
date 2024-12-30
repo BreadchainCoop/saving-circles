@@ -2,9 +2,12 @@
 pragma solidity ^0.8.28;
 
 interface ISavingCircles {
+  /*///////////////////////////////////////////////////////////////
+                            STRUCTS
+  //////////////////////////////////////////////////////////////*/
+
   struct Circle {
     address owner;
-    string name;
     address[] members;
     uint256 currentIndex;
     uint256 depositAmount;
@@ -14,13 +17,21 @@ interface ISavingCircles {
     uint256 maxDeposits;
   }
 
+  /*///////////////////////////////////////////////////////////////
+                            EVENTS
+  //////////////////////////////////////////////////////////////*/
+
   event CircleCreated(
-    bytes32 indexed id, string name, address[] members, address token, uint256 depositAmount, uint256 depositInterval
+    uint256 indexed id, address[] members, address token, uint256 depositAmount, uint256 depositInterval
   );
-  event CircleDecommissioned(bytes32 indexed id);
-  event FundsDeposited(bytes32 indexed id, address indexed member, uint256 amount);
-  event FundsWithdrawn(bytes32 indexed id, address indexed member, uint256 amount);
+  event CircleDecommissioned(uint256 indexed id);
+  event FundsDeposited(uint256 indexed id, address indexed member, uint256 amount);
+  event FundsWithdrawn(uint256 indexed id, address indexed member, uint256 amount);
   event TokenAllowed(address indexed token, bool indexed allowed);
+
+  /*///////////////////////////////////////////////////////////////
+                            ERRORS
+  //////////////////////////////////////////////////////////////*/
 
   error AlreadyDeposited();
   error AlreadyExists();
@@ -32,19 +43,26 @@ interface ISavingCircles {
   error NotWithdrawable();
   error TransferFailed();
 
-  // External functions (state-changing)
+  /*///////////////////////////////////////////////////////////////
+                            VIEW
+  //////////////////////////////////////////////////////////////*/
+
   function initialize(address owner) external;
   function setTokenAllowed(address token, bool allowed) external;
-  function create(Circle memory circle) external;
-  function deposit(bytes32 id, uint256 value) external;
-  function depositFor(bytes32 id, uint256 value, address member) external;
-  function withdraw(bytes32 id) external;
-  function decommission(bytes32 id) external;
+  function create(Circle memory circle) external returns (uint256);
+  function deposit(uint256 id, uint256 value) external;
+  function depositFor(uint256 id, uint256 value, address member) external;
+  function withdraw(uint256 id) external;
+  function withdrawFor(uint256 id, address member) external;
+  function decommission(uint256 id) external;
 
-  // External view functions
-  function circle(bytes32 id) external view returns (Circle memory);
+  /*///////////////////////////////////////////////////////////////
+                            VIEW
+  //////////////////////////////////////////////////////////////*/
+
+  function circle(uint256 id) external view returns (Circle memory);
   function isTokenAllowed(address token) external view returns (bool);
-  function memberBalances(bytes32 id) external view returns (address[] memory, uint256[] memory);
-  function withdrawable(bytes32 id) external view returns (bool);
-  function withdrawableBy(bytes32 id) external view returns (address);
+  function memberBalances(uint256 id) external view returns (address[] memory, uint256[] memory);
+  function withdrawable(uint256 id) external view returns (bool);
+  function withdrawableBy(uint256 id) external view returns (address);
 }

@@ -28,7 +28,7 @@ contract SavingCirclesUnit is Test {
   address public immutable STRANGER = makeAddr('stranger');
 
   // Test data
-  bytes32 public baseCircleId;
+  uint256 public baseCircleId;
   address[] public members;
   ISavingCircles.Circle public baseCircle;
 
@@ -60,12 +60,10 @@ contract SavingCirclesUnit is Test {
     members[0] = alice;
     members[1] = bob;
     members[2] = carol;
-    baseCircleId = keccak256(abi.encodePacked('Test Circle'));
 
     // Setup savingcircles parameters
     baseCircle = ISavingCircles.Circle({
       owner: owner,
-      name: 'Test Circle',
       members: members,
       currentIndex: 0,
       circleStart: block.timestamp,
@@ -77,7 +75,7 @@ contract SavingCirclesUnit is Test {
 
     // Create an initial test circle
     vm.prank(alice);
-    savingCircles.create(baseCircle);
+    baseCircleId = savingCircles.create(baseCircle);
   }
 
   function test_SetTokenAllowedWhenCallerIsNotOwner() external {
@@ -113,7 +111,7 @@ contract SavingCirclesUnit is Test {
   }
 
   function test_DepositWhenCircleDoesNotExist() external {
-    bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
+    uint256 nonExistentCircleId = uint256(keccak256(abi.encodePacked('Non Existent Circle')));
 
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
@@ -166,7 +164,7 @@ contract SavingCirclesUnit is Test {
   }
 
   function test_WithdrawWhenCircleDoesNotExist() external {
-    bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
+    uint256 nonExistentCircleId = uint256(keccak256(abi.encodePacked('Non Existent Circle')));
 
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
@@ -266,7 +264,7 @@ contract SavingCirclesUnit is Test {
   }
 
   function test_CircleInfoWhenCircleDoesNotExist() external {
-    bytes32 nonExistentCircleId = keccak256(abi.encodePacked('Non Existent Circle'));
+    uint256 nonExistentCircleId = uint256(keccak256(abi.encodePacked('Non Existent Circle')));
 
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
     savingCircles.circle(nonExistentCircleId);
@@ -275,7 +273,6 @@ contract SavingCirclesUnit is Test {
   function test_CircleInfoWhenCircleAlreadyExists() external {
     ISavingCircles.Circle memory _circle = savingCircles.circle(baseCircleId);
 
-    assertEq(_circle.name, 'Test Circle');
     assertEq(_circle.members.length, members.length);
     assertEq(_circle.token, address(token));
     assertEq(_circle.depositAmount, DEPOSIT_AMOUNT);
@@ -323,17 +320,10 @@ contract SavingCirclesUnit is Test {
     assertEq(token.balanceOf(alice), DEPOSIT_AMOUNT);
   }
 
-  function test_CreateWhenCircleNameAlreadyExists() external {
-    vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyExists.selector));
-    savingCircles.create(baseCircle);
-  }
-
   function test_CreateWhenTokenIsNotWhitelisted() external {
     address _notAllowedToken = makeAddr('notAllowedToken');
 
     ISavingCircles.Circle memory _invalidCircle = baseCircle;
-    _invalidCircle.name = 'Invalid Circle';
     _invalidCircle.token = _notAllowedToken;
 
     vm.prank(alice);
@@ -343,7 +333,6 @@ contract SavingCirclesUnit is Test {
 
   function test_CreateWhenIntervalIsZero() external {
     ISavingCircles.Circle memory _invalidCircle = baseCircle;
-    _invalidCircle.name = 'Invalid Circle';
     _invalidCircle.depositInterval = 0;
 
     vm.prank(alice);
@@ -353,7 +342,6 @@ contract SavingCirclesUnit is Test {
 
   function test_CreateWhenDepositAmountIsZero() external {
     ISavingCircles.Circle memory _invalidCircle = baseCircle;
-    _invalidCircle.name = 'Invalid Circle';
     _invalidCircle.depositAmount = 0;
 
     vm.prank(alice);
@@ -366,7 +354,6 @@ contract SavingCirclesUnit is Test {
     _oneMember[0] = alice;
 
     ISavingCircles.Circle memory _invalidCircle = baseCircle;
-    _invalidCircle.name = 'Invalid Circle';
     _invalidCircle.members = _oneMember;
 
     vm.prank(alice);

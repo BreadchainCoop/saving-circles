@@ -22,13 +22,12 @@ contract IntegrationBase is Common, Test {
   address[] public members;
 
   ISavingCircles.Circle public baseCircle;
+  uint256 public baseCircleId;
 
-  string public constant BASE_CIRCLE_NAME = 'Test Circle';
   uint256 public constant DEPOSIT_AMOUNT = 1000e18;
   uint256 public constant DEPOSIT_INTERVAL = 7 days;
   uint256 public constant BASE_CURRENT_INDEX = 0;
   uint256 public constant BASE_MAX_DEPOSITS = 1000;
-  bytes32 public constant BASE_CIRCLE_ID = keccak256(abi.encodePacked(BASE_CIRCLE_NAME));
 
   function setUp() public virtual override {
     super.setUp();
@@ -42,7 +41,6 @@ contract IntegrationBase is Common, Test {
 
     baseCircle = ISavingCircles.Circle({
       owner: alice,
-      name: BASE_CIRCLE_NAME,
       members: members,
       currentIndex: BASE_CURRENT_INDEX,
       circleStart: block.timestamp,
@@ -58,7 +56,7 @@ contract IntegrationBase is Common, Test {
     circle.setTokenAllowed(address(token), true);
 
     vm.prank(alice);
-    circle.create(baseCircle);
+    baseCircleId = circle.create(baseCircle);
   }
 
   function _setUpAccounts() internal {

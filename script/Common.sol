@@ -10,7 +10,7 @@ import {SavingCircles} from '../src/contracts/SavingCircles.sol';
 /**
  * @title Common Contract
  * @author Breadchain
- * @notice This contract is used to deploy an upgradable Saving Circles contract
+ * @notice This contract is used to deploy an upgradeable Saving Circles contract
  * @dev This contract is intended for use in Scripts and Integration Tests
  */
 contract Common is Script {
