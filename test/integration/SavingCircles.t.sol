@@ -122,6 +122,54 @@ contract SavingCirclesIntegration is IntegrationBase {
     circle.withdraw(baseCircleId);
   }
 
+  function test_WithdrawForWithInterval() public {
+    createBaseCircle();
+
+    // Initial deposits from all members
+    vm.prank(alice);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+
+    vm.prank(bob);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+
+    vm.prank(carol);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+
+    // Bob tries to withdraw for Alice (who is first in line)
+    uint256 balanceBefore = token.balanceOf(alice);
+    vm.prank(bob);
+    circle.withdrawFor(baseCircleId, alice);
+    uint256 balanceAfter = token.balanceOf(alice);
+
+    // Alice should receive DEPOSIT_AMOUNT * 3 (from all members)
+    assertEq(balanceAfter - balanceBefore, DEPOSIT_AMOUNT * 3);
+
+    // Try to withdraw for Bob before interval
+    vm.prank(alice);
+    vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
+    circle.withdrawFor(baseCircleId, bob);
+
+    // Wait for interval (need to wait for index 1's interval)
+    vm.warp(block.timestamp + DEPOSIT_INTERVAL);
+
+    // New round of deposits
+    vm.prank(alice);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    vm.prank(bob);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    vm.prank(carol);
+    circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+
+    // Alice withdraws for Bob (who is now next in line)
+    balanceBefore = token.balanceOf(bob);
+    vm.prank(alice);
+    circle.withdrawFor(baseCircleId, bob);
+    balanceAfter = token.balanceOf(bob);
+
+    // Bob should receive DEPOSIT_AMOUNT * 3
+    assertEq(balanceAfter - balanceBefore, DEPOSIT_AMOUNT * 3);
+  }
+
   function test_DecommissionCircle() public {
     createBaseCircle();
 

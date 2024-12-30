@@ -82,26 +82,17 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    * @param _id Identifier of the circle
    */
   function withdraw(uint256 _id) external override nonReentrant {
-    Circle storage _circle = circles[_id];
-
-    if (!_withdrawable(_id)) revert NotWithdrawable();
-    if (_circle.members[_circle.currentIndex] != msg.sender) revert NotWithdrawable();
-    if (_circle.currentIndex >= _circle.maxDeposits) revert NotWithdrawable();
-
-    uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
-
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      balances[_id][_circle.members[i]] = 0;
-    }
-
-    _circle.currentIndex = (_circle.currentIndex + 1) % _circle.members.length;
-    bool success = IERC20(_circle.token).transfer(msg.sender, _withdrawAmount);
-    if (!success) revert TransferFailed();
-
-    emit FundsWithdrawn(_id, msg.sender, _withdrawAmount);
+    _withdraw(_id, msg.sender);
   }
 
-  function withdrawFor(uint256 _id, address _member) external override nonReentrant {}
+  /**
+   * @notice Make a withdrawal from a specified circle on behalf of another member
+   * @param _id Identifier of the circle
+   * @param _member Address of the member to make a withdrawal for
+   */
+  function withdrawFor(uint256 _id, address _member) external override nonReentrant {
+    _withdraw(_id, _member);
+  }
 
   /**
    * @notice Set if a token can be used for saving circles
@@ -223,9 +214,29 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /**
-   * @dev TODO
+   * @dev Make a withdrawal from a specified circle
+   *      A withdrawal must be made by a member of the circle, even if it is for another member.
    */
-  function _withdraw() internal {}
+  function _withdraw(uint256 _id, address _member) internal {
+    Circle storage _circle = circles[_id];
+
+    if (!isMember[_id][msg.sender]) revert NotMember();
+    if (!_withdrawable(_id)) revert NotWithdrawable();
+    if (_circle.members[_circle.currentIndex] != _member) revert NotWithdrawable();
+    if (_circle.currentIndex >= _circle.maxDeposits) revert NotWithdrawable();
+
+    uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
+
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      balances[_id][_circle.members[i]] = 0;
+    }
+
+    _circle.currentIndex = (_circle.currentIndex + 1) % _circle.members.length;
+    bool success = IERC20(_circle.token).transfer(_member, _withdrawAmount);
+    if (!success) revert TransferFailed();
+
+    emit FundsWithdrawn(_id, _member, _withdrawAmount);
+  }
 
   /**
    * @dev Make a deposit into a specified circle

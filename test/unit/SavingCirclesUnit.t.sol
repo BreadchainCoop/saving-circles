@@ -168,6 +168,10 @@ contract SavingCirclesUnit is Test {
 
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
+    savingCircles.withdrawable(nonExistentCircleId);
+
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
     savingCircles.withdraw(nonExistentCircleId);
   }
 
@@ -175,7 +179,7 @@ contract SavingCirclesUnit is Test {
     address nonMember = makeAddr('nonMember');
 
     vm.prank(nonMember);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
     savingCircles.withdraw(baseCircleId);
   }
 
@@ -248,6 +252,51 @@ contract SavingCirclesUnit is Test {
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsWithdrawn(baseCircleId, alice, withdrawAmount);
     savingCircles.withdraw(baseCircleId);
+
+    // Verify alice received the tokens
+    assertEq(token.balanceOf(alice), withdrawAmount);
+
+    // Verify all member balances were reset
+    (, uint256[] memory balances) = savingCircles.memberBalances(baseCircleId);
+    for (uint256 i = 0; i < balances.length; i++) {
+      assertEq(balances[i], 0);
+    }
+
+    // Verify current index moved to next member
+    ISavingCircles.Circle memory circle = savingCircles.circle(baseCircleId);
+    assertEq(circle.currentIndex, 1);
+  }
+
+  function test_WithdrawForWhenParametersAreValid() external {
+    // Complete deposits from all members
+    vm.startPrank(alice);
+    token.mint(alice, DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+    token.mint(bob, DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    vm.startPrank(carol);
+    token.mint(carol, DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    // Move time past first round
+    vm.warp(block.timestamp + DEPOSIT_INTERVAL);
+
+    uint256 withdrawAmount = DEPOSIT_AMOUNT * members.length;
+
+    // Bob should be able to withdraw for Alice (who is first in line)
+    vm.prank(bob);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.FundsWithdrawn(baseCircleId, alice, withdrawAmount);
+    savingCircles.withdrawFor(baseCircleId, alice);
 
     // Verify alice received the tokens
     assertEq(token.balanceOf(alice), withdrawAmount);
