@@ -1,40 +1,42 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.28;
 
-import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
-import {Greeter, IGreeter} from 'contracts/Greeter.sol';
+import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
+import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Script} from 'forge-std/Script.sol';
-// solhint-disable-next-line
-import 'script/Registry.sol';
+
+import {SavingCircles} from '../src/contracts/SavingCircles.sol';
 
 /**
  * @title Common Contract
  * @author Breadchain
- * @notice This contract is used to deploy the Greeter contract
+ * @notice This contract is used to deploy an upgradeable Saving Circles contract
  * @dev This contract is intended for use in Scripts and Integration Tests
  */
 contract Common is Script {
-  struct DeploymentParams {
-    string greeting;
-    IERC20 token;
+  function setUp() public virtual {}
+
+  function _deploySavingCircles() internal returns (SavingCircles) {
+    return new SavingCircles();
   }
 
-  IGreeter public greeter;
-
-  /// @notice Deployment parameters for each chain
-  mapping(uint256 _chainId => DeploymentParams _params) internal _deploymentParams;
-
-  function setUp() public virtual {
-    // Optimism
-    _deploymentParams[10] = DeploymentParams('Hello, Optimism!', IERC20(OPTIMISM_DAI));
-
-    // Gnosis
-    _deploymentParams[100] = DeploymentParams('Hello, Gnosis!', IERC20(GNOSIS_BREAD));
+  function _deployProxyAdmin(address _admin) internal returns (ProxyAdmin) {
+    return new ProxyAdmin(_admin);
   }
 
-  function _deployContracts() internal {
-    DeploymentParams memory _params = _deploymentParams[block.chainid];
+  function _deployTransparentProxy(
+    address _implementation,
+    address _proxyAdmin,
+    bytes memory _initData
+  ) internal returns (TransparentUpgradeableProxy) {
+    return new TransparentUpgradeableProxy(_implementation, _proxyAdmin, _initData);
+  }
 
-    greeter = new Greeter(_params.greeting, _params.token);
+  function _deployContracts(address _admin) internal returns (TransparentUpgradeableProxy) {
+    return _deployTransparentProxy(
+      address(_deploySavingCircles()),
+      address(_deployProxyAdmin(_admin)),
+      abi.encodeWithSelector(SavingCircles.initialize.selector, _admin)
+    );
   }
 }

@@ -1,18 +1,18 @@
-SavingsCircleTest::AllowlistToken
+SavingCirclesUnit::AllowlistToken
 ├── when caller is not owner
 │   └── it reverts
 └── when caller is owner
     ├── it allowslists the token
     └── it emits token allowedlisted event
 
-SavingsCircleTest::DenylistToken
+SavingCirclesUnit::DenylistToken
 ├── when caller is not owner
 │   └── it reverts
 └── when caller is owner
     ├── it denylists the token
     └── it emits token deniedlisted event
 
-SavingsCircleTest::addCircle
+SavingCirclesUnit::create
 ├── when circle name already exists
 │   └── it reverts
 ├── when token is not whitelisted
@@ -28,7 +28,7 @@ SavingsCircleTest::addCircle
     ├── it updates memberships
     └── it emits circle created event
 
-SavingsCircleTest::deposit
+SavingCirclesUnit::deposit
 ├── when circle does not exist
 │   └── it reverts
 ├── when user is not a circle member
@@ -45,7 +45,7 @@ SavingsCircleTest::deposit
 └── given member has already deposited
     └── it reverts
 
-SavingsCircleTest::withdraw
+SavingCirclesUnit::withdraw
 ├── when circle does not exist
 │   └── it reverts
 ├── when user is not a circle member
@@ -61,13 +61,13 @@ SavingsCircleTest::withdraw
     ├── it marks payout as claimed
     └── it emits payout claimed event
 
-SavingsCircleTest::circleInfo
+SavingCirclesUnit::circleInfo
 ├── when circle does not exist
 │   └── it reverts
 └── when circle exists
     └── it returns correct circle information
 
-SavingsCircleTest::decommission
+SavingCirclesUnit::decommission
 ├── when caller is not owner
 │   └── it reverts
 ├── when circle does not exist
