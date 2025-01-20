@@ -118,16 +118,22 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    */
   function decommission(uint256 _id) external override {
     Circle storage _circle = circles[_id];
+    address[] memory _members = _circle.members;
+    uint256 _currentTime = block.timestamp;
+    uint256 _depositDeadline = _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1));
+    address _sender = msg.sender;
+    if (_currentTime <= _depositDeadline) {
+      revert NotDecommissionable();
+    }
 
-    if (_circle.owner != msg.sender) {
-      if (!isMember[_id][msg.sender]) revert NotMember();
-      if (block.timestamp <= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
-        revert NotDecommissionable();
-      }
+    if (_circle.owner != _sender) {
+      if (!isMember[_id][_sender]) revert NotMember();
 
       bool hasIncompleteDeposits = false;
-      for (uint256 i = 0; i < _circle.members.length; i++) {
-        if (balances[_id][_circle.members[i]] < _circle.depositAmount) {
+      uint256 _requiredDeposit = _circle.depositAmount;
+
+      for (uint256 i = 0; i < _members.length; i++) {
+        if (balances[_id][_members[i]] < _requiredDeposit) {
           hasIncompleteDeposits = true;
           break;
         }
@@ -136,8 +142,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     }
 
     // Return deposits to members
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      address _member = _circle.members[i];
+    for (uint256 i = 0; i < _members.length; i++) {
+      address _member = _members[i];
       uint256 _balance = balances[_id][_member];
 
       if (_balance > 0) {
