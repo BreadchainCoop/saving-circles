@@ -144,10 +144,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function getCircle(uint256 _id) external view override returns (Circle memory _circle) {
+  function getCircle(uint256 _id) external view override onlyCommissioned(_id) returns (Circle memory _circle) {
     _circle = circles[_id];
-
-    if (_isDecommissioned(_circle)) revert NotCommissioned();
   }
 
   /// @inheritdoc ISavingCircles
@@ -205,10 +203,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function withdrawableBy(uint256 _id) external view override returns (address) {
+  function withdrawableBy(uint256 _id) external view override onlyCommissioned(_id) returns (address) {
     Circle memory _circle = circles[_id];
-
-    if (_isDecommissioned(_circle)) revert NotCommissioned();
 
     return _circle.members[_circle.currentIndex];
   }
@@ -217,10 +213,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    * @dev Make a withdrawal from a specified circle
    *      A withdrawal must be made by a member of the circle, even if it is for another member.
    */
-  function _withdraw(uint256 _id, address _member) internal {
+  function _withdraw(uint256 _id, address _member) internal onlyMember(_id) {
     Circle storage _circle = circles[_id];
 
-    if (!isMember[_id][msg.sender]) revert NotMember();
     if (!_withdrawable(_id)) revert NotWithdrawable();
     if (_circle.members[_circle.currentIndex] != _member) revert NotWithdrawable();
     if (_circle.currentIndex >= _circle.maxDeposits) revert NotWithdrawable();
@@ -243,11 +238,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    *      A deposit must be made in specific time window and can be made partially so long as the final balance equals
    *      the specified deposit amount for the circle.
    */
-  function _deposit(uint256 _id, uint256 _value, address _member) internal {
+  function _deposit(uint256 _id, uint256 _value, address _member) internal onlyCommissioned(_id) onlyMember(_id) {
     Circle memory _circle = circles[_id];
 
-    if (_isDecommissioned(_circle)) revert NotCommissioned();
-    if (!isMember[_id][_member]) revert NotMember();
     if (block.timestamp < circles[_id].circleStart) {
       revert DepositBeforeCircleStart();
     }
@@ -275,10 +268,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    *      To be considered withdrawable, enough time must have passed since the deposit interval started
    *      and all members must have made a deposit.
    */
-  function _withdrawable(uint256 _id) internal view returns (bool) {
+  function _withdrawable(uint256 _id) internal view onlyCommissioned(_id) returns (bool) {
     Circle memory _circle = circles[_id];
-
-    if (_isDecommissioned(_circle)) revert NotCommissioned();
 
     if (block.timestamp < _circle.circleStart + (_circle.depositInterval * _circle.currentIndex)) {
       return false;
