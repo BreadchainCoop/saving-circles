@@ -75,7 +75,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (_circle.owner == address(0)) revert InvalidOwner();
     if (_circle.members.length < MINIMUM_MEMBERS) revert InvalidMemberCount();
 
-    for (uint256 i = 0; i < _circle.members.length; i++) {
+    //Caching the circle members length to avoid multiple lookups
+    uint256 _circleMembersLength = _circle.members.length;
+
+    for (uint256 i = 0; i < _circleMembersLength; i++) {
       address _member = _circle.members[i];
       if (_member == address(0)) revert InvalidMemberAddress();
       isMember[_id][_member] = true;
@@ -111,15 +114,19 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
   /// @inheritdoc ISavingCircles
   function decommission(uint256 _id) external override nonReentrant {
-    Circle storage _circle = circles[_id];
+    Circle memory _circle = circles[_id];
 
     if (block.timestamp <= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
       revert NotDecommissionable();
     }
 
+    //Caching the circle members variables to avoid multiple lookups
+    uint256 _circleMembersLength = _circle.members.length;
+    uint256 _circleDepositAmount = _circle.depositAmount;
+
     bool hasIncompleteDeposits = false;
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      if (balances[_id][_circle.members[i]] < _circle.depositAmount) {
+    for (uint256 i = 0; i < _circleMembersLength; i++) {
+      if (balances[_id][_circle.members[i]] < _circleDepositAmount) {
         hasIncompleteDeposits = true;
         break;
       }
@@ -127,7 +134,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (!hasIncompleteDeposits) revert NotDecommissionable();
 
     // Return deposits to members
-    for (uint256 i = 0; i < _circle.members.length; i++) {
+    for (uint256 i = 0; i < _circleMembersLength; i++) {
       address _member = _circle.members[i];
 
       if (balances[_id][_member] > 0) {  
@@ -172,8 +179,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
 
-    _balances = new uint256[](_circle.members.length);
-    for (uint256 i = 0; i < _circle.members.length; i++) {
+    //Caching the circle members length to avoid multiple lookups
+    uint256 _circleMembersLength = _circle.members.length;
+
+    _balances = new uint256[](_circleMembersLength);
+    for (uint256 i = 0; i < _circleMembersLength; i++) {
       _balances[i] = balances[_id][_circle.members[i]];
     }
 
@@ -213,19 +223,22 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    *      A withdrawal must be made by a member of the circle, even if it is for another member.
    */
   function _withdraw(uint256 _id, address _member) internal onlyMember(_id) {
-    Circle storage _circle = circles[_id];
+    Circle memory _circle = circles[_id];
 
     if (!_withdrawable(_id)) revert NotWithdrawable();
     if (_circle.members[_circle.currentIndex] != _member) revert NotWithdrawable();
     if (_circle.currentIndex >= _circle.maxDeposits) revert NotWithdrawable();
 
-    uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
+    //Caching the circle members length to avoid multiple lookups
+    uint256 _circleMembersLength = _circle.members.length;
 
-    for (uint256 i = 0; i < _circle.members.length; i++) {
+    uint256 _withdrawAmount = _circle.depositAmount * (_circleMembersLength);
+
+    for (uint256 i = 0; i < _circleMembersLength; i++) {
       balances[_id][_circle.members[i]] = 0;
     }
 
-    _circle.currentIndex = (_circle.currentIndex + 1) % _circle.members.length;
+    circles[_id].currentIndex = (circles[_id].currentIndex + 1) % _circleMembersLength;
     bool success = IERC20(_circle.token).transfer(_member, _withdrawAmount);
     if (!success) revert TransferFailed();
 
@@ -274,8 +287,12 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
       return false;
     }
 
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      if (balances[_id][_circle.members[i]] < _circle.depositAmount) {
+    //Caching the circle variables length to avoid multiple lookups
+    uint256 _circleMembersLength = _circle.members.length;
+    uint256 _circleDepositAmount = _circle.depositAmount;
+    
+    for (uint256 i = 0; i < _circleMembersLength; i++) {
+      if (balances[_id][_circle.members[i]] < _circleDepositAmount) {
         return false;
       }
     }
