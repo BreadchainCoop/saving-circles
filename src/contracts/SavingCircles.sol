@@ -136,8 +136,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     // Return deposits to members
     for (uint256 i = 0; i < _circleMembersLength; i++) {
       address _member = _circle.members[i];
+      _balance = balances[_id][_member];
 
-      if (balances[_id][_member] > 0) {  
+      if (_balance > 0) {  
         balances[_id][_member] = 0;
         bool success = IERC20(_circle.token).transfer(_member, _balance);
         if (!success) revert TransferFailed();
