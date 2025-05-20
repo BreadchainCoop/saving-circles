@@ -13,6 +13,8 @@ import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
  * @author Breadchain Collective
  * @author @RonTuretzky
  * @author bagelface.eth
+ * @author exo404
+ * @author valeriooconte
  */
 contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   uint256 public constant MINIMUM_MEMBERS = 2;
@@ -24,21 +26,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   mapping(address member => uint256[] ids) public memberCircles;
   mapping(address token => bool status) public allowedTokens;
 
-  /**
-   * @dev Requires circle is commissioned by checking if an owner is set
-   * @author exo404
-   * @author valeriooconte
-   */
+  /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
     if (_isDecommissioned(circles[_id])) revert NotCommissioned();
     _;
   }
 
-  /**
-   * @dev Requires address is a member by checking the mapping
-   * @author exo404
-   * @author valeriooconte
-   */
+  /// @dev Requires address is a member by checking the mapping
   modifier onlyMember(uint256 _id) {
     if (!isMember[_id][msg.sender]) revert NotMember();
     _;
