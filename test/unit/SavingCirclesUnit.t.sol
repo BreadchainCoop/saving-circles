@@ -526,4 +526,43 @@ contract SavingCirclesUnit is Test {
     assertFalse(strangerStatuses[1]); // Not in secondCircle
     assertFalse(strangerStatuses[2]); // Not in non-existent circle
   }
+
+  /**
+   * @notice Ensures getTotalBalance sums a member's balances across multiple circles
+   */
+  function test_GetTotalBalanceAggregatesAcrossCircles() external {
+    // Create a second circle with the same parameters but a different owner
+    ISavingCircles.Circle memory secondCircle = baseCircle;
+    secondCircle.owner = bob;
+    vm.prank(bob);
+    uint256 secondCircleId = savingCircles.create(secondCircle);
+
+    // Prepare deposits: full amount in first circle, half in second
+    uint256 firstDeposit = DEPOSIT_AMOUNT;
+    uint256 secondDeposit = DEPOSIT_AMOUNT / 2;
+
+    // Mint and approve tokens for Alice
+    token.mint(alice, firstDeposit + secondDeposit);
+    vm.startPrank(alice);
+    token.approve(address(savingCircles), firstDeposit + secondDeposit);
+
+    // Perform deposits
+    savingCircles.deposit(baseCircleId, firstDeposit);
+    savingCircles.deposit(secondCircleId, secondDeposit);
+    vm.stopPrank();
+
+    // Expected total balance across both circles
+    uint256 expectedTotal = firstDeposit + secondDeposit;
+
+    uint256 totalBalance = savingCircles.getTotalBalance(alice);
+    assertEq(totalBalance, expectedTotal, 'Total balance mismatch');
+  }
+
+  /**
+   * @notice Ensures getTotalBalance returns zero when member has no balances
+   */
+  function test_GetTotalBalanceWhenNoDeposits() external {
+    uint256 totalBalance = savingCircles.getTotalBalance(STRANGER);
+    assertEq(totalBalance, 0, 'Total balance for non-member should be zero');
+  }
 }
