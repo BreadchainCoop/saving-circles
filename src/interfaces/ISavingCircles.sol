@@ -286,4 +286,11 @@ interface ISavingCircles {
    * @return withdrawableBy The address of the withdrawable by
    */
   function withdrawableBy(uint256 id) external view returns (address withdrawableBy);
+
+  /**
+   * @notice Get the total balance for a member across all circles they have joined
+   * @param member The address of the member
+   * @return totalBalance The sum of the member's balances across all circles
+   */
+  function getTotalBalance(address member) external view returns (uint256 totalBalance);
 }

@@ -203,6 +203,17 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     return _circle.members[_circle.currentIndex];
   }
 
+  /// @inheritdoc ISavingCircles
+  function getTotalBalance(address _member) external view override returns (uint256 _totalBalance) {
+    uint256[] storage _ids = memberCircles[_member];
+
+    for (uint256 i = 0; i < _ids.length; i++) {
+      _totalBalance += balances[_ids[i]][_member];
+    }
+
+    return _totalBalance;
+  }
+
   /**
    * @dev Make a withdrawal from a specified circle
    *      A withdrawal must be made by a member of the circle, even if it is for another member.
@@ -232,7 +243,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    *      A deposit must be made in specific time window and can be made partially so long as the final balance equals
    *      the specified deposit amount for the circle.
    */
-  function _deposit(uint256 _id, uint256 _value, address _member) internal onlyCommissioned(_id) onlyMember(_id, _member) {
+  function _deposit(
+    uint256 _id,
+    uint256 _value,
+    address _member
+  ) internal onlyCommissioned(_id) onlyMember(_id, _member) {
     Circle memory _circle = circles[_id];
 
     if (block.timestamp < circles[_id].circleStart) {
