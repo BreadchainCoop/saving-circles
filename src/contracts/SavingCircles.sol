@@ -158,7 +158,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
   /// @inheritdoc ISavingCircles
   function getMemberBalances(uint256 _id)
-    external
+    public
     view
     override
     returns (address[] memory _members, uint256[] memory _balances)
@@ -192,19 +192,19 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function isWithdrawable(uint256 _id) external view override returns (bool) {
+  function isWithdrawable(uint256 _id) public view override returns (bool) {
     return _withdrawable(_id);
   }
 
   /// @inheritdoc ISavingCircles
-  function withdrawableBy(uint256 _id) external view override onlyCommissioned(_id) returns (address) {
+  function withdrawableBy(uint256 _id) public view override onlyCommissioned(_id) returns (address) {
     Circle memory _circle = circles[_id];
 
     return _circle.members[_circle.currentIndex];
   }
 
   /// @inheritdoc ISavingCircles
-  function getTotalBalance(address _member) external view override returns (uint256 _totalBalance) {
+  function getTotalBalance(address _member) public view override returns (uint256 _totalBalance) {
     uint256[] storage _ids = memberCircles[_member];
 
     for (uint256 i = 0; i < _ids.length; i++) {
@@ -212,6 +212,291 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     }
 
     return _totalBalance;
+  }
+
+  struct UserCircleData {
+    uint256 circleId;
+    Circle circleInfo;
+    uint256 userBalance;
+    bool isMember;
+    bool isOwner;
+    bool isCurrentWithdrawer;
+    bool canWithdraw;
+    uint256 nextWithdrawTime;
+    uint256 depositWindowEnd;
+    bool isExpired;
+    bool isDecommissioned;
+    uint256 totalPoolBalance;
+    uint256 remainingDepositsNeeded;
+    uint256 completedRounds;
+    uint256 totalRounds;
+  }
+
+  struct UserFinancialSummary {
+    uint256 totalBalance;
+    uint256 totalDeposited;
+    uint256 totalWithdrawn;
+    uint256 activeCirclesCount;
+    uint256 ownedCirclesCount;
+    uint256 completedCirclesCount;
+    uint256 pendingWithdrawals;
+    uint256 upcomingDeposits;
+  }
+
+  struct UserMembershipStatus {
+    uint256[] allCircleIds;
+    uint256[] activeCircleIds;
+    uint256[] ownedCircleIds;
+    uint256[] withdrawableCircleIds;
+    uint256[] expiredCircleIds;
+    uint256[] decommissionedCircleIds;
+  }
+
+  struct ComprehensiveUserData {
+    address userAddress;
+    UserFinancialSummary financialSummary;
+    UserMembershipStatus membershipStatus;
+    UserCircleData[] circleData;
+    uint256 timestamp;
+    uint256 blockNumber;
+  }
+
+  function getComprehensiveUserData(address _user) external view returns (ComprehensiveUserData memory userData) {
+    userData.userAddress = _user;
+    userData.timestamp = block.timestamp;
+    userData.blockNumber = block.number;
+
+    uint256[] memory userCircleIds = _getAllUserCircleIds(_user);
+    userData.circleData = new UserCircleData[](userCircleIds.length);
+
+    userData.membershipStatus = _getUserMembershipStatus(_user, userCircleIds);
+    userData.financialSummary = _getUserFinancialSummary(_user, userCircleIds);
+
+    for (uint256 i = 0; i < userCircleIds.length; i++) {
+      userData.circleData[i] = _getUserCircleData(_user, userCircleIds[i]);
+    }
+
+    return userData;
+  }
+
+  function getUserFinancialSummary(address _user) external view returns (UserFinancialSummary memory summary) {
+    uint256[] memory userCircleIds = _getAllUserCircleIds(_user);
+    return _getUserFinancialSummary(_user, userCircleIds);
+  }
+
+  function getUserMembershipStatus(address _user) external view returns (UserMembershipStatus memory status) {
+    uint256[] memory userCircleIds = _getAllUserCircleIds(_user);
+    return _getUserMembershipStatus(_user, userCircleIds);
+  }
+
+  function getUserCircleData(address _user, uint256 _circleId) external view returns (UserCircleData memory circleData) {
+    return _getUserCircleData(_user, _circleId);
+  }
+
+  function getUserCirclesData(
+    address _user,
+    uint256[] calldata _circleIds
+  ) external view returns (UserCircleData[] memory circleDataArray) {
+    circleDataArray = new UserCircleData[](_circleIds.length);
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      circleDataArray[i] = _getUserCircleData(_user, _circleIds[i]);
+    }
+    return circleDataArray;
+  }
+
+  function _getAllUserCircleIds(address _user) internal view returns (uint256[] memory) {
+    uint256[] memory memberCircleIds = memberCircles[_user];
+
+    // Count owned circles that are not already in memberCircles
+    uint256 ownedCirclesCount = 0;
+    for (uint256 i = 0; i < nextId; i++) {
+      if (circles[i].owner == _user) {
+        bool isAlreadyMember = false;
+        for (uint256 j = 0; j < memberCircleIds.length; j++) {
+          if (memberCircleIds[j] == i) {
+            isAlreadyMember = true;
+            break;
+          }
+        }
+        if (!isAlreadyMember) {
+          ownedCirclesCount++;
+        }
+      }
+    }
+
+    // Create array with all circle IDs
+    uint256[] memory allCircleIds = new uint256[](memberCircleIds.length + ownedCirclesCount);
+
+    // Add member circles
+    for (uint256 i = 0; i < memberCircleIds.length; i++) {
+      allCircleIds[i] = memberCircleIds[i];
+    }
+
+    // Add owned circles that are not already included
+    uint256 currentIndex = memberCircleIds.length;
+    for (uint256 i = 0; i < nextId; i++) {
+      if (circles[i].owner == _user) {
+        bool isAlreadyMember = false;
+        for (uint256 j = 0; j < memberCircleIds.length; j++) {
+          if (memberCircleIds[j] == i) {
+            isAlreadyMember = true;
+            break;
+          }
+        }
+        if (!isAlreadyMember) {
+          allCircleIds[currentIndex] = i;
+          currentIndex++;
+        }
+      }
+    }
+
+    return allCircleIds;
+  }
+
+  function _getUserFinancialSummary(
+    address _user,
+    uint256[] memory _circleIds
+  ) internal view returns (UserFinancialSummary memory summary) {
+    summary.totalBalance = getTotalBalance(_user);
+
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      uint256 circleId = _circleIds[i];
+      UserCircleData memory circleData = _getUserCircleData(_user, circleId);
+
+      if (!circleData.isDecommissioned) {
+        summary.activeCirclesCount++;
+
+        if (circleData.isOwner) {
+          summary.ownedCirclesCount++;
+        }
+
+        if (circleData.canWithdraw) {
+          summary.pendingWithdrawals++;
+        }
+
+        if (circleData.userBalance < circleData.circleInfo.depositAmount && !circleData.isExpired) {
+          summary.upcomingDeposits++;
+        }
+
+        summary.totalDeposited += circleData.userBalance;
+      } else {
+        summary.completedCirclesCount++;
+      }
+    }
+  }
+
+  function _getUserMembershipStatus(
+    address _user,
+    uint256[] memory _circleIds
+  ) internal view returns (UserMembershipStatus memory status) {
+    status.allCircleIds = _circleIds;
+
+    uint256 activeCount = 0;
+    uint256 ownedCount = 0;
+    uint256 withdrawableCount = 0;
+    uint256 expiredCount = 0;
+    uint256 decommissionedCount = 0;
+
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      uint256 circleId = _circleIds[i];
+      UserCircleData memory circleData = _getUserCircleData(_user, circleId);
+
+      if (circleData.isDecommissioned) {
+        decommissionedCount++;
+      } else if (circleData.isExpired) {
+        expiredCount++;
+      } else {
+        activeCount++;
+        if (circleData.isOwner) {
+          ownedCount++;
+        }
+        if (circleData.canWithdraw) {
+          withdrawableCount++;
+        }
+      }
+    }
+
+    status.activeCircleIds = new uint256[](activeCount);
+    status.ownedCircleIds = new uint256[](ownedCount);
+    status.withdrawableCircleIds = new uint256[](withdrawableCount);
+    status.expiredCircleIds = new uint256[](expiredCount);
+    status.decommissionedCircleIds = new uint256[](decommissionedCount);
+
+    uint256 activeIndex = 0;
+    uint256 ownedIndex = 0;
+    uint256 withdrawableIndex = 0;
+    uint256 expiredIndex = 0;
+    uint256 decommissionedIndex = 0;
+
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      uint256 circleId = _circleIds[i];
+      UserCircleData memory circleData = _getUserCircleData(_user, circleId);
+
+      if (circleData.isDecommissioned) {
+        status.decommissionedCircleIds[decommissionedIndex++] = circleId;
+      } else if (circleData.isExpired) {
+        status.expiredCircleIds[expiredIndex++] = circleId;
+      } else {
+        status.activeCircleIds[activeIndex++] = circleId;
+        if (circleData.isOwner) {
+          status.ownedCircleIds[ownedIndex++] = circleId;
+        }
+        if (circleData.canWithdraw) {
+          status.withdrawableCircleIds[withdrawableIndex++] = circleId;
+        }
+      }
+    }
+  }
+
+  function _getUserCircleData(
+    address _user,
+    uint256 _circleId
+  ) internal view returns (UserCircleData memory circleData) {
+    circleData.circleId = _circleId;
+
+    Circle memory circle = circles[_circleId];
+    if (_isDecommissioned(circle)) {
+      circleData.isDecommissioned = true;
+      return circleData;
+    }
+
+    circleData.circleInfo = circle;
+    circleData.isDecommissioned = false;
+
+    (address[] memory members, uint256[] memory memberBalances) = getMemberBalances(_circleId);
+
+    for (uint256 i = 0; i < members.length; i++) {
+      if (members[i] == _user) {
+        circleData.userBalance = memberBalances[i];
+        circleData.isMember = true;
+      }
+      circleData.totalPoolBalance += memberBalances[i];
+    }
+
+    circleData.isOwner = (circle.owner == _user);
+
+    address currentWithdrawer = withdrawableBy(_circleId);
+    circleData.isCurrentWithdrawer = (currentWithdrawer == _user);
+
+    circleData.canWithdraw = circleData.isCurrentWithdrawer && isWithdrawable(_circleId);
+
+    uint256 currentPeriodEnd = circle.circleStart + (circle.depositInterval * (circle.currentIndex + 1));
+    circleData.nextWithdrawTime = circle.circleStart + (circle.depositInterval * circle.currentIndex);
+    circleData.depositWindowEnd = currentPeriodEnd;
+
+    uint256 circleEndTime = circle.circleStart + (circle.depositInterval * circle.maxDeposits);
+    circleData.isExpired = (block.timestamp >= circleEndTime);
+
+    circleData.completedRounds = circle.currentIndex;
+    circleData.totalRounds = circle.maxDeposits;
+
+    uint256 membersWithFullDeposits = 0;
+    for (uint256 i = 0; i < memberBalances.length; i++) {
+      if (memberBalances[i] >= circle.depositAmount) {
+        membersWithFullDeposits++;
+      }
+    }
+    circleData.remainingDepositsNeeded = members.length - membersWithFullDeposits;
   }
 
   /**
