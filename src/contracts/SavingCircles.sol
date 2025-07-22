@@ -17,53 +17,6 @@ import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
  * @author valeriooconte
  */
 contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
-  struct UserCircleData {
-    uint256 circleId;
-    Circle circleInfo;
-    uint256 userBalance;
-    bool isMember;
-    bool isOwner;
-    bool isCurrentWithdrawer;
-    bool canWithdraw;
-    uint256 nextWithdrawTime;
-    uint256 depositWindowEnd;
-    bool isExpired;
-    bool isDecommissioned;
-    uint256 totalPoolBalance;
-    uint256 remainingDepositsNeeded;
-    uint256 completedRounds;
-    uint256 totalRounds;
-  }
-
-  struct UserFinancialSummary {
-    uint256 totalBalance;
-    uint256 totalDeposited;
-    uint256 totalWithdrawn;
-    uint256 activeCirclesCount;
-    uint256 ownedCirclesCount;
-    uint256 completedCirclesCount;
-    uint256 pendingWithdrawals;
-    uint256 upcomingDeposits;
-  }
-
-  struct UserMembershipStatus {
-    uint256[] allCircleIds;
-    uint256[] activeCircleIds;
-    uint256[] ownedCircleIds;
-    uint256[] withdrawableCircleIds;
-    uint256[] expiredCircleIds;
-    uint256[] decommissionedCircleIds;
-  }
-
-  struct ComprehensiveUserData {
-    address userAddress;
-    UserFinancialSummary financialSummary;
-    UserMembershipStatus membershipStatus;
-    UserCircleData[] circleData;
-    uint256 timestamp;
-    uint256 blockNumber;
-  }
-
   uint256 public constant MINIMUM_MEMBERS = 2;
 
   uint256 public nextId;
