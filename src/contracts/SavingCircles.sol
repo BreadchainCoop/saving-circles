@@ -257,6 +257,64 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     return _totalBalance;
   }
 
+  /**
+   * @dev Make a withdrawal from a specified circle
+   *      A withdrawal must be made by a member of the circle, even if it is for another member.
+   */
+  function _withdraw(uint256 _id, address _member) internal onlyMember(_id, msg.sender) {
+    Circle storage _circle = circles[_id];
+
+    if (!_withdrawable(_id)) revert NotWithdrawable();
+    if (_circle.members[_circle.currentIndex] != _member) revert NotWithdrawable();
+    if (_circle.currentIndex >= _circle.maxDeposits) revert NotWithdrawable();
+
+    uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
+
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      balances[_id][_circle.members[i]] = 0;
+    }
+
+    _circle.currentIndex = (_circle.currentIndex + 1) % _circle.members.length;
+    bool success = IERC20(_circle.token).transfer(_member, _withdrawAmount);
+    if (!success) revert TransferFailed();
+
+    emit FundsWithdrawn(_id, _member, _withdrawAmount);
+  }
+
+  /**
+   * @dev Make a deposit into a specified circle
+   *      A deposit must be made in specific time window and can be made partially so long as the final balance equals
+   *      the specified deposit amount for the circle.
+   */
+  function _deposit(
+    uint256 _id,
+    uint256 _value,
+    address _member
+  ) internal onlyCommissioned(_id) onlyMember(_id, _member) {
+    Circle memory _circle = circles[_id];
+
+    if (block.timestamp < circles[_id].circleStart) {
+      revert DepositBeforeCircleStart();
+    }
+    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * (circles[_id].currentIndex + 1)))
+    {
+      revert DepositWindowClosed();
+    }
+    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].maxDeposits)) {
+      revert CircleExpired();
+    }
+    if (balances[_id][_member] + _value > circles[_id].depositAmount) {
+      revert ExceedsDepositAmount();
+    }
+
+    balances[_id][_member] = balances[_id][_member] + _value;
+
+    bool success = IERC20(_circle.token).transferFrom(msg.sender, address(this), _value);
+    if (!success) revert TransferFailed();
+
+    emit FundsDeposited(_id, _member, _value);
+  }
+
   function _getAllUserCircleIds(address _user) internal view returns (uint256[] memory) {
     uint256[] memory memberCircleIds = memberCircles[_user];
     uint256[] memory ownedOnlyCircleIds = _getOwnedOnlyCircleIds(_user, memberCircleIds);
@@ -461,64 +519,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
       }
     }
     circleData.remainingDepositsNeeded = memberBalances.length - membersWithFullDeposits;
-  }
-
-  /**
-   * @dev Make a withdrawal from a specified circle
-   *      A withdrawal must be made by a member of the circle, even if it is for another member.
-   */
-  function _withdraw(uint256 _id, address _member) internal onlyMember(_id, msg.sender) {
-    Circle storage _circle = circles[_id];
-
-    if (!_withdrawable(_id)) revert NotWithdrawable();
-    if (_circle.members[_circle.currentIndex] != _member) revert NotWithdrawable();
-    if (_circle.currentIndex >= _circle.maxDeposits) revert NotWithdrawable();
-
-    uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
-
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      balances[_id][_circle.members[i]] = 0;
-    }
-
-    _circle.currentIndex = (_circle.currentIndex + 1) % _circle.members.length;
-    bool success = IERC20(_circle.token).transfer(_member, _withdrawAmount);
-    if (!success) revert TransferFailed();
-
-    emit FundsWithdrawn(_id, _member, _withdrawAmount);
-  }
-
-  /**
-   * @dev Make a deposit into a specified circle
-   *      A deposit must be made in specific time window and can be made partially so long as the final balance equals
-   *      the specified deposit amount for the circle.
-   */
-  function _deposit(
-    uint256 _id,
-    uint256 _value,
-    address _member
-  ) internal onlyCommissioned(_id) onlyMember(_id, _member) {
-    Circle memory _circle = circles[_id];
-
-    if (block.timestamp < circles[_id].circleStart) {
-      revert DepositBeforeCircleStart();
-    }
-    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * (circles[_id].currentIndex + 1)))
-    {
-      revert DepositWindowClosed();
-    }
-    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].maxDeposits)) {
-      revert CircleExpired();
-    }
-    if (balances[_id][_member] + _value > circles[_id].depositAmount) {
-      revert ExceedsDepositAmount();
-    }
-
-    balances[_id][_member] = balances[_id][_member] + _value;
-
-    bool success = IERC20(_circle.token).transferFrom(msg.sender, address(this), _value);
-    if (!success) revert TransferFailed();
-
-    emit FundsDeposited(_id, _member, _value);
   }
 
   /**
