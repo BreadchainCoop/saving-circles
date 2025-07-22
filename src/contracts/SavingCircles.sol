@@ -64,14 +64,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     uint256 blockNumber;
   }
 
-  struct CircleCounts {
-    uint256 active;
-    uint256 owned;
-    uint256 withdrawable;
-    uint256 expired;
-    uint256 decommissioned;
-  }
-
   uint256 public constant MINIMUM_MEMBERS = 2;
 
   uint256 public nextId;
@@ -386,28 +378,33 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   ) internal view returns (UserMembershipStatus memory status) {
     status.allCircleIds = _circleIds;
 
-    CircleCounts memory counts = _countCirclesByStatus(_user, _circleIds);
-    status = _initializeStatusArrays(status, counts);
-    status = _populateStatusArrays(status, _user, _circleIds);
-  }
+    uint256 activeCount = 0;
+    uint256 ownedCount = 0;
+    uint256 withdrawableCount = 0;
+    uint256 expiredCount = 0;
+    uint256 decommissionedCount = 0;
 
-  function _countCirclesByStatus(
-    address _user,
-    uint256[] memory _circleIds
-  ) internal view returns (CircleCounts memory counts) {
     for (uint256 i = 0; i < _circleIds.length; i++) {
       UserCircleData memory circleData = _getUserCircleData(_user, _circleIds[i]);
 
       if (circleData.isDecommissioned) {
-        counts.decommissioned++;
+        decommissionedCount++;
       } else if (circleData.isExpired) {
-        counts.expired++;
+        expiredCount++;
       } else {
-        counts.active++;
-        if (circleData.isOwner) counts.owned++;
-        if (circleData.canWithdraw) counts.withdrawable++;
+        activeCount++;
+        if (circleData.isOwner) ownedCount++;
+        if (circleData.canWithdraw) withdrawableCount++;
       }
     }
+
+    status.activeCircleIds = new uint256[](activeCount);
+    status.ownedCircleIds = new uint256[](ownedCount);
+    status.withdrawableCircleIds = new uint256[](withdrawableCount);
+    status.expiredCircleIds = new uint256[](expiredCount);
+    status.decommissionedCircleIds = new uint256[](decommissionedCount);
+
+    status = _populateStatusArrays(status, _user, _circleIds);
   }
 
   function _populateStatusArrays(
@@ -597,18 +594,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    */
   function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
     return _circle.owner == address(0);
-  }
-
-  function _initializeStatusArrays(
-    UserMembershipStatus memory status,
-    CircleCounts memory counts
-  ) internal pure returns (UserMembershipStatus memory) {
-    status.activeCircleIds = new uint256[](counts.active);
-    status.ownedCircleIds = new uint256[](counts.owned);
-    status.withdrawableCircleIds = new uint256[](counts.withdrawable);
-    status.expiredCircleIds = new uint256[](counts.expired);
-    status.decommissionedCircleIds = new uint256[](counts.decommissioned);
-    return status;
   }
 
   function _isInArray(uint256 value, uint256[] memory array) internal pure returns (bool) {
