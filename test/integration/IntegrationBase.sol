@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 import {Test} from 'forge-std/Test.sol';
 import {Common} from 'script/Common.sol';
 
-import {SavingCircles} from '../../src/contracts/SavingCircles.sol';
-import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
-import {MockERC20} from '../mocks/MockERC20.sol';
+import {SavingCircles} from 'contracts/SavingCircles.sol';
+import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
+import {MockERC20} from 'test/mocks/MockERC20.sol';
 
 // solhint-disable-next-line
 import 'script/Registry.sol';
