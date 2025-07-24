@@ -6,6 +6,17 @@ import {SavingCircles} from 'contracts/SavingCircles.sol';
 import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
 import {ISavingCirclesLens} from 'interfaces/ISavingCirclesLens.sol';
 
+/**
+ * @title Saving Circles Lens
+ * @notice Lens contract for viewing the Saving Circles contract
+ * @dev This contract is used exclusively to view the state of the Saving Circles contract
+ * @dev This contract does not modify or interact with the Saving Circles contract
+ * @author Breadchain Collective
+ * @author @RonTuretzky
+ * @author bagelface.eth
+ * @author exo404
+ * @author valeriooconte
+ */
 contract SavingCirclesLens is ISavingCirclesLens {
   SavingCircles public immutable SAVING_CIRCLES;
 
