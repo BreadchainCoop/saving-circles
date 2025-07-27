@@ -16,6 +16,12 @@
   <li>Use yarn scripts, not forge scripts (Look at the `package.json`!).</li>
   <li>Add scripts to the `package.json` as needed.</li>
 
+  <dt>New Off-Chain to On-Chain Flow</dt>
+  <li>The SavingCircles contract now supports creating circles with email addresses before transitioning to on-chain.</li>
+  <li>This reduces onboarding friction for users unfamiliar with web3.</li>
+  <li>See <code>docs/OFF_CHAIN_TO_ON_CHAIN.md</code> for detailed documentation of the new flow.</li>
+  <li>Integration with web3 wallet providers that support email/social login is supported.</li>
+
   <dt>Required Contracts</dt>
   <li>Every contract is required to have a full interface.</li>
   <li>The contract should inherit it's own interface.</li>

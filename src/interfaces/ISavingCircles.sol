@@ -25,6 +25,26 @@ interface ISavingCircles {
   }
 
   /**
+   * @notice A struct representing a pending off-chain saving circle
+   * @param ownerEmail The email of the circle owner
+   * @param memberEmails The email addresses of the circle members
+   * @param depositAmount The deposit amount of the circle
+   * @param token The token of the circle
+   * @param depositInterval The deposit interval of the circle
+   * @param maxDeposits The maximum number of deposits for the circle
+   * @param isActive Whether the pending circle is active
+   */
+  struct PendingCircle {
+    string ownerEmail;
+    string[] memberEmails;
+    uint256 depositAmount;
+    address token;
+    uint256 depositInterval;
+    uint256 maxDeposits;
+    bool isActive;
+  }
+
+  /**
    * @notice Emitted when a circle is created
    * @param id The ID of the circle
    * @param members The members of the circle
@@ -35,6 +55,33 @@ interface ISavingCircles {
   event CircleCreated(
     uint256 indexed id, address[] members, address token, uint256 depositAmount, uint256 depositInterval
   );
+
+  /**
+   * @notice Emitted when a pending circle is created off-chain
+   * @param id The ID of the pending circle
+   * @param ownerEmail The email of the owner
+   * @param memberEmails The email addresses of the members
+   * @param token The token of the circle
+   * @param depositAmount The deposit amount of the circle
+   * @param depositInterval The deposit interval of the circle
+   */
+  event PendingCircleCreated(
+    uint256 indexed id, string ownerEmail, string[] memberEmails, address token, uint256 depositAmount, uint256 depositInterval
+  );
+
+  /**
+   * @notice Emitted when an email is mapped to a wallet address
+   * @param email The email address
+   * @param walletAddress The wallet address
+   */
+  event EmailMapped(string indexed email, address indexed walletAddress);
+
+  /**
+   * @notice Emitted when a pending circle is migrated on-chain
+   * @param pendingId The ID of the pending circle
+   * @param circleId The ID of the new on-chain circle
+   */
+  event CircleMigrated(uint256 indexed pendingId, uint256 indexed circleId);
 
   /**
    * @notice Emitted when a circle is decommissioned
@@ -176,6 +223,26 @@ interface ISavingCircles {
   error InvalidMemberAddress();
 
   /**
+   * @notice Thrown when an email address is invalid or empty
+   */
+  error InvalidEmail();
+
+  /**
+   * @notice Thrown when a pending circle does not exist or is not active
+   */
+  error PendingCircleNotFound();
+
+  /**
+   * @notice Thrown when an email is not mapped to a wallet address
+   */
+  error EmailNotMapped();
+
+  /**
+   * @notice Thrown when trying to migrate a circle that cannot be migrated
+   */
+  error CannotMigrate();
+
+  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -194,6 +261,28 @@ interface ISavingCircles {
    * @return id The ID of the circle
    */
   function create(Circle memory circle) external returns (uint256);
+
+  /**
+   * @notice Create a pending circle off-chain with email addresses
+   * @param pendingCircle The pending circle
+   * @return id The ID of the pending circle
+   */
+  function createPendingCircle(PendingCircle memory pendingCircle) external returns (uint256);
+
+  /**
+   * @notice Map an email address to a wallet address
+   * @param email The email address
+   * @param walletAddress The wallet address
+   */
+  function mapEmailToAddress(string calldata email, address walletAddress) external;
+
+  /**
+   * @notice Migrate a pending circle to an active on-chain circle
+   * @param pendingId The ID of the pending circle
+   * @param circleStart The start time for the circle
+   * @return circleId The ID of the new on-chain circle
+   */
+  function migratePendingCircle(uint256 pendingId, uint256 circleStart) external returns (uint256 circleId);
 
   /**
    * @notice Deposit funds into a circle
@@ -235,6 +324,20 @@ interface ISavingCircles {
    * @return circle The circle
    */
   function getCircle(uint256 id) external view returns (Circle memory circle);
+
+  /**
+   * @notice Get a pending circle
+   * @param id The ID of the pending circle
+   * @return pendingCircle The pending circle
+   */
+  function getPendingCircle(uint256 id) external view returns (PendingCircle memory pendingCircle);
+
+  /**
+   * @notice Get the wallet address mapped to an email
+   * @param email The email address
+   * @return walletAddress The mapped wallet address
+   */
+  function getAddressFromEmail(string calldata email) external view returns (address walletAddress);
 
   /**
    * @notice Get multiple circles

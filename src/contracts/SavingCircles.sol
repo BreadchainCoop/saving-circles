@@ -20,11 +20,14 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   uint256 public constant MINIMUM_MEMBERS = 2;
 
   uint256 public nextId;
+  uint256 public nextPendingId;
   mapping(uint256 id => Circle circle) public circles;
+  mapping(uint256 id => PendingCircle pendingCircle) public pendingCircles;
   mapping(uint256 id => mapping(address token => uint256 balance)) public balances;
   mapping(uint256 id => mapping(address member => bool status)) public isMember;
   mapping(address member => uint256[] ids) public memberCircles;
   mapping(address token => bool status) public allowedTokens;
+  mapping(string email => address walletAddress) public emailToAddress;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -84,6 +87,87 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
+  function createPendingCircle(PendingCircle memory _pendingCircle) external override returns (uint256 _id) {
+    _id = nextPendingId++;
+
+    if (!allowedTokens[_pendingCircle.token]) revert TokenNotAllowed();
+    if (_pendingCircle.depositInterval == 0) revert InvalidDepositInterval();
+    if (_pendingCircle.depositAmount == 0) revert InvalidDepositAmount();
+    if (_pendingCircle.maxDeposits == 0) revert InvalidMaxDeposits();
+    if (bytes(_pendingCircle.ownerEmail).length == 0) revert InvalidEmail();
+    if (_pendingCircle.memberEmails.length < MINIMUM_MEMBERS) revert InvalidMemberCount();
+
+    for (uint256 i = 0; i < _pendingCircle.memberEmails.length; i++) {
+      if (bytes(_pendingCircle.memberEmails[i]).length == 0) revert InvalidEmail();
+    }
+
+    _pendingCircle.isActive = true;
+    pendingCircles[_id] = _pendingCircle;
+
+    emit PendingCircleCreated(_id, _pendingCircle.ownerEmail, _pendingCircle.memberEmails, _pendingCircle.token, _pendingCircle.depositAmount, _pendingCircle.depositInterval);
+
+    return _id;
+  }
+
+  /// @inheritdoc ISavingCircles
+  function mapEmailToAddress(string calldata _email, address _walletAddress) external override {
+    if (bytes(_email).length == 0) revert InvalidEmail();
+    if (_walletAddress == address(0)) revert InvalidMemberAddress();
+    
+    emailToAddress[_email] = _walletAddress;
+    
+    emit EmailMapped(_email, _walletAddress);
+  }
+
+  /// @inheritdoc ISavingCircles
+  function migratePendingCircle(uint256 _pendingId, uint256 _circleStart) external override returns (uint256 _circleId) {
+    PendingCircle storage _pendingCircle = pendingCircles[_pendingId];
+    
+    if (!_pendingCircle.isActive) revert PendingCircleNotFound();
+    if (_circleStart == 0) revert InvalidCircleStartTime();
+    
+    // Check that all emails are mapped to addresses
+    address _owner = emailToAddress[_pendingCircle.ownerEmail];
+    if (_owner == address(0)) revert EmailNotMapped();
+    
+    address[] memory _members = new address[](_pendingCircle.memberEmails.length);
+    for (uint256 i = 0; i < _pendingCircle.memberEmails.length; i++) {
+      address _member = emailToAddress[_pendingCircle.memberEmails[i]];
+      if (_member == address(0)) revert EmailNotMapped();
+      _members[i] = _member;
+    }
+    
+    // Create the on-chain circle
+    Circle memory _circle = Circle({
+      owner: _owner,
+      members: _members,
+      currentIndex: 0,
+      depositAmount: _pendingCircle.depositAmount,
+      token: _pendingCircle.token,
+      depositInterval: _pendingCircle.depositInterval,
+      circleStart: _circleStart,
+      maxDeposits: _pendingCircle.maxDeposits
+    });
+    
+    _circleId = nextId++;
+    
+    for (uint256 i = 0; i < _members.length; i++) {
+      isMember[_circleId][_members[i]] = true;
+      memberCircles[_members[i]].push(_circleId);
+    }
+    
+    circles[_circleId] = _circle;
+    
+    // Mark pending circle as inactive
+    _pendingCircle.isActive = false;
+    
+    emit CircleMigrated(_pendingId, _circleId);
+    emit CircleCreated(_circleId, _members, _circle.token, _circle.depositAmount, _circle.depositInterval);
+    
+    return _circleId;
+  }
+
+  /// @inheritdoc ISavingCircles
   function deposit(uint256 _id, uint256 _value) external override nonReentrant {
     _deposit(_id, _value, msg.sender);
   }
@@ -140,6 +224,17 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   /// @inheritdoc ISavingCircles
   function getCircle(uint256 _id) external view override onlyCommissioned(_id) returns (Circle memory _circle) {
     _circle = circles[_id];
+  }
+
+  /// @inheritdoc ISavingCircles
+  function getPendingCircle(uint256 _id) external view override returns (PendingCircle memory _pendingCircle) {
+    _pendingCircle = pendingCircles[_id];
+    if (!_pendingCircle.isActive) revert PendingCircleNotFound();
+  }
+
+  /// @inheritdoc ISavingCircles
+  function getAddressFromEmail(string calldata _email) external view override returns (address _walletAddress) {
+    _walletAddress = emailToAddress[_email];
   }
 
   /// @inheritdoc ISavingCircles
