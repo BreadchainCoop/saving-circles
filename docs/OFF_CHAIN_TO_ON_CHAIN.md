@@ -70,17 +70,18 @@ After migration, the circle operates exactly like a traditional on-chain circle 
 
 ## Web3 Wallet Integration
 
-This system is designed to work with web3 wallet providers that support email/social login, such as:
+This system is designed to work with Privy, a modern web3 authentication provider that supports:
 
-- Magic (magic.link)
-- Web3Auth
-- Wallet Connect with social providers
-- Account abstraction solutions
+- Email-based wallet creation
+- Social login (Google, Twitter, Discord, etc.)
+- Embedded wallets for seamless onboarding
+- Cross-app authentication
+- Smart wallet integration
 
 The email-to-address mapping can be handled by:
-1. Frontend applications during user onboarding
-2. Backend services that manage user accounts
-3. Smart contract integrations with identity providers
+1. Frontend applications during user onboarding with Privy
+2. Backend services that integrate with Privy's authentication API
+3. Smart contract integrations with Privy's identity verification
 
 ## Error Handling
 

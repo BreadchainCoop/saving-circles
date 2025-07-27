@@ -1,30 +1,78 @@
 # Web3 Wallet Integration Examples
 
-This document provides examples of how to integrate the off-chain to on-chain circle creation flow with popular web3 wallet providers that support email/social login.
+This document provides examples of how to integrate the off-chain to on-chain circle creation flow with Privy, a modern web3 authentication provider that supports email/social login.
 
-## Magic (magic.link) Integration
+## Privy Integration
 
-Magic allows users to create accounts using just their email address. Here's how to integrate it:
+Privy provides seamless web3 authentication with email, social logins, and embedded wallets. Here's how to integrate it with the saving circles system:
 
 ### Frontend JavaScript Example
 
 ```javascript
-import { Magic } from 'magic-sdk';
+import { PrivyProvider, usePrivy, useWallets } from '@privy-io/react-auth';
 import { ethers } from 'ethers';
 
-// Initialize Magic
-const magic = new Magic('your-magic-publishable-key');
+// Initialize Privy Provider at the app root
+function App() {
+    return (
+        <PrivyProvider
+            appId="your-privy-app-id"
+            config={{
+                loginMethods: ['email', 'google', 'twitter', 'discord'],
+                appearance: {
+                    theme: 'light',
+                    accentColor: '#676FFF',
+                },
+                embeddedWallets: {
+                    createOnLogin: 'users-without-wallets',
+                },
+            }}
+        >
+            <SavingCirclesApp />
+        </PrivyProvider>
+    );
+}
 
-// User signs up/logs in with email
-async function loginWithEmail(email) {
-    const didToken = await magic.auth.loginWithMagicLink({ email });
-    const userMetadata = await magic.user.getMetadata();
-    return userMetadata.publicAddress;
+// User authentication with Privy
+function usePrivyAuth() {
+    const { login, logout, authenticated, user } = usePrivy();
+    const { wallets } = useWallets();
+
+    const loginWithEmail = async (email) => {
+        await login();
+        return user?.wallet?.address;
+    };
+
+    const getWalletProvider = () => {
+        if (wallets.length > 0) {
+            return wallets[0].getEthersProvider();
+        }
+        return null;
+    };
+
+    return {
+        loginWithEmail,
+        getWalletProvider,
+        authenticated,
+        user,
+        userEmail: user?.email?.address,
+        userAddress: user?.wallet?.address,
+        login,
+        logout
+    };
 }
 
 // Create pending circle and map email to address
-async function createCircleWithEmail(ownerEmail, memberEmails, circleData) {
-    // Step 1: Create pending circle on-chain
+async function createCircleWithEmail(ownerEmail, memberEmails, circleData, privyAuth) {
+    // Step 1: Ensure owner is authenticated
+    if (!privyAuth.authenticated) {
+        await privyAuth.login();
+    }
+
+    const provider = privyAuth.getWalletProvider();
+    const signer = provider.getSigner();
+    
+    // Step 2: Create pending circle on-chain
     const pendingCircle = {
         ownerEmail,
         memberEmails,
@@ -35,198 +83,343 @@ async function createCircleWithEmail(ownerEmail, memberEmails, circleData) {
         isActive: false
     };
     
-    const pendingId = await savingCirclesContract.createPendingCircle(pendingCircle);
+    const contract = new ethers.Contract(
+        savingCirclesAddress, 
+        savingCirclesABI, 
+        signer
+    );
     
-    // Step 2: For each member that creates an account, map their email
-    for (const email of memberEmails) {
-        // When user logs in with Magic, get their address
-        const userAddress = await loginWithEmail(email);
-        
-        // Map email to address on-chain
-        await savingCirclesContract.mapEmailToAddress(email, userAddress);
-    }
+    const tx = await contract.createPendingCircle(pendingCircle);
+    const receipt = await tx.wait();
+    const pendingId = receipt.events.find(e => e.event === 'PendingCircleCreated').args.id;
+    
+    // Step 3: Map owner email immediately
+    await contract.mapEmailToAddress(ownerEmail, privyAuth.userAddress);
     
     return pendingId;
 }
 
 // Migrate to on-chain once all members are onboarded
-async function migrateCircle(pendingId, circleStart) {
-    const circleId = await savingCirclesContract.migratePendingCircle(pendingId, circleStart);
+async function migrateCircle(pendingId, circleStart, privyAuth) {
+    const provider = privyAuth.getWalletProvider();
+    const signer = provider.getSigner();
+    
+    const contract = new ethers.Contract(
+        savingCirclesAddress, 
+        savingCirclesABI, 
+        signer
+    );
+    
+    const tx = await contract.migratePendingCircle(pendingId, circleStart);
+    const receipt = await tx.wait();
+    const circleId = receipt.events.find(e => e.event === 'CircleMigrated').args.circleId;
+    
     return circleId;
 }
 ```
 
-## Web3Auth Integration
+## React Component Example
 
-Web3Auth supports multiple social providers (Google, Facebook, Twitter, etc.):
-
-### Frontend Integration
+Here's a complete React component using Privy for the saving circles flow:
 
 ```javascript
-import { Web3Auth } from "@web3auth/modal";
-import { CHAIN_NAMESPACES } from "@web3auth/base";
+import React, { useState, useEffect } from 'react';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { ethers } from 'ethers';
 
-// Initialize Web3Auth
-const web3auth = new Web3Auth({
-    clientId: "your-web3auth-client-id",
-    chainConfig: {
-        chainNamespace: CHAIN_NAMESPACES.EIP155,
-        chainId: "0x1", // Ethereum mainnet
-        rpcTarget: "https://rpc.ankr.com/eth",
-    },
-});
+function SavingCirclesComponent() {
+    const { login, logout, authenticated, user } = usePrivy();
+    const { wallets } = useWallets();
+    const [pendingId, setPendingId] = useState(null);
+    const [migrationStatus, setMigrationStatus] = useState({});
 
-// User authentication with social providers
-async function authenticateUser(email, provider = 'google') {
-    const web3authProvider = await web3auth.connectTo('openlogin', {
-        loginProvider: provider,
-        extraLoginOptions: {
-            login_hint: email
+    // Circle creation flow with Privy
+    const createPendingCircle = async (ownerEmail, memberEmails, circleData) => {
+        if (!authenticated) {
+            await login();
+            return;
         }
-    });
-    
-    const ethersProvider = new ethers.providers.Web3Provider(web3authProvider);
-    const signer = ethersProvider.getSigner();
-    const address = await signer.getAddress();
-    
-    return { address, signer };
-}
 
-// Circle creation flow with Web3Auth
-class CircleManager {
-    constructor(contractAddress, contractABI) {
-        this.contractAddress = contractAddress;
-        this.contractABI = contractABI;
-    }
+        try {
+            const provider = wallets[0]?.getEthersProvider();
+            const signer = provider.getSigner();
+            
+            const contract = new ethers.Contract(
+                contractAddress, 
+                contractABI, 
+                signer
+            );
+            
+            // Create pending circle
+            const pendingCircle = {
+                ownerEmail,
+                memberEmails,
+                ...circleData,
+                isActive: false
+            };
+            
+            const tx = await contract.createPendingCircle(pendingCircle);
+            const receipt = await tx.wait();
+            
+            const newPendingId = receipt.events.find(e => e.event === 'PendingCircleCreated').args.id;
+            setPendingId(newPendingId);
+            
+            // Map owner email immediately
+            await contract.mapEmailToAddress(ownerEmail, user.wallet.address);
+            
+            return newPendingId;
+        } catch (error) {
+            console.error('Error creating pending circle:', error);
+            throw error;
+        }
+    };
     
-    async createPendingCircle(ownerEmail, memberEmails, circleData) {
-        // Authenticate owner to create the pending circle
-        const { address: ownerAddress, signer } = await authenticateUser(ownerEmail);
-        
-        const contract = new ethers.Contract(
-            this.contractAddress, 
-            this.contractABI, 
-            signer
-        );
-        
-        // Create pending circle
-        const pendingCircle = {
-            ownerEmail,
-            memberEmails,
-            ...circleData,
-            isActive: false
-        };
-        
-        const tx = await contract.createPendingCircle(pendingCircle);
-        const receipt = await tx.wait();
-        
-        // Map owner email immediately
-        await contract.mapEmailToAddress(ownerEmail, ownerAddress);
-        
-        return receipt.events.find(e => e.event === 'PendingCircleCreated').args.id;
-    }
-    
-    async onboardMember(email, provider = 'google') {
-        const { address, signer } = await authenticateUser(email, provider);
-        
-        const contract = new ethers.Contract(
-            this.contractAddress, 
-            this.contractABI, 
-            signer
-        );
-        
-        // Map email to address
-        await contract.mapEmailToAddress(email, address);
-        
-        return address;
-    }
-    
-    async checkReadyForMigration(pendingId) {
-        const contract = new ethers.Contract(
-            this.contractAddress, 
-            this.contractABI, 
-            ethers.getDefaultProvider()
-        );
-        
-        const pendingCircle = await contract.getPendingCircle(pendingId);
-        
-        // Check if all emails are mapped
-        for (const email of pendingCircle.memberEmails) {
-            const address = await contract.getAddressFromEmail(email);
-            if (address === ethers.constants.AddressZero) {
-                return false;
+    const onboardMember = async (email) => {
+        if (!authenticated) {
+            await login();
+            return;
+        }
+
+        try {
+            const provider = wallets[0]?.getEthersProvider();
+            const signer = provider.getSigner();
+            
+            const contract = new ethers.Contract(
+                contractAddress, 
+                contractABI, 
+                signer
+            );
+            
+            // Map email to current user's address
+            await contract.mapEmailToAddress(email, user.wallet.address);
+            
+            // Update migration status
+            if (pendingId) {
+                await checkReadyForMigration(pendingId);
             }
+            
+            return user.wallet.address;
+        } catch (error) {
+            console.error('Error onboarding member:', error);
+            throw error;
         }
-        
-        return true;
-    }
+    };
+    
+    const checkReadyForMigration = async (id) => {
+        try {
+            const provider = wallets[0]?.getEthersProvider();
+            const contract = new ethers.Contract(
+                contractAddress, 
+                contractABI, 
+                provider
+            );
+            
+            const pendingCircle = await contract.getPendingCircle(id);
+            const unmappedEmails = [];
+            
+            // Check if all emails are mapped
+            for (const email of pendingCircle.memberEmails) {
+                const address = await contract.getAddressFromEmail(email);
+                if (address === ethers.constants.AddressZero) {
+                    unmappedEmails.push(email);
+                }
+            }
+            
+            const status = {
+                ready: unmappedEmails.length === 0,
+                unmappedEmails: unmappedEmails,
+                totalMembers: pendingCircle.memberEmails.length,
+                mappedMembers: pendingCircle.memberEmails.length - unmappedEmails.length
+            };
+            
+            setMigrationStatus(status);
+            return status;
+        } catch (error) {
+            console.error('Error checking migration readiness:', error);
+            throw error;
+        }
+    };
+
+    const migrateToOnChain = async () => {
+        if (!pendingId || !migrationStatus.ready) return;
+
+        try {
+            const provider = wallets[0]?.getEthersProvider();
+            const signer = provider.getSigner();
+            
+            const contract = new ethers.Contract(
+                contractAddress, 
+                contractABI, 
+                signer
+            );
+            
+            // Set circle start time (e.g., 1 day from now)
+            const circleStart = Math.floor(Date.now() / 1000) + (24 * 60 * 60);
+            
+            const tx = await contract.migratePendingCircle(pendingId, circleStart);
+            const receipt = await tx.wait();
+            
+            const circleId = receipt.events.find(e => e.event === 'CircleMigrated').args.circleId;
+            
+            alert(`Circle migrated successfully! New circle ID: ${circleId}`);
+            return circleId;
+        } catch (error) {
+            console.error('Error migrating circle:', error);
+            throw error;
+        }
+    };
+
+    return (
+        <div>
+            {!authenticated ? (
+                <div>
+                    <h2>Connect Your Wallet</h2>
+                    <button onClick={login}>Login with Privy</button>
+                </div>
+            ) : (
+                <div>
+                    <h2>Welcome, {user.email?.address || user.wallet?.address}</h2>
+                    <p>Connected via: {user.linkedAccounts.map(acc => acc.type).join(', ')}</p>
+                    
+                    {/* Your circle creation UI here */}
+                    
+                    <button onClick={logout}>Logout</button>
+                </div>
+            )}
+        </div>
+    );
 }
 ```
 
-## Account Abstraction Integration
+## Advanced Privy Features
 
-For even smoother UX, integrate with Account Abstraction providers:
+Privy also supports advanced features for enhanced user experience:
 
-### Example with Alchemy's Account Kit
+### Smart Wallets with Privy
 
 ```javascript
-import { AlchemyProvider } from "@alchemy/aa-alchemy";
-import { LightSmartContractAccount } from "@alchemy/aa-accounts";
+import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { createSmartAccountClient } from '@privy-io/react-auth/smart-wallets';
 
-async function createAccountFromEmail(email) {
-    // Use email-based authentication (Magic, Web3Auth, etc.)
-    const emailAuth = await authenticateWithEmail(email);
-    
-    // Create smart contract account
-    const smartAccount = new LightSmartContractAccount({
-        chain: mainnet,
-        owner: emailAuth.address,
-        factoryAddress: "0x...", // Light Account factory
-    });
-    
-    const provider = new AlchemyProvider({
-        apiKey: "your-alchemy-key",
-        chain: mainnet,
-    }).connect(smartAccount);
-    
-    const accountAddress = await provider.getAddress();
-    
-    return { address: accountAddress, provider };
+function useSmartWallet() {
+    const { authenticated, user } = usePrivy();
+    const { wallets } = useWallets();
+
+    const createSmartWallet = async () => {
+        if (!authenticated || wallets.length === 0) return null;
+
+        // Create smart wallet client
+        const smartWallet = await createSmartAccountClient({
+            wallet: wallets[0],
+        });
+
+        return smartWallet;
+    };
+
+    return { createSmartWallet };
 }
 
-// Map email to smart contract account address
-async function mapEmailToSmartAccount(email) {
-    const { address, provider } = await createAccountFromEmail(email);
+// Map email to smart wallet address
+async function mapEmailToSmartWallet(email, smartWallet) {
+    const smartWalletAddress = await smartWallet.getAddress();
     
-    // Map to the smart contract account address
-    await savingCirclesContract.mapEmailToAddress(email, address);
+    // Map to the smart wallet address
+    const contract = new ethers.Contract(
+        savingCirclesAddress, 
+        savingCirclesABI, 
+        smartWallet
+    );
     
-    return address;
+    await contract.mapEmailToAddress(email, smartWalletAddress);
+    
+    return smartWalletAddress;
+}
+```
+
+### Cross-App Authentication
+
+Privy enables users to authenticate across multiple applications:
+
+```javascript
+// Configure Privy for cross-app authentication
+const privyConfig = {
+    loginMethods: ['email', 'google', 'twitter', 'discord', 'wallet'],
+    appearance: {
+        theme: 'light',
+        accentColor: '#676FFF',
+    },
+    embeddedWallets: {
+        createOnLogin: 'users-without-wallets',
+        requireUserPasswordOnCreate: true,
+    },
+    // Enable cross-app authentication
+    crossAppAuth: {
+        enabled: true,
+    }
+};
+
+// Users can authenticate once and access multiple dApps
+async function authenticateForSavingCircles() {
+    const { login, authenticated, user } = usePrivy();
+    
+    if (!authenticated) {
+        await login();
+    }
+    
+    // User is now authenticated across all Privy-enabled apps
+    return {
+        email: user.email?.address,
+        address: user.wallet?.address,
+        isAuthenticated: authenticated
+    };
 }
 ```
 
 ## Backend Service Integration
 
-For enterprise use cases, you might want a backend service to manage email mappings:
+For enterprise use cases, you can integrate Privy with backend services to manage user authentication and email mappings:
 
-### Node.js Backend Example
+### Node.js Backend Example with Privy
 
 ```javascript
 const express = require('express');
 const { ethers } = require('ethers');
+const { PrivyApi } = require('@privy-io/server-auth');
 
 class CircleBackendService {
-    constructor(contractAddress, contractABI, privateKey) {
+    constructor(contractAddress, contractABI, privateKey, privyAppId, privyAppSecret) {
         this.provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
         this.wallet = new ethers.Wallet(privateKey, this.provider);
         this.contract = new ethers.Contract(contractAddress, contractABI, this.wallet);
+        
+        // Initialize Privy API client
+        this.privy = new PrivyApi(privyAppId, privyAppSecret);
         this.emailToAddress = new Map(); // In production, use a database
     }
     
-    async registerUser(email, walletAddress) {
-        // Validate email and address
-        if (!this.isValidEmail(email) || !ethers.utils.isAddress(walletAddress)) {
-            throw new Error('Invalid email or address');
+    async verifyUserToken(accessToken) {
+        try {
+            // Verify the Privy access token
+            const verifiedClaims = await this.privy.verifyAuthToken(accessToken);
+            return verifiedClaims;
+        } catch (error) {
+            throw new Error('Invalid or expired token');
+        }
+    }
+    
+    async registerUser(accessToken) {
+        // Verify user authentication with Privy
+        const userClaims = await this.verifyUserToken(accessToken);
+        const email = userClaims.email;
+        const walletAddress = userClaims.wallet?.address;
+        
+        if (!email || !walletAddress) {
+            throw new Error('User must have email and wallet address');
+        }
+        
+        // Validate address
+        if (!ethers.utils.isAddress(walletAddress)) {
+            throw new Error('Invalid wallet address');
         }
         
         // Store mapping (in production, use database)
@@ -239,7 +432,10 @@ class CircleBackendService {
         return { email, address: walletAddress, txHash: tx.hash };
     }
     
-    async createPendingCircleForUser(userEmail, circleData) {
+    async createPendingCircleForUser(accessToken, circleData) {
+        const userClaims = await this.verifyUserToken(accessToken);
+        const userEmail = userClaims.email;
+        
         const pendingCircle = {
             ownerEmail: userEmail,
             memberEmails: circleData.memberEmails,
@@ -259,7 +455,7 @@ class CircleBackendService {
     async autoMigrateWhenReady(pendingId) {
         const pendingCircle = await this.contract.getPendingCircle(pendingId);
         
-        // Check if all members are registered
+        // Check if all members are registered with Privy
         const allMapped = pendingCircle.memberEmails.every(email => 
             this.emailToAddress.has(email)
         );
@@ -275,57 +471,170 @@ class CircleBackendService {
         return null;
     }
     
-    isValidEmail(email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
+    // Get user information from Privy
+    async getUserInfo(userId) {
+        try {
+            const user = await this.privy.getUser(userId);
+            return {
+                id: user.id,
+                email: user.email?.address,
+                walletAddress: user.wallet?.address,
+                linkedAccounts: user.linkedAccounts
+            };
+        } catch (error) {
+            throw new Error('User not found');
+        }
     }
 }
 
-// Express routes
+// Express routes with Privy authentication
 const app = express();
 app.use(express.json());
 
 const circleService = new CircleBackendService(
     process.env.CONTRACT_ADDRESS,
     contractABI,
-    process.env.PRIVATE_KEY
+    process.env.PRIVATE_KEY,
+    process.env.PRIVY_APP_ID,
+    process.env.PRIVY_APP_SECRET
 );
 
-app.post('/register', async (req, res) => {
+// Middleware to verify Privy token
+async function authenticatePrivyToken(req, res, next) {
     try {
-        const { email, walletAddress } = req.body;
-        const result = await circleService.registerUser(email, walletAddress);
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        if (!token) {
+            return res.status(401).json({ error: 'No access token provided' });
+        }
+        
+        const userClaims = await circleService.verifyUserToken(token);
+        req.user = userClaims;
+        next();
+    } catch (error) {
+        res.status(401).json({ error: 'Invalid token' });
+    }
+}
+
+app.post('/register', authenticatePrivyToken, async (req, res) => {
+    try {
+        const token = req.headers.authorization.replace('Bearer ', '');
+        const result = await circleService.registerUser(token);
         res.json(result);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
 });
 
-app.post('/create-circle', async (req, res) => {
+app.post('/create-circle', authenticatePrivyToken, async (req, res) => {
     try {
-        const { userEmail, circleData } = req.body;
-        const pendingId = await circleService.createPendingCircleForUser(userEmail, circleData);
+        const token = req.headers.authorization.replace('Bearer ', '');
+        const { circleData } = req.body;
+        const pendingId = await circleService.createPendingCircleForUser(token, circleData);
         res.json({ pendingId });
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+});
+
+app.get('/user/:userId', authenticatePrivyToken, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const userInfo = await circleService.getUserInfo(userId);
+        res.json(userInfo);
+    } catch (error) {
+        res.status(404).json({ error: error.message });
     }
 });
 ```
 
 ## Security Considerations
 
-When integrating with web3 wallet providers:
+When integrating with Privy for web3 authentication:
 
-1. **Email Verification**: Always verify email ownership before mapping to addresses
-2. **Access Control**: Ensure only authorized parties can map emails to addresses
-3. **Rate Limiting**: Implement rate limiting to prevent spam
-4. **Address Validation**: Validate that addresses are properly formatted
-5. **Audit Trail**: Log all email-to-address mappings for security audits
+1. **Token Verification**: Always verify Privy access tokens on the backend using the Privy API
+2. **Email Verification**: Privy handles email verification, but ensure you trust verified emails
+3. **Access Control**: Ensure only authenticated users can map emails to addresses
+4. **Rate Limiting**: Implement rate limiting to prevent spam and abuse
+5. **Address Validation**: Validate that addresses are properly formatted and owned by the user
+6. **Audit Trail**: Log all email-to-address mappings for security audits
+7. **App Security**: Secure your Privy app credentials and use environment variables
 
 ## Best Practices
 
-1. **User Experience**: Provide clear onboarding flows explaining the transition from email to wallet
-2. **Progressive Enhancement**: Allow users to interact with basic features before full web3 onboarding
-3. **Fallback Options**: Provide alternative onboarding methods if social login fails
-4. **Mobile Optimization**: Ensure wallet integrations work well on mobile devices
-5. **Clear Communication**: Explain to users when they're transitioning from off-chain to on-chain interactions
+1. **User Experience**: 
+   - Use Privy's customizable login modal to match your app's branding
+   - Provide clear onboarding flows explaining the transition from email to wallet
+   - Enable multiple login methods (email, social, wallet) for user flexibility
+
+2. **Progressive Enhancement**: 
+   - Allow users to interact with basic features before full web3 onboarding
+   - Use Privy's embedded wallets for users who don't have external wallets
+   - Implement graceful fallbacks when wallet operations fail
+
+3. **Cross-Platform Support**: 
+   - Ensure Privy integrations work well on mobile devices
+   - Test with different browsers and wallet configurations
+   - Use Privy's mobile-optimized login flows
+
+4. **Error Handling**: 
+   - Handle Privy authentication errors gracefully
+   - Provide clear error messages when wallet operations fail
+   - Implement retry mechanisms for failed transactions
+
+5. **Performance**: 
+   - Cache user authentication state appropriately
+   - Use Privy's built-in session management
+   - Optimize for fast login and wallet connection experiences
+
+## Privy Configuration Examples
+
+### Production Configuration
+
+```javascript
+const privyConfig = {
+    appId: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
+    config: {
+        loginMethods: ['email', 'google', 'twitter', 'discord'],
+        appearance: {
+            theme: 'light',
+            accentColor: '#676FFF',
+            logo: 'https://your-app.com/logo.png',
+        },
+        embeddedWallets: {
+            createOnLogin: 'users-without-wallets',
+            requireUserPasswordOnCreate: true,
+        },
+        legal: {
+            termsAndConditionsUrl: 'https://your-app.com/terms',
+            privacyPolicyUrl: 'https://your-app.com/privacy',
+        },
+        // Additional security settings
+        mfa: {
+            noPromptOnMfaRequired: false,
+        }
+    }
+};
+```
+
+### Development Configuration
+
+```javascript
+const privyConfig = {
+    appId: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
+    config: {
+        loginMethods: ['email', 'wallet'], // Simpler for development
+        appearance: {
+            theme: 'light',
+            accentColor: '#676FFF',
+        },
+        embeddedWallets: {
+            createOnLogin: 'all-users', // Create wallets for all users in dev
+        },
+        // Development-specific settings
+        supportedChains: [
+            { id: 1337, name: 'Local Hardhat' }, // Local blockchain
+            { id: 5, name: 'Goerli' }, // Testnet
+        ]
+    }
+};
+```
