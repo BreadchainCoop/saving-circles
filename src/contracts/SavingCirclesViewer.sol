@@ -4,11 +4,11 @@ pragma solidity ^0.8.28;
 import {SavingCircles} from 'contracts/SavingCircles.sol';
 
 import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
-import {ISavingCirclesLens} from 'interfaces/ISavingCirclesLens.sol';
+import {ISavingCirclesViewer} from 'interfaces/ISavingCirclesViewer.sol';
 
 /**
- * @title Saving Circles Lens
- * @notice Lens contract for viewing the Saving Circles contract
+ * @title Saving Circles Viewer
+ * @notice Contract for viewing the state of the Saving Circles contract
  * @dev This contract is used exclusively to view the state of the Saving Circles contract
  * @dev This contract does not modify or interact with the Saving Circles contract
  * @author Breadchain Collective
@@ -17,19 +17,19 @@ import {ISavingCirclesLens} from 'interfaces/ISavingCirclesLens.sol';
  * @author exo404
  * @author valeriooconte
  */
-contract SavingCirclesLens is ISavingCirclesLens {
+contract SavingCirclesViewer is ISavingCirclesViewer {
   SavingCircles public immutable SAVING_CIRCLES;
 
   constructor(address _savingCircles) {
     SAVING_CIRCLES = SavingCircles(_savingCircles);
   }
 
-  /// @inheritdoc ISavingCirclesLens
+  /// @inheritdoc ISavingCirclesViewer
   function isTokenAllowed(address _token) external view override returns (bool) {
     return SAVING_CIRCLES.allowedTokens(_token);
   }
 
-  /// @inheritdoc ISavingCirclesLens
+  /// @inheritdoc ISavingCirclesViewer
   function checkMemberships(
     address _member,
     uint256[] calldata _ids
@@ -43,7 +43,7 @@ contract SavingCirclesLens is ISavingCirclesLens {
     return _statuses;
   }
 
-  /// @inheritdoc ISavingCirclesLens
+  /// @inheritdoc ISavingCirclesViewer
   function getComprehensiveUserData(address _user)
     external
     view
@@ -67,19 +67,19 @@ contract SavingCirclesLens is ISavingCirclesLens {
     return userData;
   }
 
-  /// @inheritdoc ISavingCirclesLens
+  /// @inheritdoc ISavingCirclesViewer
   function getUserFinancialSummary(address _user) external view override returns (UserFinancialSummary memory summary) {
     uint256[] memory userCircleIds = _getAllUserCircleIds(_user);
     return _getUserFinancialSummary(_user, userCircleIds);
   }
 
-  /// @inheritdoc ISavingCirclesLens
+  /// @inheritdoc ISavingCirclesViewer
   function getUserMembershipStatus(address _user) external view override returns (UserMembershipStatus memory status) {
     uint256[] memory userCircleIds = _getAllUserCircleIds(_user);
     return _getUserMembershipStatus(_user, userCircleIds);
   }
 
-  /// @inheritdoc ISavingCirclesLens
+  /// @inheritdoc ISavingCirclesViewer
   function getUserCircleData(
     address _user,
     uint256 _circleId
@@ -87,7 +87,7 @@ contract SavingCirclesLens is ISavingCirclesLens {
     return _getUserCircleData(_user, _circleId);
   }
 
-  /// @inheritdoc ISavingCirclesLens
+  /// @inheritdoc ISavingCirclesViewer
   function getUserCirclesData(
     address _user,
     uint256[] calldata _circleIds
@@ -99,7 +99,7 @@ contract SavingCirclesLens is ISavingCirclesLens {
     return circleDataArray;
   }
 
-  /// @inheritdoc ISavingCirclesLens
+  /// @inheritdoc ISavingCirclesViewer
   function getTotalBalance(address _member) external view override returns (uint256 _totalBalance) {
     return _getTotalBalance(_member);
   }

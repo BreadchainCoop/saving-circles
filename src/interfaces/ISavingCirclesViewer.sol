@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
 
-interface ISavingCirclesLens {
+interface ISavingCirclesViewer {
   /**
    * @notice Data structure for comprehensive user circle information
    * @param circleId The ID of the circle

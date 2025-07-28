@@ -6,11 +6,11 @@ import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/Trans
 import {Test} from 'forge-std/Test.sol';
 
 import {SavingCircles} from 'src/contracts/SavingCircles.sol';
-import {SavingCirclesLens} from 'src/contracts/SavingCirclesLens.sol';
+import {SavingCirclesViewer} from 'src/contracts/SavingCirclesViewer.sol';
 import {ISavingCircles} from 'src/interfaces/ISavingCircles.sol';
 import {MockERC20} from 'test/mocks/MockERC20.sol';
 
-contract SavingCirclesLensUnit is Test {
+contract SavingCirclesViewerUnit is Test {
   uint256 public constant BASE_CURRENT_INDEX = 0;
   uint256 public constant DEPOSIT_AMOUNT = 1 ether;
   uint256 public constant DEPOSIT_INTERVAL = 1 days;
@@ -18,7 +18,7 @@ contract SavingCirclesLensUnit is Test {
   uint256 public constant MAX_DEPOSITS = 1000;
 
   SavingCircles public savingCircles;
-  SavingCirclesLens public savingCirclesLens;
+  SavingCirclesViewer public savingCirclesViewer;
   MockERC20 public token;
 
   // Test addresses
@@ -56,8 +56,8 @@ contract SavingCirclesLensUnit is Test {
     savingCircles.setTokenAllowed(address(token), true);
     vm.stopPrank();
 
-    // Deploy the SavingCirclesLens contract
-    savingCirclesLens = new SavingCirclesLens(address(savingCircles));
+    // Deploy the SavingCirclesViewer contract
+    savingCirclesViewer = new SavingCirclesViewer(address(savingCircles));
 
     // Setup test data
     members = new address[](3);
@@ -109,7 +109,7 @@ contract SavingCirclesLensUnit is Test {
     // Expected total balance across both circles
     uint256 expectedTotal = firstDeposit + secondDeposit;
 
-    uint256 totalBalance = savingCirclesLens.getTotalBalance(alice);
+    uint256 totalBalance = savingCirclesViewer.getTotalBalance(alice);
     assertEq(totalBalance, expectedTotal, 'Total balance mismatch');
   }
 
@@ -117,7 +117,7 @@ contract SavingCirclesLensUnit is Test {
    * @notice Ensures getTotalBalance returns zero when member has no balances
    */
   function test_GetTotalBalanceWhenNoDeposits() external {
-    uint256 totalBalance = savingCirclesLens.getTotalBalance(STRANGER);
+    uint256 totalBalance = savingCirclesViewer.getTotalBalance(STRANGER);
     assertEq(totalBalance, 0, 'Total balance for non-member should be zero');
   }
 
@@ -137,7 +137,7 @@ contract SavingCirclesLensUnit is Test {
     vm.stopPrank();
 
     // Get comprehensive user data
-    SavingCirclesLens.ComprehensiveUserData memory userData = savingCirclesLens.getComprehensiveUserData(alice);
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(alice);
 
     // Verify basic user data
     assertEq(userData.userAddress, alice);
@@ -183,7 +183,7 @@ contract SavingCirclesLensUnit is Test {
 
   function test_GetComprehensiveUserDataForCircleOwner() external {
     // Get comprehensive data for the circle owner
-    SavingCirclesLens.ComprehensiveUserData memory userData = savingCirclesLens.getComprehensiveUserData(owner);
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(owner);
 
     // Verify financial summary shows ownership
     assertEq(userData.financialSummary.ownedCirclesCount, 1);
@@ -224,7 +224,7 @@ contract SavingCirclesLensUnit is Test {
     vm.warp(block.timestamp + DEPOSIT_INTERVAL);
 
     // Get comprehensive user data for alice (first withdrawer)
-    SavingCirclesLens.ComprehensiveUserData memory userData = savingCirclesLens.getComprehensiveUserData(alice);
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(alice);
 
     // Verify withdrawal status
     assertEq(userData.financialSummary.pendingWithdrawals, 1);
@@ -236,7 +236,7 @@ contract SavingCirclesLensUnit is Test {
 
   function test_GetComprehensiveUserDataForNonMember() external {
     // Get comprehensive data for a non-member
-    SavingCirclesLens.ComprehensiveUserData memory userData = savingCirclesLens.getComprehensiveUserData(STRANGER);
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(STRANGER);
 
     // Verify all counts are zero
     assertEq(userData.financialSummary.totalBalance, 0);
@@ -263,7 +263,7 @@ contract SavingCirclesLensUnit is Test {
     vm.stopPrank();
 
     // Get financial summary
-    SavingCirclesLens.UserFinancialSummary memory summary = savingCirclesLens.getUserFinancialSummary(alice);
+    SavingCirclesViewer.UserFinancialSummary memory summary = savingCirclesViewer.getUserFinancialSummary(alice);
 
     // Verify calculations
     assertEq(summary.totalBalance, DEPOSIT_AMOUNT * 3);
@@ -281,7 +281,7 @@ contract SavingCirclesLensUnit is Test {
     vm.stopPrank();
 
     // Get financial summary
-    SavingCirclesLens.UserFinancialSummary memory summary = savingCirclesLens.getUserFinancialSummary(alice);
+    SavingCirclesViewer.UserFinancialSummary memory summary = savingCirclesViewer.getUserFinancialSummary(alice);
 
     // Verify upcoming deposits count
     assertEq(summary.upcomingDeposits, 1);
