@@ -232,7 +232,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    *      A deposit must be made in specific time window and can be made partially so long as the final balance equals
    *      the specified deposit amount for the circle.
    */
-  function _deposit(uint256 _id, uint256 _value, address _member) internal onlyCommissioned(_id) onlyMember(_id, _member) {
+  function _deposit(
+    uint256 _id,
+    uint256 _value,
+    address _member
+  ) internal onlyCommissioned(_id) onlyMember(_id, _member) {
     Circle memory _circle = circles[_id];
 
     if (block.timestamp < circles[_id].circleStart) {
