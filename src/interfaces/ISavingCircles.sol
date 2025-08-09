@@ -181,6 +181,11 @@ interface ISavingCircles {
   error InsufficientAllowance();
 
   /**
+   * @notice Thrown when array lengths don't match in batch operations
+   */
+  error ArrayLengthMismatch();
+
+  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -310,9 +315,9 @@ interface ISavingCircles {
     returns (uint256[] memory circleIds, address[] memory members);
 
   /**
-   * @notice Batch deposit funds for multiple users if they have sufficient allowance
-   * @param id The ID of the circle
-   * @param members The addresses of the members
+   * @notice Batch deposit funds for multiple users across multiple circles if they have sufficient allowance
+   * @param ids The IDs of the circles (must match length of members array)
+   * @param members The addresses of the members (must match length of ids array)
    */
-  function batchDepositIfAllowed(uint256 id, address[] calldata members) external;
+  function batchDepositIfAllowed(uint256[] calldata ids, address[] calldata members) external;
 }

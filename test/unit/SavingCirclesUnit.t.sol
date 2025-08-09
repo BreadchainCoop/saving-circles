@@ -701,7 +701,12 @@ contract SavingCirclesUnit is Test {
     vm.prank(carol);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
 
-    // Batch deposit
+    // Batch deposit - same circle for all members
+    uint256[] memory circleIds = new uint256[](3);
+    circleIds[0] = baseCircleId;
+    circleIds[1] = baseCircleId;
+    circleIds[2] = baseCircleId;
+
     address[] memory membersToDeposit = new address[](3);
     membersToDeposit[0] = alice;
     membersToDeposit[1] = bob;
@@ -712,7 +717,7 @@ contract SavingCirclesUnit is Test {
     emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsDeposited(baseCircleId, carol, DEPOSIT_AMOUNT);
-    savingCircles.batchDepositIfAllowed(baseCircleId, membersToDeposit);
+    savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
 
     // Verify deposits
     assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
@@ -732,6 +737,10 @@ contract SavingCirclesUnit is Test {
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
 
     // Batch deposit including non-member
+    uint256[] memory circleIds = new uint256[](2);
+    circleIds[0] = baseCircleId;
+    circleIds[1] = baseCircleId;
+
     address[] memory membersToDeposit = new address[](2);
     membersToDeposit[0] = alice;
     membersToDeposit[1] = nonMember;
@@ -740,7 +749,7 @@ contract SavingCirclesUnit is Test {
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
     // Should not emit for non-member
-    savingCircles.batchDepositIfAllowed(baseCircleId, membersToDeposit);
+    savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
 
     // Verify only alice's deposit went through
     assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
@@ -755,12 +764,90 @@ contract SavingCirclesUnit is Test {
     // Move time past deposit window
     vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
 
+    uint256[] memory circleIds = new uint256[](1);
+    circleIds[0] = baseCircleId;
+
     address[] memory membersToDeposit = new address[](1);
     membersToDeposit[0] = alice;
 
     vm.prank(owner);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.DepositWindowClosed.selector));
-    savingCircles.batchDepositIfAllowed(baseCircleId, membersToDeposit);
+    // Should not revert, just skip the deposit silently
+    savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
+
+    // Verify no deposit was made
+    assertEq(savingCircles.balances(baseCircleId, alice), 0);
+  }
+
+  function test_BatchDepositIfAllowed_MultipleCircles() external {
+    // Create second circle
+    address[] memory secondMembers = new address[](2);
+    secondMembers[0] = alice;
+    secondMembers[1] = bob;
+
+    ISavingCircles.Circle memory secondCircle = ISavingCircles.Circle({
+      owner: carol,
+      members: secondMembers,
+      currentIndex: 0,
+      circleStart: block.timestamp,
+      token: address(token),
+      depositAmount: DEPOSIT_AMOUNT / 2,
+      depositInterval: DEPOSIT_INTERVAL,
+      maxDeposits: MAX_DEPOSITS
+    });
+
+    vm.prank(carol);
+    uint256 secondCircleId = savingCircles.create(secondCircle);
+
+    // Setup tokens and approvals
+    token.mint(alice, DEPOSIT_AMOUNT * 2);
+    token.mint(bob, DEPOSIT_AMOUNT);
+    token.mint(carol, DEPOSIT_AMOUNT);
+
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT * 2);
+
+    vm.prank(bob);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    vm.prank(carol);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Batch deposit across multiple circles
+    uint256[] memory circleIds = new uint256[](4);
+    circleIds[0] = baseCircleId; // alice in first circle
+    circleIds[1] = secondCircleId; // alice in second circle
+    circleIds[2] = baseCircleId; // bob in first circle
+    circleIds[3] = baseCircleId; // carol in first circle
+
+    address[] memory membersToDeposit = new address[](4);
+    membersToDeposit[0] = alice;
+    membersToDeposit[1] = alice;
+    membersToDeposit[2] = bob;
+    membersToDeposit[3] = carol;
+
+    vm.prank(owner);
+    savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
+
+    // Verify deposits
+    assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(secondCircleId, alice), DEPOSIT_AMOUNT / 2);
+    assertEq(savingCircles.balances(baseCircleId, bob), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(baseCircleId, carol), DEPOSIT_AMOUNT);
+  }
+
+  function test_BatchDepositIfAllowed_ArrayLengthMismatch() external {
+    uint256[] memory circleIds = new uint256[](2);
+    circleIds[0] = baseCircleId;
+    circleIds[1] = baseCircleId;
+
+    address[] memory membersToDeposit = new address[](3); // Different length
+    membersToDeposit[0] = alice;
+    membersToDeposit[1] = bob;
+    membersToDeposit[2] = carol;
+
+    vm.prank(owner);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.ArrayLengthMismatch.selector));
+    savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
   }
 
   function test_BatchDepositIfAllowed_DecommissionedCircle() external {
@@ -779,11 +866,17 @@ contract SavingCirclesUnit is Test {
     vm.prank(alice);
     savingCircles.decommission(testCircleId);
 
+    uint256[] memory circleIds = new uint256[](1);
+    circleIds[0] = testCircleId;
+
     address[] memory membersToDeposit = new address[](1);
     membersToDeposit[0] = alice;
 
     vm.prank(owner);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
-    savingCircles.batchDepositIfAllowed(testCircleId, membersToDeposit);
+    // Should not revert, just skip the decommissioned circle
+    savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
+
+    // Verify no deposit was made
+    assertEq(savingCircles.balances(testCircleId, alice), 0);
   }
 }

@@ -305,30 +305,28 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function batchDepositIfAllowed(uint256 _id, address[] calldata _members) external override nonReentrant {
-    Circle memory _circle = circles[_id];
+  function batchDepositIfAllowed(uint256[] calldata _ids, address[] calldata _members) external override nonReentrant {
+    // Validate array lengths match
+    if (_ids.length != _members.length) revert ArrayLengthMismatch();
 
-    if (_isDecommissioned(_circle)) revert NotCommissioned();
-
-    // Check deposit window validity once for all members
-    if (block.timestamp < _circle.circleStart) {
-      revert DepositBeforeCircleStart();
-    }
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
-      revert DepositWindowClosed();
-    }
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
-      revert CircleExpired();
-    }
-
-    for (uint256 i = 0; i < _members.length; i++) {
+    for (uint256 i = 0; i < _ids.length; i++) {
+      uint256 circleId = _ids[i];
       address member = _members[i];
+      Circle memory _circle = circles[circleId];
+
+      // Skip if circle is decommissioned
+      if (_isDecommissioned(_circle)) continue;
 
       // Skip if not a member
-      if (!isMember[_id][member]) continue;
+      if (!isMember[circleId][member]) continue;
+
+      // Check deposit window validity
+      if (block.timestamp < _circle.circleStart) continue;
+      if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) continue;
+      if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) continue;
 
       // Calculate the remaining deposit amount needed
-      uint256 currentBalance = balances[_id][member];
+      uint256 currentBalance = balances[circleId][member];
       if (currentBalance >= _circle.depositAmount) continue; // Already deposited
       uint256 requiredAmount = _circle.depositAmount - currentBalance;
 
@@ -337,15 +335,15 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
       if (allowance < requiredAmount) continue; // Skip if insufficient allowance
 
       // Update balance
-      balances[_id][member] = balances[_id][member] + requiredAmount;
+      balances[circleId][member] = balances[circleId][member] + requiredAmount;
 
       // Transfer tokens from member to contract
       bool success = IERC20(_circle.token).transferFrom(member, address(this), requiredAmount);
       if (success) {
-        emit FundsDeposited(_id, member, requiredAmount);
+        emit FundsDeposited(circleId, member, requiredAmount);
       } else {
         // Revert balance update if transfer failed
-        balances[_id][member] = balances[_id][member] - requiredAmount;
+        balances[circleId][member] = balances[circleId][member] - requiredAmount;
       }
     }
   }

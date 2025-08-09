@@ -72,10 +72,12 @@ The Saving Circles contract now supports automated ERC20 allowance-based deposit
    - Useful for automation services to identify which deposits can be processed
    - Only includes members within active deposit windows with sufficient allowances
 
-3. **`batchDepositIfAllowed(uint256 id, address[] members)`**
-   - Processes multiple deposits in a single transaction
-   - Ideal for DAOs or automation services managing multiple accounts
+3. **`batchDepositIfAllowed(uint256[] ids, address[] members)`**
+   - Processes multiple deposits across multiple circles in a single transaction
+   - Accepts parallel arrays of circle IDs and member addresses
+   - Ideal for DAOs or automation services managing multiple accounts across different circles
    - Skips members with insufficient allowance or who have already deposited
+   - Arrays must be the same length or transaction will revert
 
 ### Usage Example
 
@@ -86,12 +88,20 @@ token.approve(savingCirclesAddress, depositAmount);
 // Anyone can then trigger the deposit
 savingCircles.depositIfAllowed(circleId, memberAddress);
 
-// Or process multiple deposits at once
-address[] memory members = new address[](3);
+// Or process multiple deposits across different circles at once
+uint256[] memory circleIds = new uint256[](4);
+circleIds[0] = circle1;  // alice in circle 1
+circleIds[1] = circle2;  // alice in circle 2
+circleIds[2] = circle1;  // bob in circle 1
+circleIds[3] = circle3;  // carol in circle 3
+
+address[] memory members = new address[](4);
 members[0] = alice;
-members[1] = bob;
-members[2] = carol;
-savingCircles.batchDepositIfAllowed(circleId, members);
+members[1] = alice;
+members[2] = bob;
+members[3] = carol;
+
+savingCircles.batchDepositIfAllowed(circleIds, members);
 ```
 
 ## Features
