@@ -69,7 +69,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (_circle.owner == address(0)) revert InvalidOwner();
     if (_circle.members.length < MINIMUM_MEMBERS) revert InvalidMemberCount();
 
-    for (uint256 i = 0; i < _circle.members.length; i++) {
+    uint256 _circleMembersLength = _circle.members.length;
+    for (uint256 i = 0; i < _circleMembersLength; i++) {
       address _member = _circle.members[i];
       if (_member == address(0)) revert InvalidMemberAddress();
       isMember[_id][_member] = true;
