@@ -176,6 +176,11 @@ interface ISavingCircles {
   error InvalidMemberAddress();
 
   /**
+   * @notice Thrown when a member has insufficient allowance for automatic deposit
+   */
+  error InsufficientAllowance();
+
+  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -286,4 +291,28 @@ interface ISavingCircles {
    * @return withdrawableBy The address of the withdrawable by
    */
   function withdrawableBy(uint256 id) external view returns (address withdrawableBy);
+
+  /**
+   * @notice Deposit funds for a user if they have sufficient allowance
+   * @param id The ID of the circle
+   * @param member The address of the member
+   */
+  function depositIfAllowed(uint256 id, address member) external;
+
+  /**
+   * @notice Get all addresses eligible for automated deposits across all circles
+   * @return circleIds The IDs of circles with eligible members
+   * @return members The addresses of eligible members
+   */
+  function getEligibleAddressesForDeposit()
+    external
+    view
+    returns (uint256[] memory circleIds, address[] memory members);
+
+  /**
+   * @notice Batch deposit funds for multiple users if they have sufficient allowance
+   * @param id The ID of the circle
+   * @param members The addresses of the members
+   */
+  function batchDepositIfAllowed(uint256 id, address[] calldata members) external;
 }

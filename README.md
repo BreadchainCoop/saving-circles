@@ -56,6 +56,44 @@
 <div align="center">End of Breadchain Notes</div>
 <div align="center">Continue Reading Wonderland Outline</div>
 
+## Saving Circles - Automated Deposits Feature
+
+The Saving Circles contract now supports automated ERC20 allowance-based deposits and batch operations for account abstraction flows. This enhancement enables:
+
+### New Functions
+
+1. **`depositIfAllowed(uint256 id, address member)`**
+   - Automatically deposits funds for a member if they have sufficient ERC20 allowance
+   - Can be called by anyone (e.g., keepers, automation services)
+   - Checks allowance and only deposits the remaining amount needed
+
+2. **`getEligibleAddressesForDeposit()`**
+   - Returns all circle IDs and member addresses eligible for automated deposits
+   - Useful for automation services to identify which deposits can be processed
+   - Only includes members within active deposit windows with sufficient allowances
+
+3. **`batchDepositIfAllowed(uint256 id, address[] members)`**
+   - Processes multiple deposits in a single transaction
+   - Ideal for DAOs or automation services managing multiple accounts
+   - Skips members with insufficient allowance or who have already deposited
+
+### Usage Example
+
+```solidity
+// Member approves the contract to spend their tokens
+token.approve(savingCirclesAddress, depositAmount);
+
+// Anyone can then trigger the deposit
+savingCircles.depositIfAllowed(circleId, memberAddress);
+
+// Or process multiple deposits at once
+address[] memory members = new address[](3);
+members[0] = alice;
+members[1] = bob;
+members[2] = carol;
+savingCircles.batchDepositIfAllowed(circleId, members);
+```
+
 ## Features
 
 <dl>

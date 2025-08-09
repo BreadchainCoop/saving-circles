@@ -526,4 +526,264 @@ contract SavingCirclesUnit is Test {
     assertFalse(strangerStatuses[1]); // Not in secondCircle
     assertFalse(strangerStatuses[2]); // Not in non-existent circle
   }
+
+  // Tests for automated deposit functions
+
+  function test_DepositIfAllowed_WithSufficientAllowance() external {
+    // Mint tokens to alice
+    token.mint(alice, DEPOSIT_AMOUNT);
+
+    // Alice approves the saving circles contract
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Anyone can call depositIfAllowed for alice
+    vm.prank(bob);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
+    savingCircles.depositIfAllowed(baseCircleId, alice);
+
+    // Verify deposit was recorded
+    uint256 balance = savingCircles.balances(baseCircleId, alice);
+    assertEq(balance, DEPOSIT_AMOUNT);
+  }
+
+  function test_DepositIfAllowed_WithInsufficientAllowance() external {
+    // Mint tokens to alice
+    token.mint(alice, DEPOSIT_AMOUNT);
+
+    // Alice approves less than required amount
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2);
+
+    // Call should revert with InsufficientAllowance
+    vm.prank(bob);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InsufficientAllowance.selector));
+    savingCircles.depositIfAllowed(baseCircleId, alice);
+  }
+
+  function test_DepositIfAllowed_WhenAlreadyDeposited() external {
+    // Mint tokens to alice
+    token.mint(alice, DEPOSIT_AMOUNT * 2);
+
+    // Alice makes a regular deposit first
+    vm.startPrank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT * 2);
+    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    // Call depositIfAllowed - should succeed without doing anything
+    vm.prank(bob);
+    savingCircles.depositIfAllowed(baseCircleId, alice);
+
+    // Balance should remain the same
+    uint256 balance = savingCircles.balances(baseCircleId, alice);
+    assertEq(balance, DEPOSIT_AMOUNT);
+  }
+
+  function test_DepositIfAllowed_PartialDeposit() external {
+    // Alice makes a partial deposit first
+    uint256 partialAmount = DEPOSIT_AMOUNT / 2;
+    token.mint(alice, DEPOSIT_AMOUNT);
+
+    vm.startPrank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(baseCircleId, partialAmount);
+    vm.stopPrank();
+
+    // Now call depositIfAllowed to complete the deposit
+    vm.prank(bob);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.FundsDeposited(baseCircleId, alice, partialAmount);
+    savingCircles.depositIfAllowed(baseCircleId, alice);
+
+    // Verify full deposit amount
+    uint256 balance = savingCircles.balances(baseCircleId, alice);
+    assertEq(balance, DEPOSIT_AMOUNT);
+  }
+
+  function test_DepositIfAllowed_NotMember() external {
+    address nonMember = makeAddr('nonMember');
+    token.mint(nonMember, DEPOSIT_AMOUNT);
+
+    vm.prank(nonMember);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    vm.prank(bob);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
+    savingCircles.depositIfAllowed(baseCircleId, nonMember);
+  }
+
+  function test_GetEligibleAddressesForDeposit() external {
+    // Setup: Alice approves, Bob doesn't, Carol approves partial
+    token.mint(alice, DEPOSIT_AMOUNT);
+    token.mint(bob, DEPOSIT_AMOUNT);
+    token.mint(carol, DEPOSIT_AMOUNT);
+
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    vm.prank(carol);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2); // Insufficient
+
+    // Get eligible addresses
+    (uint256[] memory circleIds, address[] memory eligibleMembers) = savingCircles.getEligibleAddressesForDeposit();
+
+    // Only alice should be eligible
+    assertEq(eligibleMembers.length, 1);
+    assertEq(eligibleMembers[0], alice);
+    assertEq(circleIds[0], baseCircleId);
+  }
+
+  function test_GetEligibleAddressesForDeposit_MultipleCircles() external {
+    // Create second circle
+    address[] memory secondMembers = new address[](2);
+    secondMembers[0] = alice;
+    secondMembers[1] = bob;
+
+    ISavingCircles.Circle memory secondCircle = ISavingCircles.Circle({
+      owner: carol,
+      members: secondMembers,
+      currentIndex: 0,
+      circleStart: block.timestamp,
+      token: address(token),
+      depositAmount: DEPOSIT_AMOUNT / 2,
+      depositInterval: DEPOSIT_INTERVAL,
+      maxDeposits: MAX_DEPOSITS
+    });
+
+    vm.prank(carol);
+    uint256 secondCircleId = savingCircles.create(secondCircle);
+
+    // Setup approvals
+    token.mint(alice, DEPOSIT_AMOUNT * 2);
+    token.mint(bob, DEPOSIT_AMOUNT);
+
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT * 2);
+
+    vm.prank(bob);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2);
+
+    // Get eligible addresses
+    (uint256[] memory circleIds, address[] memory eligibleMembers) = savingCircles.getEligibleAddressesForDeposit();
+
+    // Should have 3 eligible entries: alice in both circles, bob in second circle
+    assertEq(eligibleMembers.length, 3);
+  }
+
+  function test_GetEligibleAddressesForDeposit_OutsideDepositWindow() external {
+    // Setup approvals
+    token.mint(alice, DEPOSIT_AMOUNT);
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Move time past deposit window
+    vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
+
+    // Get eligible addresses - should be empty
+    (uint256[] memory circleIds, address[] memory eligibleMembers) = savingCircles.getEligibleAddressesForDeposit();
+    assertEq(eligibleMembers.length, 0);
+  }
+
+  function test_BatchDepositIfAllowed() external {
+    // Setup tokens and approvals for all members
+    token.mint(alice, DEPOSIT_AMOUNT);
+    token.mint(bob, DEPOSIT_AMOUNT);
+    token.mint(carol, DEPOSIT_AMOUNT);
+
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    vm.prank(bob);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2); // Insufficient
+
+    vm.prank(carol);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Batch deposit
+    address[] memory membersToDeposit = new address[](3);
+    membersToDeposit[0] = alice;
+    membersToDeposit[1] = bob;
+    membersToDeposit[2] = carol;
+
+    vm.prank(owner);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.FundsDeposited(baseCircleId, carol, DEPOSIT_AMOUNT);
+    savingCircles.batchDepositIfAllowed(baseCircleId, membersToDeposit);
+
+    // Verify deposits
+    assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(baseCircleId, bob), 0); // Insufficient allowance
+    assertEq(savingCircles.balances(baseCircleId, carol), DEPOSIT_AMOUNT);
+  }
+
+  function test_BatchDepositIfAllowed_WithNonMembers() external {
+    address nonMember = makeAddr('nonMember');
+    token.mint(alice, DEPOSIT_AMOUNT);
+    token.mint(nonMember, DEPOSIT_AMOUNT);
+
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    vm.prank(nonMember);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Batch deposit including non-member
+    address[] memory membersToDeposit = new address[](2);
+    membersToDeposit[0] = alice;
+    membersToDeposit[1] = nonMember;
+
+    vm.prank(owner);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
+    // Should not emit for non-member
+    savingCircles.batchDepositIfAllowed(baseCircleId, membersToDeposit);
+
+    // Verify only alice's deposit went through
+    assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(baseCircleId, nonMember), 0);
+  }
+
+  function test_BatchDepositIfAllowed_OutsideDepositWindow() external {
+    token.mint(alice, DEPOSIT_AMOUNT);
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Move time past deposit window
+    vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
+
+    address[] memory membersToDeposit = new address[](1);
+    membersToDeposit[0] = alice;
+
+    vm.prank(owner);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.DepositWindowClosed.selector));
+    savingCircles.batchDepositIfAllowed(baseCircleId, membersToDeposit);
+  }
+
+  function test_BatchDepositIfAllowed_DecommissionedCircle() external {
+    // Create a circle that can be decommissioned
+    ISavingCircles.Circle memory testCircle = baseCircle;
+    testCircle.circleStart = block.timestamp + 1 days; // Start in the future
+    testCircle.owner = alice;
+
+    vm.prank(alice);
+    uint256 testCircleId = savingCircles.create(testCircle);
+
+    // Move time to after the first deposit interval with no deposits
+    vm.warp(testCircle.circleStart + DEPOSIT_INTERVAL + 1);
+
+    // Decommission the circle (possible because deposit window closed with incomplete deposits)
+    vm.prank(alice);
+    savingCircles.decommission(testCircleId);
+
+    address[] memory membersToDeposit = new address[](1);
+    membersToDeposit[0] = alice;
+
+    vm.prank(owner);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
+    savingCircles.batchDepositIfAllowed(testCircleId, membersToDeposit);
+  }
 }
