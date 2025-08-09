@@ -139,6 +139,97 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
+  function setAutomatedDepositsEnabled(bool _enabled) external override {
+    automatedDepositsEnabled[msg.sender] = _enabled;
+    emit AutomatedDepositsToggled(msg.sender, _enabled);
+  }
+
+  /// @inheritdoc ISavingCircles
+  function depositIfAllowed(uint256 _id, address _member) external override nonReentrant {
+    Circle memory _circle = circles[_id];
+
+    if (_isDecommissioned(_circle)) revert NotCommissioned();
+    if (!isMember[_id][_member]) revert NotMember();
+    if (!automatedDepositsEnabled[_member]) revert AutomatedDepositsNotEnabled();
+
+    // Calculate the remaining deposit amount needed
+    uint256 currentBalance = balances[_id][_member];
+    if (currentBalance >= _circle.depositAmount) return; // Already deposited
+    uint256 requiredAmount = _circle.depositAmount - currentBalance;
+
+    // Check allowance
+    uint256 allowance = IERC20(_circle.token).allowance(_member, address(this));
+    if (allowance < requiredAmount) revert InsufficientAllowance();
+
+    // Check deposit window validity
+    if (block.timestamp < _circle.circleStart) {
+      revert DepositBeforeCircleStart();
+    }
+    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
+      revert DepositWindowClosed();
+    }
+    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
+      revert CircleExpired();
+    }
+
+    // Update balance
+    balances[_id][_member] = balances[_id][_member] + requiredAmount;
+
+    // Transfer tokens from member to contract
+    bool success = IERC20(_circle.token).transferFrom(_member, address(this), requiredAmount);
+    if (!success) revert TransferFailed();
+
+    emit FundsDeposited(_id, _member, requiredAmount);
+  }
+
+  /// @inheritdoc ISavingCircles
+  function batchDepositIfAllowed(uint256[] calldata _ids, address[] calldata _members) external override nonReentrant {
+    // Validate array lengths match
+    if (_ids.length != _members.length) revert ArrayLengthMismatch();
+
+    for (uint256 i = 0; i < _ids.length; i++) {
+      uint256 circleId = _ids[i];
+      address member = _members[i];
+      Circle memory _circle = circles[circleId];
+
+      // Skip if circle is decommissioned
+      if (_isDecommissioned(_circle)) continue;
+
+      // Skip if not a member
+      if (!isMember[circleId][member]) continue;
+
+      // Skip if member has not opted in to automated deposits
+      if (!automatedDepositsEnabled[member]) continue;
+
+      // Check deposit window validity
+      if (block.timestamp < _circle.circleStart) continue;
+      if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) continue;
+      if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) continue;
+
+      // Calculate the remaining deposit amount needed
+      uint256 currentBalance = balances[circleId][member];
+      if (currentBalance >= _circle.depositAmount) continue; // Already deposited
+      uint256 requiredAmount = _circle.depositAmount - currentBalance;
+
+      // Check allowance
+      uint256 allowance = IERC20(_circle.token).allowance(member, address(this));
+      if (allowance < requiredAmount) continue; // Skip if insufficient allowance
+
+      // Update balance
+      balances[circleId][member] = balances[circleId][member] + requiredAmount;
+
+      // Transfer tokens from member to contract
+      bool success = IERC20(_circle.token).transferFrom(member, address(this), requiredAmount);
+      if (success) {
+        emit FundsDeposited(circleId, member, requiredAmount);
+      } else {
+        // Revert balance update if transfer failed
+        balances[circleId][member] = balances[circleId][member] - requiredAmount;
+      }
+    }
+  }
+
+  /// @inheritdoc ISavingCircles
   function getCircle(uint256 _id) external view override onlyCommissioned(_id) returns (Circle memory _circle) {
     _circle = circles[_id];
   }
@@ -205,52 +296,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function setAutomatedDepositsEnabled(bool _enabled) external override {
-    automatedDepositsEnabled[msg.sender] = _enabled;
-    emit AutomatedDepositsToggled(msg.sender, _enabled);
-  }
-
-  /// @inheritdoc ISavingCircles
   function isAutomatedDepositsEnabled(address _member) external view override returns (bool) {
     return automatedDepositsEnabled[_member];
-  }
-
-  /// @inheritdoc ISavingCircles
-  function depositIfAllowed(uint256 _id, address _member) external override nonReentrant {
-    Circle memory _circle = circles[_id];
-
-    if (_isDecommissioned(_circle)) revert NotCommissioned();
-    if (!isMember[_id][_member]) revert NotMember();
-    if (!automatedDepositsEnabled[_member]) revert AutomatedDepositsNotEnabled();
-
-    // Calculate the remaining deposit amount needed
-    uint256 currentBalance = balances[_id][_member];
-    if (currentBalance >= _circle.depositAmount) return; // Already deposited
-    uint256 requiredAmount = _circle.depositAmount - currentBalance;
-
-    // Check allowance
-    uint256 allowance = IERC20(_circle.token).allowance(_member, address(this));
-    if (allowance < requiredAmount) revert InsufficientAllowance();
-
-    // Check deposit window validity
-    if (block.timestamp < _circle.circleStart) {
-      revert DepositBeforeCircleStart();
-    }
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
-      revert DepositWindowClosed();
-    }
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
-      revert CircleExpired();
-    }
-
-    // Update balance
-    balances[_id][_member] = balances[_id][_member] + requiredAmount;
-
-    // Transfer tokens from member to contract
-    bool success = IERC20(_circle.token).transferFrom(_member, address(this), requiredAmount);
-    if (!success) revert TransferFailed();
-
-    emit FundsDeposited(_id, _member, requiredAmount);
   }
 
   /// @inheritdoc ISavingCircles
@@ -319,53 +366,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     }
 
     return (circleIds, members);
-  }
-
-  /// @inheritdoc ISavingCircles
-  function batchDepositIfAllowed(uint256[] calldata _ids, address[] calldata _members) external override nonReentrant {
-    // Validate array lengths match
-    if (_ids.length != _members.length) revert ArrayLengthMismatch();
-
-    for (uint256 i = 0; i < _ids.length; i++) {
-      uint256 circleId = _ids[i];
-      address member = _members[i];
-      Circle memory _circle = circles[circleId];
-
-      // Skip if circle is decommissioned
-      if (_isDecommissioned(_circle)) continue;
-
-      // Skip if not a member
-      if (!isMember[circleId][member]) continue;
-
-      // Skip if member has not opted in to automated deposits
-      if (!automatedDepositsEnabled[member]) continue;
-
-      // Check deposit window validity
-      if (block.timestamp < _circle.circleStart) continue;
-      if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) continue;
-      if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) continue;
-
-      // Calculate the remaining deposit amount needed
-      uint256 currentBalance = balances[circleId][member];
-      if (currentBalance >= _circle.depositAmount) continue; // Already deposited
-      uint256 requiredAmount = _circle.depositAmount - currentBalance;
-
-      // Check allowance
-      uint256 allowance = IERC20(_circle.token).allowance(member, address(this));
-      if (allowance < requiredAmount) continue; // Skip if insufficient allowance
-
-      // Update balance
-      balances[circleId][member] = balances[circleId][member] + requiredAmount;
-
-      // Transfer tokens from member to contract
-      bool success = IERC20(_circle.token).transferFrom(member, address(this), requiredAmount);
-      if (success) {
-        emit FundsDeposited(circleId, member, requiredAmount);
-      } else {
-        // Revert balance update if transfer failed
-        balances[circleId][member] = balances[circleId][member] - requiredAmount;
-      }
-    }
   }
 
   /**
