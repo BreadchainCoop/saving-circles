@@ -529,9 +529,38 @@ contract SavingCirclesUnit is Test {
 
   // Tests for automated deposit functions
 
+  function test_SetAutomatedDepositsEnabled() external {
+    // Check initial state is disabled
+    assertFalse(savingCircles.isAutomatedDepositsEnabled(alice));
+
+    // Alice enables automated deposits
+    vm.prank(alice);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.AutomatedDepositsToggled(alice, true);
+    savingCircles.setAutomatedDepositsEnabled(true);
+
+    // Verify it's enabled
+    assertTrue(savingCircles.isAutomatedDepositsEnabled(alice));
+
+    // Alice disables automated deposits
+    vm.prank(alice);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.AutomatedDepositsToggled(alice, false);
+    savingCircles.setAutomatedDepositsEnabled(false);
+
+    // Verify it's disabled
+    assertFalse(savingCircles.isAutomatedDepositsEnabled(alice));
+  }
+
+  // Tests for automated deposit functions
+
   function test_DepositIfAllowed_WithSufficientAllowance() external {
     // Mint tokens to alice
     token.mint(alice, DEPOSIT_AMOUNT);
+
+    // Alice opts in to automated deposits
+    vm.prank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
 
     // Alice approves the saving circles contract
     vm.prank(alice);
@@ -548,9 +577,27 @@ contract SavingCirclesUnit is Test {
     assertEq(balance, DEPOSIT_AMOUNT);
   }
 
+  function test_DepositIfAllowed_NotOptedIn() external {
+    // Mint tokens to alice
+    token.mint(alice, DEPOSIT_AMOUNT);
+
+    // Alice approves but does NOT opt in
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Should revert because alice hasn't opted in
+    vm.prank(bob);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AutomatedDepositsNotEnabled.selector));
+    savingCircles.depositIfAllowed(baseCircleId, alice);
+  }
+
   function test_DepositIfAllowed_WithInsufficientAllowance() external {
     // Mint tokens to alice
     token.mint(alice, DEPOSIT_AMOUNT);
+
+    // Alice opts in to automated deposits
+    vm.prank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
 
     // Alice approves less than required amount
     vm.prank(alice);
@@ -565,6 +612,10 @@ contract SavingCirclesUnit is Test {
   function test_DepositIfAllowed_WhenAlreadyDeposited() external {
     // Mint tokens to alice
     token.mint(alice, DEPOSIT_AMOUNT * 2);
+
+    // Alice opts in to automated deposits
+    vm.prank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
 
     // Alice makes a regular deposit first
     vm.startPrank(alice);
@@ -586,6 +637,10 @@ contract SavingCirclesUnit is Test {
     uint256 partialAmount = DEPOSIT_AMOUNT / 2;
     token.mint(alice, DEPOSIT_AMOUNT);
 
+    // Alice opts in to automated deposits
+    vm.prank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
+
     vm.startPrank(alice);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
     savingCircles.deposit(baseCircleId, partialAmount);
@@ -606,8 +661,11 @@ contract SavingCirclesUnit is Test {
     address nonMember = makeAddr('nonMember');
     token.mint(nonMember, DEPOSIT_AMOUNT);
 
-    vm.prank(nonMember);
+    // Non-member opts in and approves
+    vm.startPrank(nonMember);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
     vm.prank(bob);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
@@ -615,21 +673,29 @@ contract SavingCirclesUnit is Test {
   }
 
   function test_GetEligibleAddressesForDeposit() external {
-    // Setup: Alice approves, Bob doesn't, Carol approves partial
+    // Setup: Alice opts in and approves, Bob opts in but doesn't approve, Carol doesn't opt in
     token.mint(alice, DEPOSIT_AMOUNT);
     token.mint(bob, DEPOSIT_AMOUNT);
     token.mint(carol, DEPOSIT_AMOUNT);
 
-    vm.prank(alice);
+    // Alice opts in and approves
+    vm.startPrank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
+    // Bob opts in but doesn't approve
+    vm.prank(bob);
+    savingCircles.setAutomatedDepositsEnabled(true);
+
+    // Carol approves but doesn't opt in
     vm.prank(carol);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2); // Insufficient
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
 
     // Get eligible addresses
     (uint256[] memory circleIds, address[] memory eligibleMembers) = savingCircles.getEligibleAddressesForDeposit();
 
-    // Only alice should be eligible
+    // Only alice should be eligible (opted in AND has allowance)
     assertEq(eligibleMembers.length, 1);
     assertEq(eligibleMembers[0], alice);
     assertEq(circleIds[0], baseCircleId);
@@ -659,11 +725,17 @@ contract SavingCirclesUnit is Test {
     token.mint(alice, DEPOSIT_AMOUNT * 2);
     token.mint(bob, DEPOSIT_AMOUNT);
 
-    vm.prank(alice);
+    // Alice opts in and approves
+    vm.startPrank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT * 2);
+    vm.stopPrank();
 
-    vm.prank(bob);
+    // Bob opts in and approves
+    vm.startPrank(bob);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2);
+    vm.stopPrank();
 
     // Get eligible addresses
     (uint256[] memory circleIds, address[] memory eligibleMembers) = savingCircles.getEligibleAddressesForDeposit();
@@ -675,8 +747,11 @@ contract SavingCirclesUnit is Test {
   function test_GetEligibleAddressesForDeposit_OutsideDepositWindow() external {
     // Setup approvals
     token.mint(alice, DEPOSIT_AMOUNT);
-    vm.prank(alice);
+
+    vm.startPrank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
     // Move time past deposit window
     vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
@@ -692,14 +767,23 @@ contract SavingCirclesUnit is Test {
     token.mint(bob, DEPOSIT_AMOUNT);
     token.mint(carol, DEPOSIT_AMOUNT);
 
-    vm.prank(alice);
+    // Alice opts in and approves
+    vm.startPrank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
-    vm.prank(bob);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2); // Insufficient
+    // Bob opts in but has insufficient allowance
+    vm.startPrank(bob);
+    savingCircles.setAutomatedDepositsEnabled(true);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2);
+    vm.stopPrank();
 
-    vm.prank(carol);
+    // Carol opts in and approves
+    vm.startPrank(carol);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
     // Batch deposit - same circle for all members
     uint256[] memory circleIds = new uint256[](3);
@@ -730,11 +814,17 @@ contract SavingCirclesUnit is Test {
     token.mint(alice, DEPOSIT_AMOUNT);
     token.mint(nonMember, DEPOSIT_AMOUNT);
 
-    vm.prank(alice);
+    // Alice opts in and approves
+    vm.startPrank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
-    vm.prank(nonMember);
+    // NonMember opts in and approves (but is not a member)
+    vm.startPrank(nonMember);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
     // Batch deposit including non-member
     uint256[] memory circleIds = new uint256[](2);
@@ -758,8 +848,12 @@ contract SavingCirclesUnit is Test {
 
   function test_BatchDepositIfAllowed_OutsideDepositWindow() external {
     token.mint(alice, DEPOSIT_AMOUNT);
-    vm.prank(alice);
+
+    // Alice opts in and approves
+    vm.startPrank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
     // Move time past deposit window
     vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
@@ -803,14 +897,23 @@ contract SavingCirclesUnit is Test {
     token.mint(bob, DEPOSIT_AMOUNT);
     token.mint(carol, DEPOSIT_AMOUNT);
 
-    vm.prank(alice);
+    // Alice opts in and approves
+    vm.startPrank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT * 2);
+    vm.stopPrank();
 
-    vm.prank(bob);
+    // Bob opts in and approves
+    vm.startPrank(bob);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
-    vm.prank(carol);
+    // Carol opts in and approves
+    vm.startPrank(carol);
+    savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
 
     // Batch deposit across multiple circles
     uint256[] memory circleIds = new uint256[](4);

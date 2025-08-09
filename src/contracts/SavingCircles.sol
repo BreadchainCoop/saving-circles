@@ -25,6 +25,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   mapping(uint256 id => mapping(address member => bool status)) public isMember;
   mapping(address member => uint256[] ids) public memberCircles;
   mapping(address token => bool status) public allowedTokens;
+  mapping(address member => bool enabled) public automatedDepositsEnabled;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -204,11 +205,23 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
+  function setAutomatedDepositsEnabled(bool _enabled) external override {
+    automatedDepositsEnabled[msg.sender] = _enabled;
+    emit AutomatedDepositsToggled(msg.sender, _enabled);
+  }
+
+  /// @inheritdoc ISavingCircles
+  function isAutomatedDepositsEnabled(address _member) external view override returns (bool) {
+    return automatedDepositsEnabled[_member];
+  }
+
+  /// @inheritdoc ISavingCircles
   function depositIfAllowed(uint256 _id, address _member) external override nonReentrant {
     Circle memory _circle = circles[_id];
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
     if (!isMember[_id][_member]) revert NotMember();
+    if (!automatedDepositsEnabled[_member]) revert AutomatedDepositsNotEnabled();
 
     // Calculate the remaining deposit amount needed
     uint256 currentBalance = balances[_id][_member];
@@ -260,6 +273,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
       for (uint256 j = 0; j < _circle.members.length; j++) {
         address member = _circle.members[j];
+        if (!automatedDepositsEnabled[member]) continue; // Skip if not opted in
+
         uint256 currentBalance = balances[id][member];
         if (currentBalance >= _circle.depositAmount) continue; // Already deposited
 
@@ -288,6 +303,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
       for (uint256 j = 0; j < _circle.members.length; j++) {
         address member = _circle.members[j];
+        if (!automatedDepositsEnabled[member]) continue; // Skip if not opted in
+
         uint256 currentBalance = balances[id][member];
         if (currentBalance >= _circle.depositAmount) continue; // Already deposited
 
@@ -319,6 +336,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
       // Skip if not a member
       if (!isMember[circleId][member]) continue;
+
+      // Skip if member has not opted in to automated deposits
+      if (!automatedDepositsEnabled[member]) continue;
 
       // Check deposit window validity
       if (block.timestamp < _circle.circleStart) continue;

@@ -62,30 +62,48 @@ The Saving Circles contract now supports automated ERC20 allowance-based deposit
 
 ### New Functions
 
-1. **`depositIfAllowed(uint256 id, address member)`**
-   - Automatically deposits funds for a member if they have sufficient ERC20 allowance
+1. **`setAutomatedDepositsEnabled(bool enabled)`**
+   - Members must call this function to opt-in to automated deposits
+   - Provides user control over whether their deposits can be automated
+   - Can be toggled on/off at any time
+
+2. **`isAutomatedDepositsEnabled(address member)`**
+   - Check if a member has opted in to automated deposits
+   - Returns true if the member has enabled automated deposits
+
+3. **`depositIfAllowed(uint256 id, address member)`**
+   - Automatically deposits funds for a member if they have:
+     - Opted in to automated deposits
+     - Sufficient ERC20 allowance
+     - Not already completed their deposit
    - Can be called by anyone (e.g., keepers, automation services)
-   - Checks allowance and only deposits the remaining amount needed
+   - Only deposits the remaining amount needed
 
-2. **`getEligibleAddressesForDeposit()`**
+4. **`getEligibleAddressesForDeposit()`**
    - Returns all circle IDs and member addresses eligible for automated deposits
+   - Only includes members who have:
+     - Opted in to automated deposits
+     - Sufficient ERC20 allowance
+     - Active deposit windows
    - Useful for automation services to identify which deposits can be processed
-   - Only includes members within active deposit windows with sufficient allowances
 
-3. **`batchDepositIfAllowed(uint256[] ids, address[] members)`**
+5. **`batchDepositIfAllowed(uint256[] ids, address[] members)`**
    - Processes multiple deposits across multiple circles in a single transaction
    - Accepts parallel arrays of circle IDs and member addresses
-   - Ideal for DAOs or automation services managing multiple accounts across different circles
-   - Skips members with insufficient allowance or who have already deposited
+   - Only processes deposits for members who have opted in
+   - Ideal for DAOs or automation services managing multiple accounts
    - Arrays must be the same length or transaction will revert
 
 ### Usage Example
 
 ```solidity
-// Member approves the contract to spend their tokens
+// Step 1: Member opts in to automated deposits
+savingCircles.setAutomatedDepositsEnabled(true);
+
+// Step 2: Member approves the contract to spend their tokens
 token.approve(savingCirclesAddress, depositAmount);
 
-// Anyone can then trigger the deposit
+// Step 3: Anyone can then trigger the deposit
 savingCircles.depositIfAllowed(circleId, memberAddress);
 
 // Or process multiple deposits across different circles at once

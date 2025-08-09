@@ -66,6 +66,13 @@ interface ISavingCircles {
   event TokenAllowed(address indexed token, bool indexed allowed);
 
   /**
+   * @notice Emitted when a member enables or disables automated deposits
+   * @param member The address of the member
+   * @param enabled Whether automated deposits are enabled
+   */
+  event AutomatedDepositsToggled(address indexed member, bool indexed enabled);
+
+  /**
    * @notice Thrown when a member attempts to redundantly deposit funds into a circle
    */
   error AlreadyDeposited();
@@ -186,6 +193,11 @@ interface ISavingCircles {
   error ArrayLengthMismatch();
 
   /**
+   * @notice Thrown when automated deposits are not enabled for a member
+   */
+  error AutomatedDepositsNotEnabled();
+
+  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -298,7 +310,20 @@ interface ISavingCircles {
   function withdrawableBy(uint256 id) external view returns (address withdrawableBy);
 
   /**
-   * @notice Deposit funds for a user if they have sufficient allowance
+   * @notice Enable or disable automated deposits for the caller
+   * @param enabled Whether to enable automated deposits
+   */
+  function setAutomatedDepositsEnabled(bool enabled) external;
+
+  /**
+   * @notice Check if a member has automated deposits enabled
+   * @param member The address of the member
+   * @return enabled Whether automated deposits are enabled
+   */
+  function isAutomatedDepositsEnabled(address member) external view returns (bool enabled);
+
+  /**
+   * @notice Deposit funds for a user if they have sufficient allowance and have opted in
    * @param id The ID of the circle
    * @param member The address of the member
    */
