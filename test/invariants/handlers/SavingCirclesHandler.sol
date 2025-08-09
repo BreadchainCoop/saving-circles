@@ -49,7 +49,7 @@ contract SavingCirclesHandler is Test {
     uint256 depositInterval,
     uint256 maxDeposits,
     uint256 circleStartOffset,
-    uint256 actorSeed
+    uint256 actorSeed // solhint-disable-line no-unused-vars
   ) public useActor(actorSeed) {
     uint256 memberCount = bound(memberCountSeed, 2, 5);
     depositAmount = bound(depositAmount, 100, 1e18);
@@ -79,7 +79,11 @@ contract SavingCirclesHandler is Test {
     } catch {}
   }
 
-  function deposit(uint256 circleIndexSeed, uint256 amount, uint256 actorSeed) public useActor(actorSeed) {
+  function deposit(
+    uint256 circleIndexSeed,
+    uint256 amount,
+    uint256 actorSeed // solhint-disable-line no-unused-vars
+  ) public useActor(actorSeed) {
     if (activeCircles.length == 0) return;
 
     uint256 circleIndex = circleIndexSeed % activeCircles.length;
@@ -109,7 +113,7 @@ contract SavingCirclesHandler is Test {
     uint256 circleIndexSeed,
     uint256 memberIndexSeed,
     uint256 amount,
-    uint256 actorSeed
+    uint256 actorSeed // solhint-disable-line no-unused-vars
   ) public useActor(actorSeed) {
     if (activeCircles.length == 0) return;
 
@@ -139,7 +143,10 @@ contract SavingCirclesHandler is Test {
     } catch {}
   }
 
-  function withdraw(uint256 circleIndexSeed, uint256 actorSeed) public useActor(actorSeed) {
+  function withdraw(
+    uint256 circleIndexSeed,
+    uint256 actorSeed // solhint-disable-line no-unused-vars
+  ) public useActor(actorSeed) {
     if (activeCircles.length == 0) return;
 
     uint256 circleIndex = circleIndexSeed % activeCircles.length;
@@ -162,7 +169,11 @@ contract SavingCirclesHandler is Test {
     } catch {}
   }
 
-  function withdrawFor(uint256 circleIndexSeed, uint256 memberIndexSeed, uint256 actorSeed) public useActor(actorSeed) {
+  function withdrawFor(
+    uint256 circleIndexSeed,
+    uint256 memberIndexSeed,
+    uint256 actorSeed // solhint-disable-line no-unused-vars
+  ) public useActor(actorSeed) {
     if (activeCircles.length == 0) return;
 
     uint256 circleIndex = circleIndexSeed % activeCircles.length;
@@ -189,7 +200,10 @@ contract SavingCirclesHandler is Test {
     } catch {}
   }
 
-  function decommission(uint256 circleIndexSeed, uint256 actorSeed) public useActor(actorSeed) {
+  function decommission(
+    uint256 circleIndexSeed,
+    uint256 actorSeed // solhint-disable-line no-unused-vars
+  ) public useActor(actorSeed) {
     if (activeCircles.length == 0) return;
 
     uint256 circleIndex = circleIndexSeed % activeCircles.length;
