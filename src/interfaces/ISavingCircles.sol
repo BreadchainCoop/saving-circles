@@ -252,6 +252,26 @@ interface ISavingCircles {
   function decommission(uint256 id) external;
 
   /**
+   * @notice Enable or disable automated deposits for the caller
+   * @param enabled Whether to enable automated deposits
+   */
+  function setAutomatedDepositsEnabled(bool enabled) external;
+
+  /**
+   * @notice Deposit funds for a user if they have sufficient allowance and have opted in
+   * @param id The ID of the circle
+   * @param member The address of the member
+   */
+  function depositIfAllowed(uint256 id, address member) external;
+
+  /**
+   * @notice Batch deposit funds for multiple users across multiple circles if they have sufficient allowance
+   * @param ids The IDs of the circles (must match length of members array)
+   * @param members The addresses of the members (must match length of ids array)
+   */
+  function batchDepositIfAllowed(uint256[] calldata ids, address[] calldata members) external;
+
+  /**
    * @notice Get a single circle
    * @param id The ID of the circle
    * @return circle The circle
@@ -310,24 +330,11 @@ interface ISavingCircles {
   function withdrawableBy(uint256 id) external view returns (address withdrawableBy);
 
   /**
-   * @notice Enable or disable automated deposits for the caller
-   * @param enabled Whether to enable automated deposits
-   */
-  function setAutomatedDepositsEnabled(bool enabled) external;
-
-  /**
    * @notice Check if a member has automated deposits enabled
    * @param member The address of the member
    * @return enabled Whether automated deposits are enabled
    */
   function isAutomatedDepositsEnabled(address member) external view returns (bool enabled);
-
-  /**
-   * @notice Deposit funds for a user if they have sufficient allowance and have opted in
-   * @param id The ID of the circle
-   * @param member The address of the member
-   */
-  function depositIfAllowed(uint256 id, address member) external;
 
   /**
    * @notice Get all addresses eligible for automated deposits across all circles
@@ -338,11 +345,4 @@ interface ISavingCircles {
     external
     view
     returns (uint256[] memory circleIds, address[] memory members);
-
-  /**
-   * @notice Batch deposit funds for multiple users across multiple circles if they have sufficient allowance
-   * @param ids The IDs of the circles (must match length of members array)
-   * @param members The addresses of the members (must match length of ids array)
-   */
-  function batchDepositIfAllowed(uint256[] calldata ids, address[] calldata members) external;
 }

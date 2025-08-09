@@ -145,8 +145,46 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function depositIfAllowed(uint256 _id, address _member) external override nonReentrant {
-    _depositIfAllowedWithRevert(_id, _member);
+  function depositIfAllowed(uint256 _id, address _member) external override {
+    Circle memory _circle = circles[_id];
+
+    // Check basic requirements
+    if (_isDecommissioned(_circle)) revert NotCommissioned();
+    if (!isMember[_id][_member]) revert NotMember();
+    if (!automatedDepositsEnabled[_member]) revert AutomatedDepositsNotEnabled();
+
+    // Calculate the remaining deposit amount needed
+    uint256 currentBalance = balances[_id][_member];
+    if (currentBalance >= _circle.depositAmount) return; // Already deposited - no revert needed
+    uint256 requiredAmount = _circle.depositAmount - currentBalance;
+
+    // Check allowance
+    uint256 allowance = IERC20(_circle.token).allowance(_member, address(this));
+    if (allowance < requiredAmount) revert InsufficientAllowance();
+
+    // Check deposit window validity
+    if (block.timestamp < _circle.circleStart) {
+      revert DepositBeforeCircleStart();
+    }
+    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
+      revert DepositWindowClosed();
+    }
+    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
+      revert CircleExpired();
+    }
+
+    // Update balance
+    balances[_id][_member] = balances[_id][_member] + requiredAmount;
+
+    // Transfer tokens from member to contract
+    bool transferSuccess = IERC20(_circle.token).transferFrom(_member, address(this), requiredAmount);
+    if (!transferSuccess) {
+      // Revert balance update if transfer failed
+      balances[_id][_member] = balances[_id][_member] - requiredAmount;
+      revert TransferFailed();
+    }
+
+    emit FundsDeposited(_id, _member, requiredAmount);
   }
 
   /// @inheritdoc ISavingCircles
@@ -156,7 +194,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
     for (uint256 i = 0; i < _ids.length; i++) {
       // Try to deposit, skip on failure
-      _tryDepositIfAllowed(_ids[i], _members[i]);
+      try this.depositIfAllowed(_ids[i], _members[i]) {} catch {}
     }
   }
 
@@ -355,96 +393,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (!success) revert TransferFailed();
 
     emit FundsDeposited(_id, _member, _value);
-  }
-
-  /**
-   * @dev Internal function for depositIfAllowed that reverts on errors
-   */
-  function _depositIfAllowedWithRevert(uint256 _id, address _member) internal {
-    (bool success,,) = _performDepositIfAllowed(_id, _member);
-    if (!success) {
-      // Revert with appropriate error based on the reason
-      Circle memory _circle = circles[_id];
-      if (_isDecommissioned(_circle)) revert NotCommissioned();
-      if (!isMember[_id][_member]) revert NotMember();
-      if (!automatedDepositsEnabled[_member]) revert AutomatedDepositsNotEnabled();
-
-      uint256 currentBalance = balances[_id][_member];
-      if (currentBalance < _circle.depositAmount) {
-        uint256 requiredAmount = _circle.depositAmount - currentBalance;
-        uint256 allowance = IERC20(_circle.token).allowance(_member, address(this));
-        if (allowance < requiredAmount) revert InsufficientAllowance();
-
-        if (block.timestamp < _circle.circleStart) {
-          revert DepositBeforeCircleStart();
-        }
-        if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
-          revert DepositWindowClosed();
-        }
-        if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
-          revert CircleExpired();
-        }
-      }
-    }
-  }
-
-  /**
-   * @dev Internal function that attempts deposit but doesn't revert on failure
-   */
-  function _tryDepositIfAllowed(uint256 _id, address _member) internal {
-    _performDepositIfAllowed(_id, _member);
-  }
-
-  /**
-   * @dev Core logic for automated deposits, returns success status and details
-   * @param _id Circle ID
-   * @param _member Member address to deposit for
-   * @return success Whether the deposit was successful
-   * @return amountDeposited Amount actually deposited (0 if failed or already deposited)
-   * @return alreadyDeposited True if member has already made their full deposit
-   */
-  function _performDepositIfAllowed(
-    uint256 _id,
-    address _member
-  ) internal returns (bool success, uint256 amountDeposited, bool alreadyDeposited) {
-    Circle memory _circle = circles[_id];
-
-    // Check basic requirements
-    if (_isDecommissioned(_circle)) return (false, 0, false);
-    if (!isMember[_id][_member]) return (false, 0, false);
-    if (!automatedDepositsEnabled[_member]) return (false, 0, false);
-
-    // Calculate the remaining deposit amount needed
-    uint256 currentBalance = balances[_id][_member];
-    if (currentBalance >= _circle.depositAmount) return (true, 0, true); // Already deposited
-    uint256 requiredAmount = _circle.depositAmount - currentBalance;
-
-    // Check allowance
-    uint256 allowance = IERC20(_circle.token).allowance(_member, address(this));
-    if (allowance < requiredAmount) return (false, 0, false);
-
-    // Check deposit window validity
-    if (block.timestamp < _circle.circleStart) return (false, 0, false);
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
-      return (false, 0, false);
-    }
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
-      return (false, 0, false);
-    }
-
-    // Update balance
-    balances[_id][_member] = balances[_id][_member] + requiredAmount;
-
-    // Transfer tokens from member to contract
-    bool transferSuccess = IERC20(_circle.token).transferFrom(_member, address(this), requiredAmount);
-    if (transferSuccess) {
-      emit FundsDeposited(_id, _member, requiredAmount);
-      return (true, requiredAmount, false);
-    } else {
-      // Revert balance update if transfer failed
-      balances[_id][_member] = balances[_id][_member] - requiredAmount;
-      return (false, 0, false);
-    }
   }
 
   /**
