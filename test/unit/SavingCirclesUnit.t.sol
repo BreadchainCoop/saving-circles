@@ -767,19 +767,17 @@ contract SavingCirclesUnit is Test {
     token.mint(bob, DEPOSIT_AMOUNT);
     token.mint(carol, DEPOSIT_AMOUNT);
 
-    // Alice opts in and approves
+    // All users opt in and approve full amount
     vm.startPrank(alice);
     savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
     vm.stopPrank();
 
-    // Bob opts in but has insufficient allowance
     vm.startPrank(bob);
     savingCircles.setAutomatedDepositsEnabled(true);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
     vm.stopPrank();
 
-    // Carol opts in and approves
     vm.startPrank(carol);
     savingCircles.setAutomatedDepositsEnabled(true);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
@@ -800,13 +798,49 @@ contract SavingCirclesUnit is Test {
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
     vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.FundsDeposited(baseCircleId, bob, DEPOSIT_AMOUNT);
+    vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsDeposited(baseCircleId, carol, DEPOSIT_AMOUNT);
     savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
 
-    // Verify deposits
+    // Verify all deposits succeeded
     assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
-    assertEq(savingCircles.balances(baseCircleId, bob), 0); // Insufficient allowance
+    assertEq(savingCircles.balances(baseCircleId, bob), DEPOSIT_AMOUNT);
     assertEq(savingCircles.balances(baseCircleId, carol), DEPOSIT_AMOUNT);
+  }
+
+  function test_BatchDepositIfAllowed_FailsOnInsufficientAllowance() external {
+    token.mint(alice, DEPOSIT_AMOUNT);
+    token.mint(bob, DEPOSIT_AMOUNT);
+
+    // Alice opts in and approves full amount
+    vm.startPrank(alice);
+    savingCircles.setAutomatedDepositsEnabled(true);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    // Bob opts in but only approves partial amount
+    vm.startPrank(bob);
+    savingCircles.setAutomatedDepositsEnabled(true);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2);
+    vm.stopPrank();
+
+    // Batch deposit - should fail on bob's insufficient allowance
+    uint256[] memory circleIds = new uint256[](2);
+    circleIds[0] = baseCircleId;
+    circleIds[1] = baseCircleId;
+
+    address[] memory membersToDeposit = new address[](2);
+    membersToDeposit[0] = alice;
+    membersToDeposit[1] = bob;
+
+    vm.prank(owner);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InsufficientAllowance.selector));
+    savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
+
+    // Verify no deposits went through (all-or-nothing)
+    assertEq(savingCircles.balances(baseCircleId, alice), 0);
+    assertEq(savingCircles.balances(baseCircleId, bob), 0);
   }
 
   function test_BatchDepositIfAllowed_WithNonMembers() external {
@@ -826,7 +860,7 @@ contract SavingCirclesUnit is Test {
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
     vm.stopPrank();
 
-    // Batch deposit including non-member
+    // Batch deposit including non-member - should fail
     uint256[] memory circleIds = new uint256[](2);
     circleIds[0] = baseCircleId;
     circleIds[1] = baseCircleId;
@@ -836,13 +870,11 @@ contract SavingCirclesUnit is Test {
     membersToDeposit[1] = nonMember;
 
     vm.prank(owner);
-    vm.expectEmit(true, true, true, true);
-    emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
-    // Should not emit for non-member
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
     savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
 
-    // Verify only alice's deposit went through
-    assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
+    // Verify no deposits went through (all-or-nothing)
+    assertEq(savingCircles.balances(baseCircleId, alice), 0);
     assertEq(savingCircles.balances(baseCircleId, nonMember), 0);
   }
 
@@ -865,7 +897,8 @@ contract SavingCirclesUnit is Test {
     membersToDeposit[0] = alice;
 
     vm.prank(owner);
-    // Should not revert, just skip the deposit silently
+    // Should revert with DepositWindowClosed error
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.DepositWindowClosed.selector));
     savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
 
     // Verify no deposit was made
@@ -976,7 +1009,8 @@ contract SavingCirclesUnit is Test {
     membersToDeposit[0] = alice;
 
     vm.prank(owner);
-    // Should not revert, just skip the decommissioned circle
+    // Should revert with NotCommissioned error
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
     savingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
 
     // Verify no deposit was made

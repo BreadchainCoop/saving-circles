@@ -145,46 +145,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function depositIfAllowed(uint256 _id, address _member) external override {
-    Circle memory _circle = circles[_id];
-
-    // Check basic requirements
-    if (_isDecommissioned(_circle)) revert NotCommissioned();
-    if (!isMember[_id][_member]) revert NotMember();
-    if (!automatedDepositsEnabled[_member]) revert AutomatedDepositsNotEnabled();
-
-    // Calculate the remaining deposit amount needed
-    uint256 currentBalance = balances[_id][_member];
-    if (currentBalance >= _circle.depositAmount) return; // Already deposited - no revert needed
-    uint256 requiredAmount = _circle.depositAmount - currentBalance;
-
-    // Check allowance
-    uint256 allowance = IERC20(_circle.token).allowance(_member, address(this));
-    if (allowance < requiredAmount) revert InsufficientAllowance();
-
-    // Check deposit window validity
-    if (block.timestamp < _circle.circleStart) {
-      revert DepositBeforeCircleStart();
-    }
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
-      revert DepositWindowClosed();
-    }
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
-      revert CircleExpired();
-    }
-
-    // Update balance
-    balances[_id][_member] = balances[_id][_member] + requiredAmount;
-
-    // Transfer tokens from member to contract
-    bool transferSuccess = IERC20(_circle.token).transferFrom(_member, address(this), requiredAmount);
-    if (!transferSuccess) {
-      // Revert balance update if transfer failed
-      balances[_id][_member] = balances[_id][_member] - requiredAmount;
-      revert TransferFailed();
-    }
-
-    emit FundsDeposited(_id, _member, requiredAmount);
+  function depositIfAllowed(uint256 _id, address _member) external override nonReentrant {
+    _depositIfAllowed(_id, _member);
   }
 
   /// @inheritdoc ISavingCircles
@@ -193,8 +155,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (_ids.length != _members.length) revert ArrayLengthMismatch();
 
     for (uint256 i = 0; i < _ids.length; i++) {
-      // Try to deposit, skip on failure
-      try this.depositIfAllowed(_ids[i], _members[i]) {} catch {}
+      _depositIfAllowed(_ids[i], _members[i]);
     }
   }
 
@@ -393,6 +354,53 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (!success) revert TransferFailed();
 
     emit FundsDeposited(_id, _member, _value);
+  }
+
+  /**
+   * @dev Internal function to handle automated deposits
+   * @param _id Circle ID
+   * @param _member Member address to deposit for
+   */
+  function _depositIfAllowed(uint256 _id, address _member) internal {
+    Circle memory _circle = circles[_id];
+
+    // Check basic requirements
+    if (_isDecommissioned(_circle)) revert NotCommissioned();
+    if (!isMember[_id][_member]) revert NotMember();
+    if (!automatedDepositsEnabled[_member]) revert AutomatedDepositsNotEnabled();
+
+    // Calculate the remaining deposit amount needed
+    uint256 currentBalance = balances[_id][_member];
+    if (currentBalance >= _circle.depositAmount) return; // Already deposited - no revert needed
+    uint256 requiredAmount = _circle.depositAmount - currentBalance;
+
+    // Check allowance
+    uint256 allowance = IERC20(_circle.token).allowance(_member, address(this));
+    if (allowance < requiredAmount) revert InsufficientAllowance();
+
+    // Check deposit window validity
+    if (block.timestamp < _circle.circleStart) {
+      revert DepositBeforeCircleStart();
+    }
+    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
+      revert DepositWindowClosed();
+    }
+    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
+      revert CircleExpired();
+    }
+
+    // Update balance
+    balances[_id][_member] = balances[_id][_member] + requiredAmount;
+
+    // Transfer tokens from member to contract
+    bool transferSuccess = IERC20(_circle.token).transferFrom(_member, address(this), requiredAmount);
+    if (!transferSuccess) {
+      // Revert balance update if transfer failed
+      balances[_id][_member] = balances[_id][_member] - requiredAmount;
+      revert TransferFailed();
+    }
+
+    emit FundsDeposited(_id, _member, requiredAmount);
   }
 
   /**
