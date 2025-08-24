@@ -66,13 +66,6 @@ interface ISavingCircles {
   event TokenAllowed(address indexed token, bool indexed allowed);
 
   /**
-   * @notice Emitted when a member enables or disables automated deposits
-   * @param member The address of the member
-   * @param enabled Whether automated deposits are enabled
-   */
-  event AutomatedDepositsToggled(address indexed member, bool indexed enabled);
-
-  /**
    * @notice Thrown when a member attempts to redundantly deposit funds into a circle
    */
   error AlreadyDeposited();
@@ -183,21 +176,6 @@ interface ISavingCircles {
   error InvalidMemberAddress();
 
   /**
-   * @notice Thrown when a member has insufficient allowance for automatic deposit
-   */
-  error InsufficientAllowance();
-
-  /**
-   * @notice Thrown when array lengths don't match in batch operations
-   */
-  error ArrayLengthMismatch();
-
-  /**
-   * @notice Thrown when automated deposits are not enabled for a member
-   */
-  error AutomatedDepositsNotEnabled();
-
-  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -250,26 +228,6 @@ interface ISavingCircles {
    * @param id The ID of the circle
    */
   function decommission(uint256 id) external;
-
-  /**
-   * @notice Enable or disable automated deposits for the caller
-   * @param enabled Whether to enable automated deposits
-   */
-  function setAutomatedDepositsEnabled(bool enabled) external;
-
-  /**
-   * @notice Deposit funds for a user if they have sufficient allowance and have opted in
-   * @param id The ID of the circle
-   * @param member The address of the member
-   */
-  function depositIfAllowed(uint256 id, address member) external;
-
-  /**
-   * @notice Batch deposit funds for multiple users across multiple circles if they have sufficient allowance
-   * @param ids The IDs of the circles (must match length of members array)
-   * @param members The addresses of the members (must match length of ids array)
-   */
-  function batchDepositIfAllowed(uint256[] calldata ids, address[] calldata members) external;
 
   /**
    * @notice Get a single circle
@@ -330,19 +288,16 @@ interface ISavingCircles {
   function withdrawableBy(uint256 id) external view returns (address withdrawableBy);
 
   /**
-   * @notice Check if a member has automated deposits enabled
-   * @param member The address of the member
-   * @return enabled Whether automated deposits are enabled
+   * @notice Get the next ID that will be assigned to a new circle
+   * @return nextId The next ID
    */
-  function isAutomatedDepositsEnabled(address member) external view returns (bool enabled);
+  function nextId() external view returns (uint256 nextId);
 
   /**
-   * @notice Get all addresses eligible for automated deposits across all circles
-   * @return circleIds The IDs of circles with eligible members
-   * @return members The addresses of eligible members
+   * @notice Get balance for a member in a circle
+   * @param id The ID of the circle
+   * @param member The address of the member
+   * @return balance The balance
    */
-  function getEligibleAddressesForDeposit()
-    external
-    view
-    returns (uint256[] memory circleIds, address[] memory members);
+  function balances(uint256 id, address member) external view returns (uint256 balance);
 }
