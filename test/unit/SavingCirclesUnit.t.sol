@@ -623,8 +623,9 @@ contract SavingCirclesUnit is Test {
     savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
-    // Call depositIfAllowed - should succeed without doing anything
+    // Call depositIfAllowed - should revert with AlreadyDeposited
     vm.prank(bob);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyDeposited.selector));
     savingCircles.depositIfAllowed(baseCircleId, alice);
 
     // Balance should remain the same
@@ -742,6 +743,23 @@ contract SavingCirclesUnit is Test {
 
     // Should have 3 eligible entries: alice in both circles, bob in second circle
     assertEq(eligibleMembers.length, 3);
+    assertEq(circleIds.length, 3);
+
+    // Check specific entries (alice in baseCircle, alice in secondCircle, bob in secondCircle)
+    // Note: Order may vary based on implementation, so we check for presence
+    bool foundAliceBase = false;
+    bool foundAliceSecond = false;
+    bool foundBobSecond = false;
+
+    for (uint256 i = 0; i < 3; i++) {
+      if (eligibleMembers[i] == alice && circleIds[i] == baseCircleId) foundAliceBase = true;
+      if (eligibleMembers[i] == alice && circleIds[i] == secondCircleId) foundAliceSecond = true;
+      if (eligibleMembers[i] == bob && circleIds[i] == secondCircleId) foundBobSecond = true;
+    }
+
+    assertTrue(foundAliceBase, 'Alice should be eligible for base circle');
+    assertTrue(foundAliceSecond, 'Alice should be eligible for second circle');
+    assertTrue(foundBobSecond, 'Bob should be eligible for second circle');
   }
 
   function test_GetEligibleAddressesForDeposit_OutsideDepositWindow() external {
@@ -759,6 +777,7 @@ contract SavingCirclesUnit is Test {
     // Get eligible addresses - should be empty
     (uint256[] memory circleIds, address[] memory eligibleMembers) = savingCircles.getEligibleAddressesForDeposit();
     assertEq(eligibleMembers.length, 0);
+    assertEq(circleIds.length, 0);
   }
 
   function test_BatchDepositIfAllowed() external {

@@ -371,7 +371,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
     // Calculate the remaining deposit amount needed
     uint256 currentBalance = balances[_id][_member];
-    if (currentBalance >= _circle.depositAmount) return; // Already deposited - no revert needed
+    if (currentBalance >= _circle.depositAmount) revert AlreadyDeposited();
     uint256 requiredAmount = _circle.depositAmount - currentBalance;
 
     // Check allowance
@@ -382,9 +382,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (block.timestamp < _circle.circleStart) {
       revert DepositBeforeCircleStart();
     }
+    // Check if current deposit window has closed (each window lasts depositInterval)
     if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
       revert DepositWindowClosed();
     }
+    // Check if all deposit periods have passed (maxDeposits * depositInterval = total circle duration)
     if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
       revert CircleExpired();
     }
