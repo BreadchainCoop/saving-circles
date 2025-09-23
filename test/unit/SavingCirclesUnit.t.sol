@@ -301,7 +301,7 @@ contract SavingCirclesUnit is Test {
     uint256 nonExistentId = 999;
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
     savingCircles.withdraw(nonExistentId);
   }
 
@@ -329,6 +329,9 @@ contract SavingCirclesUnit is Test {
 
     vm.prank(alice);
     uint256 aliceCircleId = savingCircles.create(aliceCircle);
+
+    // Move time past deposit window with incomplete deposits (no deposits made)
+    vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
 
     // Alice can decommission her own circle
     vm.prank(alice);

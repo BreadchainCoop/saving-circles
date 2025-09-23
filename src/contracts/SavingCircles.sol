@@ -269,7 +269,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   function _withdrawable(uint256 _id) internal view onlyCommissioned(_id) returns (bool) {
     Circle memory _circle = circles[_id];
 
-    if (block.timestamp < _circle.circleStart + (_circle.depositInterval * _circle.currentIndex)) {
+    if (block.timestamp < _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
       return false;
     }
 
