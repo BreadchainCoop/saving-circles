@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
 
-import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
+import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
 import {IntegrationBase} from 'test/integration/IntegrationBase.sol';
 
 contract SavingCirclesIntegration is IntegrationBase {

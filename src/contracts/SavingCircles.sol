@@ -5,7 +5,7 @@ import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgrad
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
 import {ReentrancyGuard} from '@openzeppelin/utils/ReentrancyGuard.sol';
 
-import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
+import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
 
 /**
  * @title Saving Circles
@@ -157,6 +157,22 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
+  function isTokenAllowed(address _token) external view override returns (bool) {
+    return allowedTokens[_token];
+  }
+
+  /// @inheritdoc ISavingCircles
+  function checkMemberships(address _member, uint256[] calldata _ids) external view returns (bool[] memory _statuses) {
+    _statuses = new bool[](_ids.length);
+
+    for (uint256 i = 0; i < _ids.length; i++) {
+      _statuses[i] = isMember[_ids[i]][_member];
+    }
+
+    return _statuses;
+  }
+
+  /// @inheritdoc ISavingCircles
   function getMemberBalances(uint256 _id)
     external
     view
@@ -176,28 +192,17 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function checkMemberships(address _member, uint256[] calldata _ids) external view returns (bool[] memory _statuses) {
-    _statuses = new bool[](_ids.length);
-
-    for (uint256 i = 0; i < _ids.length; i++) {
-      _statuses[i] = isMember[_ids[i]][_member];
-    }
-
-    return _statuses;
+  function isDecommissioned(Circle memory _circle) external view override returns (bool) {
+    return _isDecommissioned(_circle);
   }
 
   /// @inheritdoc ISavingCircles
-  function isTokenAllowed(address _token) external view override returns (bool) {
-    return allowedTokens[_token];
-  }
-
-  /// @inheritdoc ISavingCircles
-  function isWithdrawable(uint256 _id) external view override returns (bool) {
+  function isWithdrawable(uint256 _id) public view override returns (bool) {
     return _withdrawable(_id);
   }
 
   /// @inheritdoc ISavingCircles
-  function withdrawableBy(uint256 _id) external view override onlyCommissioned(_id) returns (address) {
+  function withdrawableBy(uint256 _id) public view override onlyCommissioned(_id) returns (address) {
     Circle memory _circle = circles[_id];
 
     return _circle.members[_circle.currentIndex];
@@ -232,7 +237,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    *      A deposit must be made in specific time window and can be made partially so long as the final balance equals
    *      the specified deposit amount for the circle.
    */
-  function _deposit(uint256 _id, uint256 _value, address _member) internal onlyCommissioned(_id) onlyMember(_id, _member) {
+  function _deposit(
+    uint256 _id,
+    uint256 _value,
+    address _member
+  ) internal onlyCommissioned(_id) onlyMember(_id, _member) {
     Circle memory _circle = circles[_id];
 
     if (block.timestamp < circles[_id].circleStart) {

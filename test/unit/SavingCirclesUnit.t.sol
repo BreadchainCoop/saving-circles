@@ -7,8 +7,9 @@ import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/Trans
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
 import {Test} from 'forge-std/Test.sol';
 
-import {MockERC20} from '../mocks/MockERC20.sol';
-import {ISavingCircles, SavingCircles} from 'contracts/SavingCircles.sol';
+import {SavingCircles} from 'src/contracts/SavingCircles.sol';
+import {ISavingCircles} from 'src/interfaces/ISavingCircles.sol';
+import {MockERC20} from 'test/mocks/MockERC20.sol';
 
 contract SavingCirclesUnit is Test {
   uint256 public constant BASE_CURRENT_INDEX = 0;

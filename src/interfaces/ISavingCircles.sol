@@ -24,6 +24,10 @@ interface ISavingCircles {
     uint256 maxDeposits;
   }
 
+  // =======================
+  // EVENTS
+  // =======================
+
   /**
    * @notice Emitted when a circle is created
    * @param id The ID of the circle
@@ -272,6 +276,13 @@ interface ISavingCircles {
    * @return allowed Whether the token is allowed
    */
   function isTokenAllowed(address token) external view returns (bool allowed);
+
+  /**
+   * @notice Check if a circle is decommissioned
+   * @param circle The circle
+   * @return decommissioned Whether the circle is decommissioned
+   */
+  function isDecommissioned(Circle memory circle) external view returns (bool decommissioned);
 
   /**
    * @notice Check if a circle is withdrawable
