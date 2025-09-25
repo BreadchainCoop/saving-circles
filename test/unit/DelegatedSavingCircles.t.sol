@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {DelegatedSavingCircles} from '../../src/contracts/DelegatedSavingCircles.sol';
 import {SavingCircles} from '../../src/contracts/SavingCircles.sol';
-import {SavingCirclesAutomatedDeposits} from '../../src/contracts/SavingCirclesAutomatedDeposits.sol';
+import {IDelegatedSavingCircles} from '../../src/interfaces/IDelegatedSavingCircles.sol';
 import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
-import {ISavingCirclesAutomatedDeposits} from '../../src/interfaces/ISavingCirclesAutomatedDeposits.sol';
 import {MockERC20} from '../mocks/MockERC20.sol';
 import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
 import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Test} from 'forge-std/Test.sol';
 
-contract SavingCirclesAutomatedDepositsUnit is Test {
+contract DelegatedSavingCirclesUnit is Test {
   SavingCircles public savingCircles;
-  SavingCirclesAutomatedDeposits public automatedDeposits;
+  DelegatedSavingCircles public delegatedSavingCircles;
   MockERC20 public token;
   ProxyAdmin public proxyAdmin;
 
@@ -41,8 +41,8 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
     );
     savingCircles = SavingCircles(address(proxy));
 
-    // Deploy automated deposits extension
-    automatedDeposits = new SavingCirclesAutomatedDeposits(address(savingCircles));
+    // Deploy delegated deposits extension
+    delegatedSavingCircles = new DelegatedSavingCircles(address(savingCircles));
 
     // Setup members
     members = new address[](3);
@@ -70,46 +70,46 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
     baseCircleId = savingCircles.create(baseCircle);
   }
 
-  function test_SetAutomatedDepositsEnabled() external {
+  function test_SetDelegatedDepositsEnabled() external {
     // Check initial state is disabled
-    assertFalse(automatedDeposits.isAutomatedDepositsEnabled(alice));
+    assertFalse(delegatedSavingCircles.isDelegatedDepositsEnabled(alice));
 
-    // Alice enables automated deposits
+    // Alice enables delegated deposits
     vm.prank(alice);
     vm.expectEmit(true, true, true, true);
-    emit ISavingCirclesAutomatedDeposits.AutomatedDepositsToggled(alice, true);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
+    emit IDelegatedSavingCircles.DelegatedDepositsToggled(alice, true);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
 
     // Verify it's enabled
-    assertTrue(automatedDeposits.isAutomatedDepositsEnabled(alice));
+    assertTrue(delegatedSavingCircles.isDelegatedDepositsEnabled(alice));
 
-    // Alice disables automated deposits
+    // Alice disables delegated deposits
     vm.prank(alice);
     vm.expectEmit(true, true, true, true);
-    emit ISavingCirclesAutomatedDeposits.AutomatedDepositsToggled(alice, false);
-    automatedDeposits.setAutomatedDepositsEnabled(false);
+    emit IDelegatedSavingCircles.DelegatedDepositsToggled(alice, false);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(false);
 
     // Verify it's disabled
-    assertFalse(automatedDeposits.isAutomatedDepositsEnabled(alice));
+    assertFalse(delegatedSavingCircles.isDelegatedDepositsEnabled(alice));
   }
 
   function test_DepositIfAllowed_WithSufficientAllowance() external {
     // Mint tokens to alice
     token.mint(alice, DEPOSIT_AMOUNT);
 
-    // Alice opts in to automated deposits
+    // Alice opts in to delegated deposits
     vm.prank(alice);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
 
     // Alice approves the extension contract (not main contract)
     vm.prank(alice);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
 
     // Anyone can call depositIfAllowed for alice
     vm.prank(bob);
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
-    automatedDeposits.depositIfAllowed(baseCircleId, alice);
+    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
 
     // Verify deposit was recorded in main contract
     uint256 balance = savingCircles.balances(baseCircleId, alice);
@@ -122,39 +122,39 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
 
     // Alice approves but does NOT opt in
     vm.prank(alice);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
 
     // Should revert because alice hasn't opted in
     vm.prank(bob);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCirclesAutomatedDeposits.AutomatedDepositsNotEnabled.selector));
-    automatedDeposits.depositIfAllowed(baseCircleId, alice);
+    vm.expectRevert(abi.encodeWithSelector(IDelegatedSavingCircles.DelegatedDepositsNotEnabled.selector));
+    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
   }
 
   function test_DepositIfAllowed_WithInsufficientAllowance() external {
     // Mint tokens to alice
     token.mint(alice, DEPOSIT_AMOUNT);
 
-    // Alice opts in to automated deposits
+    // Alice opts in to delegated deposits
     vm.prank(alice);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
 
     // Alice approves less than required amount
     vm.prank(alice);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT / 2);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT / 2);
 
     // Call should revert with InsufficientAllowance
     vm.prank(bob);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCirclesAutomatedDeposits.InsufficientAllowance.selector));
-    automatedDeposits.depositIfAllowed(baseCircleId, alice);
+    vm.expectRevert(abi.encodeWithSelector(IDelegatedSavingCircles.InsufficientAllowance.selector));
+    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
   }
 
   function test_DepositIfAllowed_WhenAlreadyDeposited() external {
     // Mint tokens to alice
     token.mint(alice, DEPOSIT_AMOUNT * 2);
 
-    // Alice opts in to automated deposits
+    // Alice opts in to delegated deposits
     vm.prank(alice);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
 
     // Alice makes a regular deposit first directly to main contract
     vm.startPrank(alice);
@@ -164,12 +164,12 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
 
     // Approve extension for another deposit attempt
     vm.prank(alice);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
 
     // Call depositIfAllowed - should revert with AlreadyDeposited
     vm.prank(bob);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyDeposited.selector));
-    automatedDeposits.depositIfAllowed(baseCircleId, alice);
+    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
 
     // Balance should remain the same
     uint256 balance = savingCircles.balances(baseCircleId, alice);
@@ -181,9 +181,9 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
     uint256 partialAmount = DEPOSIT_AMOUNT / 2;
     token.mint(alice, DEPOSIT_AMOUNT);
 
-    // Alice opts in to automated deposits
+    // Alice opts in to delegated deposits
     vm.prank(alice);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
 
     // Make partial deposit directly to main contract
     vm.startPrank(alice);
@@ -193,13 +193,13 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
 
     // Approve extension for remaining amount
     vm.prank(alice);
-    token.approve(address(automatedDeposits), partialAmount);
+    token.approve(address(delegatedSavingCircles), partialAmount);
 
     // Now call depositIfAllowed to complete the deposit
     vm.prank(bob);
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsDeposited(baseCircleId, alice, partialAmount);
-    automatedDeposits.depositIfAllowed(baseCircleId, alice);
+    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
 
     // Verify full deposit amount
     uint256 balance = savingCircles.balances(baseCircleId, alice);
@@ -212,13 +212,13 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
 
     // Non-member opts in and approves
     vm.startPrank(nonMember);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     vm.prank(bob);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
-    automatedDeposits.depositIfAllowed(baseCircleId, nonMember);
+    delegatedSavingCircles.depositIfAllowed(baseCircleId, nonMember);
   }
 
   function test_BatchDepositIfAllowed() external {
@@ -229,18 +229,18 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
 
     // All users opt in and approve full amount to extension
     vm.startPrank(alice);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     vm.startPrank(bob);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     vm.startPrank(carol);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     // Batch deposit - same circle for all members
@@ -261,7 +261,7 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
     emit ISavingCircles.FundsDeposited(baseCircleId, bob, DEPOSIT_AMOUNT);
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsDeposited(baseCircleId, carol, DEPOSIT_AMOUNT);
-    automatedDeposits.batchDepositIfAllowed(circleIds, membersToDeposit);
+    delegatedSavingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
 
     // Verify all deposits succeeded
     assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
@@ -275,14 +275,14 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
 
     // Alice opts in and approves full amount
     vm.startPrank(alice);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     // Bob opts in but only approves partial amount
     vm.startPrank(bob);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT / 2);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT / 2);
     vm.stopPrank();
 
     // Batch deposit - should fail on bob's insufficient allowance
@@ -295,8 +295,8 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
     membersToDeposit[1] = bob;
 
     vm.prank(owner);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCirclesAutomatedDeposits.InsufficientAllowance.selector));
-    automatedDeposits.batchDepositIfAllowed(circleIds, membersToDeposit);
+    vm.expectRevert(abi.encodeWithSelector(IDelegatedSavingCircles.InsufficientAllowance.selector));
+    delegatedSavingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
 
     // Verify no deposits went through (all-or-nothing)
     assertEq(savingCircles.balances(baseCircleId, alice), 0);
@@ -311,20 +311,21 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
 
     // Alice opts in and approves
     vm.startPrank(alice);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     // Bob opts in but doesn't approve
     vm.prank(bob);
-    automatedDeposits.setAutomatedDepositsEnabled(true);
+    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
 
     // Carol approves but doesn't opt in
     vm.prank(carol);
-    token.approve(address(automatedDeposits), DEPOSIT_AMOUNT);
+    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
 
     // Get eligible addresses
-    (uint256[] memory circleIds, address[] memory eligibleMembers) = automatedDeposits.getEligibleAddressesForDeposit();
+    (uint256[] memory circleIds, address[] memory eligibleMembers) =
+      delegatedSavingCircles.getEligibleAddressesForDeposit();
 
     // Only alice should be eligible (opted in AND has allowance)
     assertEq(eligibleMembers.length, 1);
@@ -344,7 +345,7 @@ contract SavingCirclesAutomatedDepositsUnit is Test {
     membersToDeposit[2] = carol;
 
     vm.prank(owner);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCirclesAutomatedDeposits.ArrayLengthMismatch.selector));
-    automatedDeposits.batchDepositIfAllowed(circleIds, membersToDeposit);
+    vm.expectRevert(abi.encodeWithSelector(IDelegatedSavingCircles.ArrayLengthMismatch.selector));
+    delegatedSavingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
   }
 }

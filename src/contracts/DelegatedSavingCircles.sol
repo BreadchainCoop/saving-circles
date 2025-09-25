@@ -1,48 +1,43 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {IDelegatedSavingCircles} from '../interfaces/IDelegatedSavingCircles.sol';
 import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
-import {ISavingCirclesAutomatedDeposits} from '../interfaces/ISavingCirclesAutomatedDeposits.sol';
+import {SavingCircles} from './SavingCircles.sol';
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
-import {ReentrancyGuard} from '@openzeppelin/utils/ReentrancyGuard.sol';
 
 /**
- * @title SavingCirclesAutomatedDeposits
- * @notice Extension contract for automated deposits in SavingCircles
- * @dev This contract enables automated ERC20 allowance-based deposits and batch operations
+ * @title DelegatedSavingCircles
+ * @notice Extension contract for delegated deposits in SavingCircles
+ * @dev This contract enables delegated ERC20 allowance-based deposits and batch operations
  */
-contract SavingCirclesAutomatedDeposits is ISavingCirclesAutomatedDeposits, ReentrancyGuard {
+contract DelegatedSavingCircles is IDelegatedSavingCircles, SavingCircles {
   /// @notice The main SavingCircles contract
-  ISavingCircles public immutable savingCircles;
+  ISavingCircles public immutable SAVING_CIRCLES;
 
-  /// @notice Mapping to track which members have enabled automated deposits
-  mapping(address member => bool enabled) public automatedDepositsEnabled;
+  /// @notice Mapping to track which members have enabled delegated deposits
+  mapping(address member => bool enabled) public delegatedDepositsEnabled;
 
   /**
    * @notice Constructor
    * @param _savingCircles Address of the main SavingCircles contract
    */
   constructor(address _savingCircles) {
-    savingCircles = ISavingCircles(_savingCircles);
+    SAVING_CIRCLES = ISavingCircles(_savingCircles);
   }
 
-  /// @inheritdoc ISavingCirclesAutomatedDeposits
-  function setAutomatedDepositsEnabled(bool _enabled) external override {
-    automatedDepositsEnabled[msg.sender] = _enabled;
-    emit AutomatedDepositsToggled(msg.sender, _enabled);
+  /// @inheritdoc IDelegatedSavingCircles
+  function setDelegatedDepositsEnabled(bool _enabled) external override {
+    delegatedDepositsEnabled[msg.sender] = _enabled;
+    emit DelegatedDepositsToggled(msg.sender, _enabled);
   }
 
-  /// @inheritdoc ISavingCirclesAutomatedDeposits
-  function isAutomatedDepositsEnabled(address _member) external view override returns (bool) {
-    return automatedDepositsEnabled[_member];
-  }
-
-  /// @inheritdoc ISavingCirclesAutomatedDeposits
+  /// @inheritdoc IDelegatedSavingCircles
   function depositIfAllowed(uint256 _circleId, address _member) external override nonReentrant {
     _depositIfAllowed(_circleId, _member);
   }
 
-  /// @inheritdoc ISavingCirclesAutomatedDeposits
+  /// @inheritdoc IDelegatedSavingCircles
   function batchDepositIfAllowed(
     uint256[] calldata _circleIds,
     address[] calldata _members
@@ -55,7 +50,12 @@ contract SavingCirclesAutomatedDeposits is ISavingCirclesAutomatedDeposits, Reen
     }
   }
 
-  /// @inheritdoc ISavingCirclesAutomatedDeposits
+  /// @inheritdoc IDelegatedSavingCircles
+  function isDelegatedDepositsEnabled(address _member) external view override returns (bool) {
+    return delegatedDepositsEnabled[_member];
+  }
+
+  /// @inheritdoc IDelegatedSavingCircles
   function getEligibleAddressesForDeposit()
     external
     view
@@ -64,11 +64,11 @@ contract SavingCirclesAutomatedDeposits is ISavingCirclesAutomatedDeposits, Reen
   {
     // First, count eligible members across all circles
     uint256 eligibleCount = 0;
-    uint256 nextId = savingCircles.nextId();
+    uint256 nextId = SAVING_CIRCLES.nextId();
 
     for (uint256 id = 0; id < nextId; id++) {
       // Skip if circle doesn't exist or is decommissioned
-      try savingCircles.getCircle(id) returns (ISavingCircles.Circle memory _circle) {
+      try SAVING_CIRCLES.getCircle(id) returns (ISavingCircles.Circle memory _circle) {
         // Check if we're in a valid deposit window
         if (block.timestamp < _circle.circleStart) continue;
 
@@ -80,9 +80,9 @@ contract SavingCirclesAutomatedDeposits is ISavingCirclesAutomatedDeposits, Reen
 
         for (uint256 j = 0; j < _circle.members.length; j++) {
           address member = _circle.members[j];
-          if (!automatedDepositsEnabled[member]) continue; // Skip if not opted in
+          if (!delegatedDepositsEnabled[member]) continue; // Skip if not opted in
 
-          uint256 currentBalance = savingCircles.balances(id, member);
+          uint256 currentBalance = SAVING_CIRCLES.balances(id, member);
           if (currentBalance >= _circle.depositAmount) continue; // Already deposited
 
           uint256 requiredAmount = _circle.depositAmount - currentBalance;
@@ -104,7 +104,7 @@ contract SavingCirclesAutomatedDeposits is ISavingCirclesAutomatedDeposits, Reen
     // Fill arrays
     uint256 index = 0;
     for (uint256 id = 0; id < nextId; id++) {
-      try savingCircles.getCircle(id) returns (ISavingCircles.Circle memory _circle) {
+      try SAVING_CIRCLES.getCircle(id) returns (ISavingCircles.Circle memory _circle) {
         // Check if we're in a valid deposit window
         if (block.timestamp < _circle.circleStart) continue;
 
@@ -116,9 +116,9 @@ contract SavingCirclesAutomatedDeposits is ISavingCirclesAutomatedDeposits, Reen
 
         for (uint256 j = 0; j < _circle.members.length; j++) {
           address member = _circle.members[j];
-          if (!automatedDepositsEnabled[member]) continue; // Skip if not opted in
+          if (!delegatedDepositsEnabled[member]) continue; // Skip if not opted in
 
-          uint256 currentBalance = savingCircles.balances(id, member);
+          uint256 currentBalance = SAVING_CIRCLES.balances(id, member);
           if (currentBalance >= _circle.depositAmount) continue; // Already deposited
 
           uint256 requiredAmount = _circle.depositAmount - currentBalance;
@@ -138,16 +138,16 @@ contract SavingCirclesAutomatedDeposits is ISavingCirclesAutomatedDeposits, Reen
   }
 
   /**
-   * @dev Internal function to handle automated deposits
+   * @dev Internal function to handle delegated deposits
    * @param _circleId Circle ID
    * @param _member Member address to deposit for
    */
   function _depositIfAllowed(uint256 _circleId, address _member) internal {
-    // Check if automated deposits are enabled for this member
-    if (!automatedDepositsEnabled[_member]) revert AutomatedDepositsNotEnabled();
+    // Check if delegated deposits are enabled for this member
+    if (!delegatedDepositsEnabled[_member]) revert DelegatedDepositsNotEnabled();
 
     // Get circle information
-    ISavingCircles.Circle memory _circle = savingCircles.getCircle(_circleId);
+    ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
 
     // Check if member is part of the circle
     bool isMember = false;
@@ -160,7 +160,7 @@ contract SavingCirclesAutomatedDeposits is ISavingCirclesAutomatedDeposits, Reen
     if (!isMember) revert ISavingCircles.NotMember();
 
     // Calculate the remaining deposit amount needed
-    uint256 currentBalance = savingCircles.balances(_circleId, _member);
+    uint256 currentBalance = SAVING_CIRCLES.balances(_circleId, _member);
     if (currentBalance >= _circle.depositAmount) revert ISavingCircles.AlreadyDeposited();
     uint256 requiredAmount = _circle.depositAmount - currentBalance;
 
@@ -186,9 +186,9 @@ contract SavingCirclesAutomatedDeposits is ISavingCirclesAutomatedDeposits, Reen
     if (!transferSuccess) revert ISavingCircles.TransferFailed();
 
     // Approve the main contract to spend the tokens
-    IERC20(_circle.token).approve(address(savingCircles), requiredAmount);
+    IERC20(_circle.token).approve(address(SAVING_CIRCLES), requiredAmount);
 
     // Call depositFor on the main contract
-    savingCircles.depositFor(_circleId, requiredAmount, _member);
+    SAVING_CIRCLES.depositFor(_circleId, requiredAmount, _member);
   }
 }

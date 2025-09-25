@@ -240,7 +240,7 @@ contract SavingCirclesUnit is Test {
     assertEq(aliceTokenBalance, DEPOSIT_AMOUNT * members.length);
   }
 
-  function test_WithdrawWhenPayoutRoundHasNotEnded() external {
+  function test_WithdrawWhenAllMembersHaveDeposited() external {
     // All members deposit
     for (uint256 i = 0; i < members.length; i++) {
       token.mint(members[i], DEPOSIT_AMOUNT);
@@ -250,10 +250,15 @@ contract SavingCirclesUnit is Test {
       vm.stopPrank();
     }
 
-    // Try to withdraw before time
+    // Withdraw is allowed immediately after all deposits
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector));
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.FundsWithdrawn(baseCircleId, alice, DEPOSIT_AMOUNT * members.length);
     savingCircles.withdraw(baseCircleId);
+
+    // Check alice received funds
+    uint256 aliceTokenBalance = token.balanceOf(alice);
+    assertEq(aliceTokenBalance, DEPOSIT_AMOUNT * members.length);
   }
 
   function test_WithdrawWhenUserHasAlreadyClaimed() external {
@@ -329,6 +334,9 @@ contract SavingCirclesUnit is Test {
 
     vm.prank(alice);
     uint256 aliceCircleId = savingCircles.create(aliceCircle);
+
+    // Move time past the deposit window to allow decommission
+    vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
 
     // Alice can decommission her own circle
     vm.prank(alice);
