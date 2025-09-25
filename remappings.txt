@@ -6,3 +6,4 @@ halmos-cheatcodes=node_modules/halmos-cheatcodes
 
 contracts/=src/contracts
 interfaces/=src/interfaces
+test/=test/
