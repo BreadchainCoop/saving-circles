@@ -297,4 +297,18 @@ interface ISavingCircles {
    * @return withdrawableBy The address of the withdrawable by
    */
   function withdrawableBy(uint256 id) external view returns (address withdrawableBy);
+
+  /**
+   * @notice Get the next ID that will be assigned to a new circle
+   * @return nextId The next ID
+   */
+  function nextId() external view returns (uint256 nextId);
+
+  /**
+   * @notice Get balance for a member in a circle
+   * @param id The ID of the circle
+   * @param member The address of the member
+   * @return balance The balance
+   */
+  function balances(uint256 id, address member) external view returns (uint256 balance);
 }
