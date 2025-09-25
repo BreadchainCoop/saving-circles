@@ -56,33 +56,33 @@
 <div align="center">End of Breadchain Notes</div>
 <div align="center">Continue Reading Wonderland Outline</div>
 
-## Saving Circles - Automated Deposits Feature
+## Saving Circles - Delegate Deposits Feature
 
-The Saving Circles contract now supports automated ERC20 allowance-based deposits and batch operations for account abstraction flows. This enhancement enables:
+The Saving Circles contract now supports delegated ERC20 allowance-based deposits and batch operations for account abstraction flows. This enhancement enables:
 
 ### New Functions
 
-1. **`setAutomatedDepositsEnabled(bool enabled)`**
-   - Members must call this function to opt-in to automated deposits
-   - Provides user control over whether their deposits can be automated
+1. **`setDelegatedDepositsEnabled(bool enabled)`**
+   - Members must call this function to opt-in to delegated deposits
+   - Provides user control over whether their deposits can be delegated
    - Can be toggled on/off at any time
 
-2. **`isAutomatedDepositsEnabled(address member)`**
-   - Check if a member has opted in to automated deposits
-   - Returns true if the member has enabled automated deposits
+2. **`isDelegatedDepositsEnabled(address member)`**
+   - Check if a member has opted in to delegated deposits
+   - Returns true if the member has enabled delegated deposits
 
 3. **`depositIfAllowed(uint256 id, address member)`**
    - Automatically deposits funds for a member if they have:
-     - Opted in to automated deposits
+     - Opted in to delegated deposits
      - Sufficient ERC20 allowance
      - Not already completed their deposit
    - Can be called by anyone (e.g., keepers, automation services)
    - Only deposits the remaining amount needed
 
 4. **`getEligibleAddressesForDeposit()`**
-   - Returns all circle IDs and member addresses eligible for automated deposits
+   - Returns all circle IDs and member addresses eligible for delegated deposits
    - Only includes members who have:
-     - Opted in to automated deposits
+     - Opted in to delegated deposits
      - Sufficient ERC20 allowance
      - Active deposit windows
    - Useful for automation services to identify which deposits can be processed
@@ -97,8 +97,8 @@ The Saving Circles contract now supports automated ERC20 allowance-based deposit
 ### Usage Example
 
 ```solidity
-// Step 1: Member opts in to automated deposits
-savingCircles.setAutomatedDepositsEnabled(true);
+// Step 1: Member opts in to delegated deposits
+savingCircles.setDelegatedDepositsEnabled(true);
 
 // Step 2: Member approves the contract to spend their tokens
 token.approve(savingCirclesAddress, depositAmount);
