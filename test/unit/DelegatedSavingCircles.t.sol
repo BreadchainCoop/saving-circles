@@ -303,7 +303,7 @@ contract DelegatedSavingCirclesUnit is Test {
     assertEq(savingCircles.balances(baseCircleId, bob), 0);
   }
 
-  function test_GetEligibleAddressesForDeposit() external {
+  function test_GetAddressesForDeposit() external {
     // Setup: Alice opts in and approves, Bob opts in but doesn't approve, Carol doesn't opt in
     token.mint(alice, DEPOSIT_AMOUNT);
     token.mint(bob, DEPOSIT_AMOUNT);
@@ -324,8 +324,7 @@ contract DelegatedSavingCirclesUnit is Test {
     token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
 
     // Get eligible addresses
-    (uint256[] memory circleIds, address[] memory eligibleMembers) =
-      delegatedSavingCircles.getEligibleAddressesForDeposit();
+    (uint256[] memory circleIds, address[] memory eligibleMembers) = delegatedSavingCircles.getAddressesForDeposit();
 
     // Only alice should be eligible (opted in AND has allowance)
     assertEq(eligibleMembers.length, 1);

@@ -56,7 +56,7 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, SavingCircles {
   }
 
   /// @inheritdoc IDelegatedSavingCircles
-  function getEligibleAddressesForDeposit()
+  function getAddressesForDeposit()
     external
     view
     override

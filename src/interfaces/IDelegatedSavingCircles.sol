@@ -64,8 +64,5 @@ interface IDelegatedSavingCircles {
    * @return members Array of eligible member addresses
    * @dev Returns parallel arrays where circleIds[i] and members[i] represent an eligible pair
    */
-  function getEligibleAddressesForDeposit()
-    external
-    view
-    returns (uint256[] memory circleIds, address[] memory members);
+  function getAddressesForDeposit() external view returns (uint256[] memory circleIds, address[] memory members);
 }
