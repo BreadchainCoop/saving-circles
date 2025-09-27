@@ -70,6 +70,30 @@ interface ISavingCircles {
   event TokenAllowed(address indexed token, bool indexed allowed);
 
   /**
+   * @notice Emitted when delegated deposits are toggled for a member
+   * @param member The member address
+   * @param enabled Whether delegated deposits are enabled
+   */
+  event DelegatedDepositsToggled(address indexed member, bool enabled);
+
+  /**
+   * @notice Emitted when a delegated deposit is made
+   * @param circleId The circle ID
+   * @param member The member who received the deposit
+   * @param depositor The address that made the deposit on behalf of the member
+   * @param amount The amount deposited
+   */
+  event DelegatedDepositMade(
+    uint256 indexed circleId, address indexed member, address indexed depositor, uint256 amount
+  );
+
+  /**
+   * @notice Emitted when a batch deposit operation is completed
+   * @param count The number of deposits made
+   */
+  event BatchDepositCompleted(uint256 count);
+
+  /**
    * @notice Thrown when a member attempts to redundantly deposit funds into a circle
    */
   error AlreadyDeposited();
@@ -180,6 +204,36 @@ interface ISavingCircles {
   error InvalidMemberAddress();
 
   /**
+   * @notice Thrown when delegated deposits are not enabled for a member
+   */
+  error DelegatedDepositsNotEnabled();
+
+  /**
+   * @notice Thrown when there's insufficient allowance for a delegated deposit
+   */
+  error InsufficientAllowance();
+
+  /**
+   * @notice Thrown when array lengths don't match in batch operations
+   */
+  error ArrayLengthMismatch();
+
+  /**
+   * @notice Thrown when a signature has expired
+   */
+  error SignatureExpired();
+
+  /**
+   * @notice Thrown when a nonce is invalid
+   */
+  error InvalidNonce();
+
+  /**
+   * @notice Thrown when a signature is invalid
+   */
+  error InvalidSignature();
+
+  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -191,6 +245,42 @@ interface ISavingCircles {
    * @param allowed Whether the token is allowed
    */
   function setTokenAllowed(address token, bool allowed) external;
+
+  /**
+   * @notice Enable or disable delegated deposits for the caller
+   * @param enabled Whether to enable delegated deposits
+   */
+  function setDelegatedDepositsEnabled(bool enabled) external;
+
+  /**
+   * @notice Enable or disable delegated deposits using EIP-712 signature (for account abstraction)
+   * @param member The member address
+   * @param enabled Whether to enable delegated deposits
+   * @param nonce The nonce for replay protection
+   * @param deadline The deadline for the signature
+   * @param signature The EIP-712 signature
+   */
+  function setDelegatedDepositsEnabledWithSig(
+    address member,
+    bool enabled,
+    uint256 nonce,
+    uint256 deadline,
+    bytes calldata signature
+  ) external;
+
+  /**
+   * @notice Make a delegated deposit if the member has enabled it and has sufficient allowance
+   * @param circleId The circle ID
+   * @param member The member to deposit for
+   */
+  function depositIfAllowed(uint256 circleId, address member) external;
+
+  /**
+   * @notice Make multiple delegated deposits in a batch
+   * @param circleIds Array of circle IDs
+   * @param members Array of member addresses
+   */
+  function batchDepositIfAllowed(uint256[] calldata circleIds, address[] calldata members) external;
 
   /**
    * @notice Create a circle
@@ -299,6 +389,13 @@ interface ISavingCircles {
   function withdrawableBy(uint256 id) external view returns (address withdrawableBy);
 
   /**
+   * @notice Get addresses eligible for delegated deposits in a circle
+   * @param circleId The circle ID
+   * @return eligibleMembers Array of eligible member addresses
+   */
+  function getAddressesForDeposit(uint256 circleId) external view returns (address[] memory eligibleMembers);
+
+  /**
    * @notice Get the next ID that will be assigned to a new circle
    * @return nextId The next ID
    */
@@ -311,4 +408,18 @@ interface ISavingCircles {
    * @return balance The balance
    */
   function balances(uint256 id, address member) external view returns (uint256 balance);
+
+  /**
+   * @notice Check if delegated deposits are enabled for a member
+   * @param member The member address
+   * @return enabled Whether delegated deposits are enabled
+   */
+  function delegatedDepositsEnabled(address member) external view returns (bool enabled);
+
+  /**
+   * @notice Get the current nonce for a member (for signature-based operations)
+   * @param member The member address
+   * @return nonce The current nonce
+   */
+  function nonces(address member) external view returns (uint256 nonce);
 }
