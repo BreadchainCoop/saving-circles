@@ -401,7 +401,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
     // depending on the specific timing and max deposits reached
     try savingCircles.deposit(circleId, _depositAmount) {
       // If deposit succeeds when it shouldn't, fail the test
-      assertTrue(false, 'Deposit should have failed after max rounds');
+      fail();
     } catch (bytes memory reason) {
       // Accept either CircleExpired or DepositWindowClosed as valid rejections
       bytes4 selector = bytes4(reason);

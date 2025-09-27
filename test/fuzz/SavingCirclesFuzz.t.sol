@@ -305,7 +305,7 @@ contract SavingCirclesFuzzTest is Test {
     vm.startPrank(alice);
     token.approve(address(savingCircles), depositAmount);
 
-    if (_timeOffset < circleStart - block.timestamp) {
+    if (block.timestamp < circleStart && _timeOffset < circleStart - block.timestamp) {
       vm.expectRevert(ISavingCircles.DepositBeforeCircleStart.selector);
       savingCircles.deposit(circleId, depositAmount);
     } else {

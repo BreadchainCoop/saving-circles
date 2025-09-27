@@ -49,8 +49,8 @@ contract SavingCirclesHandler is Test {
     uint256 depositInterval,
     uint256 maxDeposits,
     uint256 circleStartOffset,
-    uint256 actorSeed // solhint-disable-line no-unused-vars
-  ) public useActor(actorSeed) {
+    uint256 _actorSeed // solhint-disable-line no-unused-vars
+  ) public useActor(_actorSeed) {
     uint256 memberCount = bound(memberCountSeed, 2, 5);
     depositAmount = bound(depositAmount, 100, 1e18);
     depositInterval = bound(depositInterval, 1 hours, 7 days);
@@ -79,11 +79,8 @@ contract SavingCirclesHandler is Test {
     } catch {}
   }
 
-  function deposit(
-    uint256 circleIndexSeed,
-    uint256 amount,
-    uint256 actorSeed // solhint-disable-line no-unused-vars
-  ) public useActor(actorSeed) {
+  // solhint-disable-next-line no-unused-vars
+  function deposit(uint256 circleIndexSeed, uint256 amount, uint256 _actorSeed) public useActor(_actorSeed) {
     if (activeCircles.length == 0) return;
 
     uint256 circleIndex = circleIndexSeed % activeCircles.length;
@@ -113,8 +110,8 @@ contract SavingCirclesHandler is Test {
     uint256 circleIndexSeed,
     uint256 memberIndexSeed,
     uint256 amount,
-    uint256 actorSeed // solhint-disable-line no-unused-vars
-  ) public useActor(actorSeed) {
+    uint256 _actorSeed // solhint-disable-line no-unused-vars
+  ) public useActor(_actorSeed) {
     if (activeCircles.length == 0) return;
 
     uint256 circleIndex = circleIndexSeed % activeCircles.length;
@@ -143,10 +140,8 @@ contract SavingCirclesHandler is Test {
     } catch {}
   }
 
-  function withdraw(
-    uint256 circleIndexSeed,
-    uint256 actorSeed // solhint-disable-line no-unused-vars
-  ) public useActor(actorSeed) {
+  // solhint-disable-next-line no-unused-vars
+  function withdraw(uint256 circleIndexSeed, uint256 _actorSeed) public useActor(_actorSeed) {
     if (activeCircles.length == 0) return;
 
     uint256 circleIndex = circleIndexSeed % activeCircles.length;
@@ -163,8 +158,8 @@ contract SavingCirclesHandler is Test {
         uint256 balanceAfter = token.balanceOf(msg.sender);
         uint256 withdrawnAmount = balanceAfter - balanceBefore;
         totalWithdrawn += withdrawnAmount;
-        expectedWithdrawals += circle.depositAmount * circle.members.length;
-        totalDeposits -= circle.depositAmount * circle.members.length;
+        expectedWithdrawals += withdrawnAmount;
+        totalDeposits -= withdrawnAmount;
       } catch {}
     } catch {}
   }
@@ -172,8 +167,8 @@ contract SavingCirclesHandler is Test {
   function withdrawFor(
     uint256 circleIndexSeed,
     uint256 memberIndexSeed,
-    uint256 actorSeed // solhint-disable-line no-unused-vars
-  ) public useActor(actorSeed) {
+    uint256 _actorSeed // solhint-disable-line no-unused-vars
+  ) public useActor(_actorSeed) {
     if (activeCircles.length == 0) return;
 
     uint256 circleIndex = circleIndexSeed % activeCircles.length;
@@ -194,16 +189,14 @@ contract SavingCirclesHandler is Test {
         uint256 balanceAfter = token.balanceOf(member);
         uint256 withdrawnAmount = balanceAfter - balanceBefore;
         totalWithdrawn += withdrawnAmount;
-        expectedWithdrawals += circle.depositAmount * circle.members.length;
-        totalDeposits -= circle.depositAmount * circle.members.length;
+        expectedWithdrawals += withdrawnAmount;
+        totalDeposits -= withdrawnAmount;
       } catch {}
     } catch {}
   }
 
-  function decommission(
-    uint256 circleIndexSeed,
-    uint256 actorSeed // solhint-disable-line no-unused-vars
-  ) public useActor(actorSeed) {
+  // solhint-disable-next-line no-unused-vars
+  function decommission(uint256 circleIndexSeed, uint256 _actorSeed) public useActor(_actorSeed) {
     if (activeCircles.length == 0) return;
 
     uint256 circleIndex = circleIndexSeed % activeCircles.length;
