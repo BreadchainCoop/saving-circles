@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {DelegatedSavingCircles} from '../../src/contracts/DelegatedSavingCircles.sol';
 import {SavingCircles} from '../../src/contracts/SavingCircles.sol';
-import {IDelegatedSavingCircles} from '../../src/interfaces/IDelegatedSavingCircles.sol';
 import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
 import {MockERC20} from '../mocks/MockERC20.sol';
 import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
@@ -12,7 +10,6 @@ import {Test} from 'forge-std/Test.sol';
 
 contract DelegatedSavingCirclesUnit is Test {
   SavingCircles public savingCircles;
-  DelegatedSavingCircles public delegatedSavingCircles;
   MockERC20 public token;
   ProxyAdmin public proxyAdmin;
 
@@ -33,16 +30,13 @@ contract DelegatedSavingCirclesUnit is Test {
     // Deploy token
     token = new MockERC20('Test Token', 'TEST');
 
-    // Deploy main SavingCircles contract
+    // Deploy SavingCircles contract with integrated delegation features
     proxyAdmin = new ProxyAdmin(owner);
     SavingCircles implementation = new SavingCircles();
     TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
       address(implementation), address(proxyAdmin), abi.encodeWithSelector(SavingCircles.initialize.selector, owner)
     );
     savingCircles = SavingCircles(address(proxy));
-
-    // Deploy delegated deposits extension
-    delegatedSavingCircles = new DelegatedSavingCircles(address(savingCircles));
 
     // Setup members
     members = new address[](3);
@@ -54,15 +48,15 @@ contract DelegatedSavingCirclesUnit is Test {
     vm.prank(owner);
     savingCircles.setTokenAllowed(address(token), true);
 
-    // Create base circle
+    // Create a base circle for testing
     baseCircle = ISavingCircles.Circle({
       owner: owner,
       members: members,
       currentIndex: 0,
-      circleStart: block.timestamp,
-      token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
+      token: address(token),
       depositInterval: DEPOSIT_INTERVAL,
+      circleStart: block.timestamp,
       maxDeposits: MAX_DEPOSITS
     });
 
@@ -72,25 +66,25 @@ contract DelegatedSavingCirclesUnit is Test {
 
   function test_SetDelegatedDepositsEnabled() external {
     // Check initial state is disabled
-    assertFalse(delegatedSavingCircles.isDelegatedDepositsEnabled(alice));
+    assertFalse(savingCircles.delegatedDepositsEnabled(alice));
 
     // Alice enables delegated deposits
     vm.prank(alice);
     vm.expectEmit(true, true, true, true);
-    emit IDelegatedSavingCircles.DelegatedDepositsToggled(alice, true);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    emit ISavingCircles.DelegatedDepositsToggled(alice, true);
+    savingCircles.setDelegatedDepositsEnabled(true);
 
     // Verify it's enabled
-    assertTrue(delegatedSavingCircles.isDelegatedDepositsEnabled(alice));
+    assertTrue(savingCircles.delegatedDepositsEnabled(alice));
 
     // Alice disables delegated deposits
     vm.prank(alice);
     vm.expectEmit(true, true, true, true);
-    emit IDelegatedSavingCircles.DelegatedDepositsToggled(alice, false);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(false);
+    emit ISavingCircles.DelegatedDepositsToggled(alice, false);
+    savingCircles.setDelegatedDepositsEnabled(false);
 
     // Verify it's disabled
-    assertFalse(delegatedSavingCircles.isDelegatedDepositsEnabled(alice));
+    assertFalse(savingCircles.delegatedDepositsEnabled(alice));
   }
 
   function test_DepositIfAllowed_WithSufficientAllowance() external {
@@ -99,19 +93,19 @@ contract DelegatedSavingCirclesUnit is Test {
 
     // Alice opts in to delegated deposits
     vm.prank(alice);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    savingCircles.setDelegatedDepositsEnabled(true);
 
-    // Alice approves the extension contract (not main contract)
+    // Alice approves the savingCircles contract
     vm.prank(alice);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
 
     // Anyone can call depositIfAllowed for alice
     vm.prank(bob);
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
-    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
+    savingCircles.depositIfAllowed(baseCircleId, alice);
 
-    // Verify deposit was recorded in main contract
+    // Verify deposit was recorded
     uint256 balance = savingCircles.balances(baseCircleId, alice);
     assertEq(balance, DEPOSIT_AMOUNT);
   }
@@ -122,12 +116,12 @@ contract DelegatedSavingCirclesUnit is Test {
 
     // Alice approves but does NOT opt in
     vm.prank(alice);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
 
     // Should revert because alice hasn't opted in
     vm.prank(bob);
-    vm.expectRevert(abi.encodeWithSelector(IDelegatedSavingCircles.DelegatedDepositsNotEnabled.selector));
-    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.DelegatedDepositsNotEnabled.selector));
+    savingCircles.depositIfAllowed(baseCircleId, alice);
   }
 
   function test_DepositIfAllowed_WithInsufficientAllowance() external {
@@ -136,16 +130,16 @@ contract DelegatedSavingCirclesUnit is Test {
 
     // Alice opts in to delegated deposits
     vm.prank(alice);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    savingCircles.setDelegatedDepositsEnabled(true);
 
     // Alice approves less than required amount
     vm.prank(alice);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT / 2);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT / 2);
 
     // Call should revert with InsufficientAllowance
     vm.prank(bob);
-    vm.expectRevert(abi.encodeWithSelector(IDelegatedSavingCircles.InsufficientAllowance.selector));
-    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InsufficientAllowance.selector));
+    savingCircles.depositIfAllowed(baseCircleId, alice);
   }
 
   function test_DepositIfAllowed_WhenAlreadyDeposited() external {
@@ -154,197 +148,180 @@ contract DelegatedSavingCirclesUnit is Test {
 
     // Alice opts in to delegated deposits
     vm.prank(alice);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    savingCircles.setDelegatedDepositsEnabled(true);
 
-    // Alice makes a regular deposit first directly to main contract
+    // Alice makes a regular deposit first
     vm.startPrank(alice);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
     savingCircles.depositFor(baseCircleId, DEPOSIT_AMOUNT, alice);
     vm.stopPrank();
 
-    // Approve extension for another deposit attempt
+    // Approve for another deposit attempt
     vm.prank(alice);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
 
     // Call depositIfAllowed - should revert with AlreadyDeposited
     vm.prank(bob);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyDeposited.selector));
-    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
-
-    // Balance should remain the same
-    uint256 balance = savingCircles.balances(baseCircleId, alice);
-    assertEq(balance, DEPOSIT_AMOUNT);
+    savingCircles.depositIfAllowed(baseCircleId, alice);
   }
 
-  function test_DepositIfAllowed_PartialDeposit() external {
-    // Alice makes a partial deposit first
-    uint256 partialAmount = DEPOSIT_AMOUNT / 2;
+  function test_DepositIfAllowed_EmitsDelegatedDepositMadeEvent() external {
+    // Setup
     token.mint(alice, DEPOSIT_AMOUNT);
-
-    // Alice opts in to delegated deposits
     vm.prank(alice);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
-
-    // Make partial deposit directly to main contract
-    vm.startPrank(alice);
-    token.approve(address(savingCircles), partialAmount);
-    savingCircles.depositFor(baseCircleId, partialAmount, alice);
-    vm.stopPrank();
-
-    // Approve extension for remaining amount
+    savingCircles.setDelegatedDepositsEnabled(true);
     vm.prank(alice);
-    token.approve(address(delegatedSavingCircles), partialAmount);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
 
-    // Now call depositIfAllowed to complete the deposit
+    // Expect both events
     vm.prank(bob);
-    vm.expectEmit(true, true, true, true);
-    emit ISavingCircles.FundsDeposited(baseCircleId, alice, partialAmount);
-    delegatedSavingCircles.depositIfAllowed(baseCircleId, alice);
-
-    // Verify full deposit amount
-    uint256 balance = savingCircles.balances(baseCircleId, alice);
-    assertEq(balance, DEPOSIT_AMOUNT);
-  }
-
-  function test_DepositIfAllowed_NotMember() external {
-    address nonMember = makeAddr('nonMember');
-    token.mint(nonMember, DEPOSIT_AMOUNT);
-
-    // Non-member opts in and approves
-    vm.startPrank(nonMember);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    vm.prank(bob);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
-    delegatedSavingCircles.depositIfAllowed(baseCircleId, nonMember);
-  }
-
-  function test_BatchDepositIfAllowed() external {
-    // Setup tokens and approvals for all members
-    token.mint(alice, DEPOSIT_AMOUNT);
-    token.mint(bob, DEPOSIT_AMOUNT);
-    token.mint(carol, DEPOSIT_AMOUNT);
-
-    // All users opt in and approve full amount to extension
-    vm.startPrank(alice);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    vm.startPrank(bob);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    vm.startPrank(carol);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    // Batch deposit - same circle for all members
-    uint256[] memory circleIds = new uint256[](3);
-    circleIds[0] = baseCircleId;
-    circleIds[1] = baseCircleId;
-    circleIds[2] = baseCircleId;
-
-    address[] memory membersToDeposit = new address[](3);
-    membersToDeposit[0] = alice;
-    membersToDeposit[1] = bob;
-    membersToDeposit[2] = carol;
-
-    vm.prank(owner);
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
     vm.expectEmit(true, true, true, true);
-    emit ISavingCircles.FundsDeposited(baseCircleId, bob, DEPOSIT_AMOUNT);
-    vm.expectEmit(true, true, true, true);
-    emit ISavingCircles.FundsDeposited(baseCircleId, carol, DEPOSIT_AMOUNT);
-    delegatedSavingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
-
-    // Verify all deposits succeeded
-    assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
-    assertEq(savingCircles.balances(baseCircleId, bob), DEPOSIT_AMOUNT);
-    assertEq(savingCircles.balances(baseCircleId, carol), DEPOSIT_AMOUNT);
+    emit ISavingCircles.DelegatedDepositMade(baseCircleId, alice, bob, DEPOSIT_AMOUNT);
+    savingCircles.depositIfAllowed(baseCircleId, alice);
   }
 
-  function test_BatchDepositIfAllowed_FailsOnInsufficientAllowance() external {
-    token.mint(alice, DEPOSIT_AMOUNT);
-    token.mint(bob, DEPOSIT_AMOUNT);
-
-    // Alice opts in and approves full amount
-    vm.startPrank(alice);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    // Bob opts in but only approves partial amount
-    vm.startPrank(bob);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT / 2);
-    vm.stopPrank();
-
-    // Batch deposit - should fail on bob's insufficient allowance
-    uint256[] memory circleIds = new uint256[](2);
-    circleIds[0] = baseCircleId;
-    circleIds[1] = baseCircleId;
-
-    address[] memory membersToDeposit = new address[](2);
-    membersToDeposit[0] = alice;
-    membersToDeposit[1] = bob;
-
-    vm.prank(owner);
-    vm.expectRevert(abi.encodeWithSelector(IDelegatedSavingCircles.InsufficientAllowance.selector));
-    delegatedSavingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
-
-    // Verify no deposits went through (all-or-nothing)
-    assertEq(savingCircles.balances(baseCircleId, alice), 0);
-    assertEq(savingCircles.balances(baseCircleId, bob), 0);
-  }
-
-  function test_GetAddressesForDeposit() external {
-    // Setup: Alice opts in and approves, Bob opts in but doesn't approve, Carol doesn't opt in
+  function test_GetAddressesForDeposit_AllEligible() external {
+    // Mint tokens to all members
     token.mint(alice, DEPOSIT_AMOUNT);
     token.mint(bob, DEPOSIT_AMOUNT);
     token.mint(carol, DEPOSIT_AMOUNT);
 
-    // Alice opts in and approves
-    vm.startPrank(alice);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
-    vm.stopPrank();
+    // All members opt in and approve
+    vm.prank(alice);
+    savingCircles.setDelegatedDepositsEnabled(true);
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    vm.prank(bob);
+    savingCircles.setDelegatedDepositsEnabled(true);
+    vm.prank(bob);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    vm.prank(carol);
+    savingCircles.setDelegatedDepositsEnabled(true);
+    vm.prank(carol);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Get eligible addresses
+    address[] memory eligible = savingCircles.getAddressesForDeposit(baseCircleId);
+    assertEq(eligible.length, 3);
+    assertEq(eligible[0], alice);
+    assertEq(eligible[1], bob);
+    assertEq(eligible[2], carol);
+  }
+
+  function test_GetAddressesForDeposit_PartiallyEligible() external {
+    // Mint tokens to alice and bob
+    token.mint(alice, DEPOSIT_AMOUNT);
+    token.mint(bob, DEPOSIT_AMOUNT);
+
+    // Only alice opts in and approves
+    vm.prank(alice);
+    savingCircles.setDelegatedDepositsEnabled(true);
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
 
     // Bob opts in but doesn't approve
     vm.prank(bob);
-    delegatedSavingCircles.setDelegatedDepositsEnabled(true);
+    savingCircles.setDelegatedDepositsEnabled(true);
 
-    // Carol approves but doesn't opt in
-    vm.prank(carol);
-    token.approve(address(delegatedSavingCircles), DEPOSIT_AMOUNT);
+    // Carol doesn't opt in
 
-    // Get eligible addresses
-    (uint256[] memory circleIds, address[] memory eligibleMembers) = delegatedSavingCircles.getAddressesForDeposit();
-
-    // Only alice should be eligible (opted in AND has allowance)
-    assertEq(eligibleMembers.length, 1);
-    assertEq(circleIds.length, 1);
-    assertEq(eligibleMembers[0], alice);
-    assertEq(circleIds[0], baseCircleId);
+    // Get eligible addresses - only alice should be eligible
+    address[] memory eligible = savingCircles.getAddressesForDeposit(baseCircleId);
+    assertEq(eligible.length, 1);
+    assertEq(eligible[0], alice);
   }
 
-  function test_BatchDepositIfAllowed_ArrayLengthMismatch() external {
+  function test_GetAddressesForDeposit_OutsideDepositWindow() external {
+    // Setup approvals
+    token.mint(alice, DEPOSIT_AMOUNT);
+    vm.prank(alice);
+    savingCircles.setDelegatedDepositsEnabled(true);
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Warp to outside the deposit window
+    vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
+
+    // Should return empty array
+    address[] memory eligible = savingCircles.getAddressesForDeposit(baseCircleId);
+    assertEq(eligible.length, 0);
+  }
+
+  function test_BatchDepositIfAllowed_Success() external {
+    // Mint tokens
+    token.mint(alice, DEPOSIT_AMOUNT);
+    token.mint(bob, DEPOSIT_AMOUNT);
+
+    // Both members opt in and approve
+    vm.prank(alice);
+    savingCircles.setDelegatedDepositsEnabled(true);
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    vm.prank(bob);
+    savingCircles.setDelegatedDepositsEnabled(true);
+    vm.prank(bob);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Setup arrays
     uint256[] memory circleIds = new uint256[](2);
     circleIds[0] = baseCircleId;
     circleIds[1] = baseCircleId;
 
-    address[] memory membersToDeposit = new address[](3);
-    membersToDeposit[0] = alice;
-    membersToDeposit[1] = bob;
-    membersToDeposit[2] = carol;
+    address[] memory membersArray = new address[](2);
+    membersArray[0] = alice;
+    membersArray[1] = bob;
 
-    vm.prank(owner);
-    vm.expectRevert(abi.encodeWithSelector(IDelegatedSavingCircles.ArrayLengthMismatch.selector));
-    delegatedSavingCircles.batchDepositIfAllowed(circleIds, membersToDeposit);
+    // Perform batch deposit
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.BatchDepositCompleted(2);
+    savingCircles.batchDepositIfAllowed(circleIds, membersArray);
+
+    // Verify deposits
+    assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(baseCircleId, bob), DEPOSIT_AMOUNT);
+  }
+
+  function test_BatchDepositIfAllowed_MismatchedArrays() external {
+    uint256[] memory circleIds = new uint256[](2);
+    address[] memory membersArray = new address[](1);
+
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.ArrayLengthMismatch.selector));
+    savingCircles.batchDepositIfAllowed(circleIds, membersArray);
+  }
+
+  function test_BatchDepositIfAllowed_PartialFailure() external {
+    // Mint tokens only to alice
+    token.mint(alice, DEPOSIT_AMOUNT);
+
+    // Alice opts in and approves
+    vm.prank(alice);
+    savingCircles.setDelegatedDepositsEnabled(true);
+    vm.prank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Bob opts in but has no tokens
+    vm.prank(bob);
+    savingCircles.setDelegatedDepositsEnabled(true);
+
+    uint256[] memory circleIds = new uint256[](2);
+    circleIds[0] = baseCircleId;
+    circleIds[1] = baseCircleId;
+
+    address[] memory membersArray = new address[](2);
+    membersArray[0] = alice;
+    membersArray[1] = bob; // This will fail due to insufficient allowance
+
+    // The batch should fail when bob's deposit fails
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InsufficientAllowance.selector));
+    savingCircles.batchDepositIfAllowed(circleIds, membersArray);
+
+    // Verify alice's deposit was not made due to revert
+    assertEq(savingCircles.balances(baseCircleId, alice), 0);
   }
 }

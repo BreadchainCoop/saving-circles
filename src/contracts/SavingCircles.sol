@@ -363,27 +363,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
   }
 
   /**
-   * @dev Return if a specified circle is withdrawable
-   *      To be considered withdrawable, enough time must have passed since the deposit interval started
-   *      and all members must have made a deposit.
-   */
-  function _withdrawable(uint256 _id) internal view onlyCommissioned(_id) returns (bool) {
-    Circle memory _circle = circles[_id];
-
-    if (block.timestamp < _circle.circleStart + (_circle.depositInterval * _circle.currentIndex)) {
-      return false;
-    }
-
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      if (balances[_id][_circle.members[i]] < _circle.depositAmount) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  /**
    * @dev Internal function to handle delegated deposits
    */
   function _depositIfAllowed(uint256 _circleId, address _member) internal {
@@ -409,6 +388,27 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
 
     emit FundsDeposited(_circleId, _member, amountToDeposit);
     emit DelegatedDepositMade(_circleId, _member, msg.sender, amountToDeposit);
+  }
+
+  /**
+   * @dev Return if a specified circle is withdrawable
+   *      To be considered withdrawable, enough time must have passed since the deposit interval started
+   *      and all members must have made a deposit.
+   */
+  function _withdrawable(uint256 _id) internal view onlyCommissioned(_id) returns (bool) {
+    Circle memory _circle = circles[_id];
+
+    if (block.timestamp < _circle.circleStart + (_circle.depositInterval * _circle.currentIndex)) {
+      return false;
+    }
+
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      if (balances[_id][_circle.members[i]] < _circle.depositAmount) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
