@@ -418,4 +418,3 @@ contract SavingCirclesWithDelegation is ISavingCirclesWithDelegation, Reentrancy
     return _circle.owner == address(0);
   }
 }
-

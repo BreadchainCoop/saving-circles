@@ -431,4 +431,3 @@ interface ISavingCirclesWithDelegation {
    */
   function nonces(address member) external view returns (uint256 nonce);
 }
-
