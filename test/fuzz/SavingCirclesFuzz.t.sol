@@ -124,6 +124,56 @@ contract SavingCirclesFuzzTest is Test {
     assertLe(depositedAmount, _totalDeposit);
   }
 
+  function testFuzz_WithdrawableBy(uint8 _memberCount, uint256 _currentIndex) public {
+    _memberCount = uint8(bound(uint256(_memberCount), 2, 10));
+    _currentIndex = bound(_currentIndex, 0, uint256(_memberCount) - 1);
+
+    address[] memory members = new address[](_memberCount);
+    for (uint256 i = 0; i < _memberCount; i++) {
+      members[i] = makeAddr(string(abi.encodePacked('member', i)));
+    }
+
+    // Create a circle
+    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
+      owner: alice,
+      members: members,
+      token: address(token),
+      depositAmount: 1000,
+      depositInterval: 1 days,
+      maxDeposits: _memberCount,
+      circleStart: block.timestamp + 1 days,
+      currentIndex: 0
+    });
+
+    vm.prank(alice);
+    uint256 circleId = savingCircles.create(circle);
+
+    // Move to start time
+    vm.warp(block.timestamp + 1 days);
+
+    // Simulate deposits and withdrawals to reach desired currentIndex
+    for (uint256 round = 0; round < _currentIndex; round++) {
+      // All members deposit
+      for (uint256 i = 0; i < _memberCount; i++) {
+        token.mint(members[i], 1000);
+        vm.startPrank(members[i]);
+        token.approve(address(savingCircles), 1000);
+        savingCircles.deposit(circleId, 1000);
+        vm.stopPrank();
+      }
+
+      // Wait for withdrawal time
+      vm.warp(block.timestamp + 1 days);
+
+      // Withdraw
+      address expectedWithdrawer = savingCircles.withdrawableBy(circleId);
+      assertEq(expectedWithdrawer, members[round % _memberCount]);
+
+      vm.prank(expectedWithdrawer);
+      savingCircles.withdraw(circleId);
+    }
+  }
+
   function testFuzz_Withdraw_AfterAllDeposits(uint256 _depositAmount, uint8 _memberCount) public {
     _depositAmount = bound(_depositAmount, 100, _MAX_REASONABLE_DEPOSIT / 10);
     _memberCount = uint8(bound(_memberCount, 2, 5));
@@ -259,14 +309,16 @@ contract SavingCirclesFuzzTest is Test {
 
     vm.startPrank(alice);
 
-    if (_depositAmount == 0) {
-      vm.expectRevert(ISavingCircles.InvalidDepositAmount.selector);
-      savingCircles.create(circle);
-    } else if (_depositInterval == 0) {
-      vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
-      savingCircles.create(circle);
-    } else if (_maxDeposits == 0) {
-      vm.expectRevert(ISavingCircles.InvalidMaxDeposits.selector);
+    if (_depositAmount == 0 || _depositInterval == 0 || _maxDeposits == 0) {
+      // The contract checks in order: depositInterval, depositAmount, maxDeposits
+      // Multiple conditions could be zero, so we need to check which error is thrown first
+      if (_depositInterval == 0) {
+        vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
+      } else if (_depositAmount == 0) {
+        vm.expectRevert(ISavingCircles.InvalidDepositAmount.selector);
+      } else {
+        vm.expectRevert(ISavingCircles.InvalidMaxDeposits.selector);
+      }
       savingCircles.create(circle);
     } else {
       uint256 circleId = savingCircles.create(circle);
