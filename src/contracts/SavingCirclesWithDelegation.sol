@@ -22,9 +22,8 @@ contract SavingCirclesWithDelegation is ISavingCirclesWithDelegation, Reentrancy
   using ECDSA for bytes32;
 
   uint256 public constant MINIMUM_MEMBERS = 2;
-  bytes32 private constant DELEGATION_TYPEHASH = keccak256(
-    "SetDelegatedDeposits(address member,bool enabled,uint256 nonce,uint256 deadline)"
-  );
+  bytes32 private constant _DELEGATION_TYPEHASH =
+    keccak256('SetDelegatedDeposits(address member,bool enabled,uint256 nonce,uint256 deadline)');
 
   uint256 public nextId;
   mapping(uint256 id => Circle circle) public circles;
@@ -32,7 +31,7 @@ contract SavingCirclesWithDelegation is ISavingCirclesWithDelegation, Reentrancy
   mapping(uint256 id => mapping(address member => bool status)) public isMember;
   mapping(address member => uint256[] ids) public memberCircles;
   mapping(address token => bool status) public allowedTokens;
-  
+
   // Delegated deposits functionality
   mapping(address member => bool enabled) public delegatedDepositsEnabled;
   mapping(address member => uint256 nonce) public nonces;
@@ -50,7 +49,7 @@ contract SavingCirclesWithDelegation is ISavingCirclesWithDelegation, Reentrancy
   }
 
   /// @custom:oz-upgrades-unsafe-allow constructor
-  constructor() EIP712("SavingCirclesWithDelegation", "1") {
+  constructor() EIP712('SavingCirclesWithDelegation', '1') {
     _disableInitializers();
   }
 
@@ -82,19 +81,13 @@ contract SavingCirclesWithDelegation is ISavingCirclesWithDelegation, Reentrancy
     if (block.timestamp > _deadline) revert SignatureExpired();
     if (_nonce != nonces[_member]) revert InvalidNonce();
 
-    bytes32 structHash = keccak256(abi.encode(
-      DELEGATION_TYPEHASH,
-      _member,
-      _enabled,
-      _nonce,
-      _deadline
-    ));
-    
+    bytes32 structHash = keccak256(abi.encode(_DELEGATION_TYPEHASH, _member, _enabled, _nonce, _deadline));
+
     bytes32 hash = _hashTypedDataV4(structHash);
     address signer = hash.recover(_signature);
-    
+
     if (signer != _member) revert InvalidSignature();
-    
+
     nonces[_member]++;
     delegatedDepositsEnabled[_member] = _enabled;
     emit DelegatedDepositsToggled(_member, _enabled);
@@ -111,54 +104,12 @@ contract SavingCirclesWithDelegation is ISavingCirclesWithDelegation, Reentrancy
     address[] calldata _members
   ) external override nonReentrant {
     if (_circleIds.length != _members.length) revert ArrayLengthMismatch();
-    
+
     for (uint256 i = 0; i < _circleIds.length; i++) {
       _depositIfAllowed(_circleIds[i], _members[i]);
     }
-    
-    emit BatchDepositCompleted(_circleIds.length);
-  }
 
-  /// @inheritdoc ISavingCirclesWithDelegation
-  function getAddressesForDeposit(
-    uint256 _circleId
-  ) external view override returns (address[] memory _eligibleMembers) {
-    Circle memory _circle = circles[_circleId];
-    if (_isDecommissioned(_circle)) revert NotCommissioned();
-    
-    uint256 depositWindowStart = _circle.circleStart + (_circle.depositInterval * _circle.currentIndex);
-    uint256 depositWindowEnd = depositWindowStart + _circle.depositInterval;
-    
-    if (block.timestamp < depositWindowStart || block.timestamp >= depositWindowEnd) {
-      return new address[](0);
-    }
-    
-    uint256 eligibleCount = 0;
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      address member = _circle.members[i];
-      if (
-        delegatedDepositsEnabled[member] &&
-        balances[_circleId][member] < _circle.depositAmount &&
-        _hasAllowance(member, _circle.token, _circle.depositAmount - balances[_circleId][member])
-      ) {
-        eligibleCount++;
-      }
-    }
-    
-    _eligibleMembers = new address[](eligibleCount);
-    uint256 index = 0;
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      address member = _circle.members[i];
-      if (
-        delegatedDepositsEnabled[member] &&
-        balances[_circleId][member] < _circle.depositAmount &&
-        _hasAllowance(member, _circle.token, _circle.depositAmount - balances[_circleId][member])
-      ) {
-        _eligibleMembers[index++] = member;
-      }
-    }
-    
-    return _eligibleMembers;
+    emit BatchDepositCompleted(_circleIds.length);
   }
 
   /// @inheritdoc ISavingCirclesWithDelegation
@@ -249,6 +200,44 @@ contract SavingCirclesWithDelegation is ISavingCirclesWithDelegation, Reentrancy
   }
 
   /// @inheritdoc ISavingCirclesWithDelegation
+  function getAddressesForDeposit(uint256 _circleId) external view override returns (address[] memory _eligibleMembers) {
+    Circle memory _circle = circles[_circleId];
+    if (_isDecommissioned(_circle)) revert NotCommissioned();
+
+    uint256 depositWindowStart = _circle.circleStart + (_circle.depositInterval * _circle.currentIndex);
+    uint256 depositWindowEnd = depositWindowStart + _circle.depositInterval;
+
+    if (block.timestamp < depositWindowStart || block.timestamp >= depositWindowEnd) {
+      return new address[](0);
+    }
+
+    uint256 eligibleCount = 0;
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      address member = _circle.members[i];
+      if (
+        delegatedDepositsEnabled[member] && balances[_circleId][member] < _circle.depositAmount
+          && _hasAllowance(member, _circle.token, _circle.depositAmount - balances[_circleId][member])
+      ) {
+        eligibleCount++;
+      }
+    }
+
+    _eligibleMembers = new address[](eligibleCount);
+    uint256 index = 0;
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      address member = _circle.members[i];
+      if (
+        delegatedDepositsEnabled[member] && balances[_circleId][member] < _circle.depositAmount
+          && _hasAllowance(member, _circle.token, _circle.depositAmount - balances[_circleId][member])
+      ) {
+        _eligibleMembers[index++] = member;
+      }
+    }
+
+    return _eligibleMembers;
+  }
+
+  /// @inheritdoc ISavingCirclesWithDelegation
   function getCircles(uint256[] calldata _ids) external view returns (Circle[] memory _circles) {
     _circles = new Circle[](_ids.length);
 
@@ -318,34 +307,27 @@ contract SavingCirclesWithDelegation is ISavingCirclesWithDelegation, Reentrancy
    */
   function _depositIfAllowed(uint256 _circleId, address _member) internal {
     if (!delegatedDepositsEnabled[_member]) revert DelegatedDepositsNotEnabled();
-    
+
     Circle memory _circle = circles[_circleId];
     if (_isDecommissioned(_circle)) revert NotCommissioned();
     if (!isMember[_circleId][_member]) revert NotMember();
-    
+
     uint256 currentBalance = balances[_circleId][_member];
     if (currentBalance >= _circle.depositAmount) revert AlreadyDeposited();
-    
+
     uint256 amountToDeposit = _circle.depositAmount - currentBalance;
-    
+
     if (!_hasAllowance(_member, _circle.token, amountToDeposit)) {
       revert InsufficientAllowance();
     }
-    
+
     balances[_circleId][_member] = _circle.depositAmount;
-    
+
     bool success = IERC20(_circle.token).transferFrom(_member, address(this), amountToDeposit);
     if (!success) revert TransferFailed();
-    
+
     emit FundsDeposited(_circleId, _member, amountToDeposit);
     emit DelegatedDepositMade(_circleId, _member, msg.sender, amountToDeposit);
-  }
-
-  /**
-   * @dev Check if member has sufficient allowance
-   */
-  function _hasAllowance(address _member, address _token, uint256 _amount) internal view returns (bool) {
-    return IERC20(_token).allowance(_member, address(this)) >= _amount;
   }
 
   /**
@@ -423,9 +405,17 @@ contract SavingCirclesWithDelegation is ISavingCirclesWithDelegation, Reentrancy
   }
 
   /**
+   * @dev Check if member has sufficient allowance
+   */
+  function _hasAllowance(address _member, address _token, uint256 _amount) internal view returns (bool) {
+    return IERC20(_token).allowance(_member, address(this)) >= _amount;
+  }
+
+  /**
    * @dev Return if a specified circle is decommissioned
    */
   function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
     return _circle.owner == address(0);
   }
 }
+

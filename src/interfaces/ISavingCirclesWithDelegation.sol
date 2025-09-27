@@ -84,10 +84,7 @@ interface ISavingCirclesWithDelegation {
    * @param amount The amount deposited
    */
   event DelegatedDepositMade(
-    uint256 indexed circleId,
-    address indexed member,
-    address indexed depositor,
-    uint256 amount
+    uint256 indexed circleId, address indexed member, address indexed depositor, uint256 amount
   );
 
   /**
@@ -291,19 +288,7 @@ interface ISavingCirclesWithDelegation {
    * @param circleIds Array of circle IDs
    * @param members Array of member addresses
    */
-  function batchDepositIfAllowed(
-    uint256[] calldata circleIds,
-    address[] calldata members
-  ) external;
-
-  /**
-   * @notice Get addresses eligible for delegated deposits in a circle
-   * @param circleId The circle ID
-   * @return eligibleMembers Array of eligible member addresses
-   */
-  function getAddressesForDeposit(
-    uint256 circleId
-  ) external view returns (address[] memory eligibleMembers);
+  function batchDepositIfAllowed(uint256[] calldata circleIds, address[] calldata members) external;
 
   /**
    * @notice Create a circle
@@ -352,6 +337,13 @@ interface ISavingCirclesWithDelegation {
    * @return circle The circle
    */
   function getCircle(uint256 id) external view returns (Circle memory circle);
+
+  /**
+   * @notice Get addresses eligible for delegated deposits in a circle
+   * @param circleId The circle ID
+   * @return eligibleMembers Array of eligible member addresses
+   */
+  function getAddressesForDeposit(uint256 circleId) external view returns (address[] memory eligibleMembers);
 
   /**
    * @notice Get multiple circles
@@ -439,3 +431,4 @@ interface ISavingCirclesWithDelegation {
    */
   function nonces(address member) external view returns (uint256 nonce);
 }
+
