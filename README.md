@@ -8,16 +8,6 @@
 
 <div align="center">Forked by Breadchain</div>
 
-<br />
-
-<div align="center">
-  
-[![CI](https://github.com/BreadchainCoop/saving-circles/actions/workflows/tests.yml/badge.svg)](https://github.com/BreadchainCoop/saving-circles/actions/workflows/tests.yml)
-[![Coverage](https://github.com/BreadchainCoop/saving-circles/actions/workflows/coverage.yml/badge.svg)](https://github.com/BreadchainCoop/saving-circles/actions/workflows/coverage.yml)
-[![Coverage](https://img.shields.io/badge/Coverage-86%25-green)](https://github.com/BreadchainCoop/saving-circles/actions/workflows/coverage.yml)
-
-</div>
-
 ## Breadchain Developers
 
 <dl>
@@ -42,11 +32,7 @@
 
   <dt>Test Coverage</dt>
   <li>Run `yarn coverage` to generate a coverage report for tests</li>
-  <li>Run `forge coverage --report summary` for a quick overview</li>
-  <li>Unit and Integration should aim for 100%, with branch testing reasonably high</li>
-  <li>Current coverage threshold: 80% (enforced in CI)</li>
-  <li>Coverage reports are automatically generated and uploaded as artifacts in CI</li>
-  <li>HTML coverage reports available in GitHub Actions artifacts</li>
+  <li>Unit and Integration should be 100%, with branch testing reasonably high</li>
 
   <dt>Advice for Writing Tests</dt>
   <li>Make use of `setUp` overrides and inheritance to cut down on redundant setups.</li>
