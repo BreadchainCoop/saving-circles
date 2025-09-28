@@ -469,6 +469,45 @@ contract SavingCirclesUnit is Test {
     assertEq(circles[0].owner, address(0));
   }
 
+  function test_DepositWhenCircleExpired() external {
+    // Test that CircleExpired error is properly triggered
+    // This tests the fix for the previously unreachable CircleExpired check
+
+    // Create a circle with small intervals for testing
+    address[] memory members = new address[](2);
+    members[0] = alice;
+    members[1] = bob;
+
+    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
+      owner: alice,
+      members: members,
+      token: address(token),
+      depositAmount: DEPOSIT_AMOUNT,
+      depositInterval: 1 hours,
+      maxDeposits: 2, // Only 2 rounds
+      circleStart: block.timestamp + 1 hours,
+      currentIndex: 0
+    });
+
+    vm.prank(alice);
+    uint256 circleId = savingCircles.create(circle);
+
+    // Warp to after circle has expired (past maxDeposits intervals)
+    // This should be: circleStart + (depositInterval * maxDeposits)
+    uint256 expiredTime = circle.circleStart + (circle.depositInterval * circle.maxDeposits) + 1;
+    vm.warp(expiredTime);
+
+    // Try to deposit after expiration
+    token.mint(alice, DEPOSIT_AMOUNT);
+    vm.startPrank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+
+    // Should revert with CircleExpired
+    vm.expectRevert(ISavingCircles.CircleExpired.selector);
+    savingCircles.deposit(circleId, DEPOSIT_AMOUNT);
+    vm.stopPrank();
+  }
+
   function test_GetMemberCircles() external {
     // Create a second circle that alice is also a member of
     ISavingCircles.Circle memory secondCircle = baseCircle;
