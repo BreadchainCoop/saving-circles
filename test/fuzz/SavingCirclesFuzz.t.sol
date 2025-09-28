@@ -374,4 +374,111 @@ contract SavingCirclesFuzzTest is Test {
 
     vm.stopPrank();
   }
+
+  // ============ Advanced Fuzz Tests ============
+
+  function testFuzz_DepositForDifferentMembers(
+    uint256 _depositAmount,
+    uint8 _memberCount,
+    uint8 _depositorIndex,
+    uint8 _targetMemberIndex
+  ) public {
+    // Test depositFor functionality with various member combinations
+    _memberCount = uint8(bound(uint256(_memberCount), 2, 10));
+    _depositorIndex = uint8(bound(uint256(_depositorIndex), 0, uint256(_memberCount) - 1));
+    _targetMemberIndex = uint8(bound(uint256(_targetMemberIndex), 0, uint256(_memberCount) - 1));
+    _depositAmount = bound(_depositAmount, 100, 1e18);
+
+    // Create members and circle
+    address[] memory members = new address[](_memberCount);
+    for (uint256 i = 0; i < _memberCount; i++) {
+      members[i] = makeAddr(string(abi.encodePacked('member', i)));
+    }
+
+    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
+      owner: members[0],
+      members: members,
+      token: address(token),
+      depositAmount: _depositAmount,
+      depositInterval: 1 days,
+      maxDeposits: _memberCount,
+      circleStart: block.timestamp + 1 hours,
+      currentIndex: 0
+    });
+
+    vm.prank(members[0]);
+    uint256 circleId = savingCircles.create(circle);
+
+    vm.warp(circle.circleStart);
+
+    // Depositor deposits for target member
+    address depositor = members[_depositorIndex];
+    address targetMember = members[_targetMemberIndex];
+
+    token.mint(depositor, _depositAmount);
+    vm.startPrank(depositor);
+    token.approve(address(savingCircles), _depositAmount);
+    savingCircles.depositFor(circleId, _depositAmount, targetMember);
+    vm.stopPrank();
+
+    // Verify the deposit was credited to target member
+    assertEq(savingCircles.balances(circleId, targetMember), _depositAmount);
+    // Depositor should have 0 balance unless they are the target member
+    if (depositor != targetMember) {
+      assertEq(savingCircles.balances(circleId, depositor), 0);
+    }
+  }
+
+  function testFuzz_RaceConditionDeposits(uint256 _depositAmount, uint8 _memberCount, uint256 _timeDelta) public {
+    // Test deposits happening at the edge of deposit windows
+    _memberCount = uint8(bound(uint256(_memberCount), 2, 5));
+    _depositAmount = bound(_depositAmount, 100, 1e18);
+    _timeDelta = bound(_timeDelta, 0, 1 hours);
+
+    address[] memory members = new address[](_memberCount);
+    for (uint256 i = 0; i < _memberCount; i++) {
+      members[i] = makeAddr(string(abi.encodePacked('member', i)));
+    }
+
+    uint256 depositInterval = 1 days;
+    uint256 startTime = block.timestamp + 1 hours;
+
+    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
+      owner: members[0],
+      members: members,
+      token: address(token),
+      depositAmount: _depositAmount,
+      depositInterval: depositInterval,
+      maxDeposits: _memberCount,
+      circleStart: startTime,
+      currentIndex: 0
+    });
+
+    vm.prank(members[0]);
+    uint256 circleId = savingCircles.create(circle);
+
+    // Warp to near the end of deposit window
+    uint256 nearWindowClose = startTime + depositInterval - _timeDelta;
+    vm.warp(nearWindowClose);
+
+    // Try to deposit for all members rapidly
+    for (uint256 i = 0; i < _memberCount; i++) {
+      token.mint(members[i], _depositAmount);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), _depositAmount);
+
+      // Check if we're still in valid deposit window
+      if (block.timestamp < startTime + depositInterval) {
+        savingCircles.deposit(circleId, _depositAmount);
+        assertEq(savingCircles.balances(circleId, members[i]), _depositAmount);
+      } else {
+        vm.expectRevert(ISavingCircles.DepositWindowClosed.selector);
+        savingCircles.deposit(circleId, _depositAmount);
+      }
+      vm.stopPrank();
+
+      // Simulate time passing between deposits
+      vm.warp(block.timestamp + _timeDelta / _memberCount);
+    }
+  }
 }

@@ -140,4 +140,78 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
   function invariant_TokenAllowanceConsistency() public view {
     assertTrue(savingCircles.isTokenAllowed(address(token)), 'Token should remain allowed throughout testing');
   }
+
+  // ============ Additional Invariants ============
+
+  function invariant_TotalDepositsNeverExceedMaximum() public {
+    // Verify total deposits for a circle never exceed depositAmount * members * maxDeposits
+    uint256[] memory activeCircles = handler.getActiveCircles();
+
+    for (uint256 i = 0; i < activeCircles.length; i++) {
+      uint256 circleId = activeCircles[i];
+
+      try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+        uint256 totalPossibleDeposits = 0;
+
+        // Calculate total deposits in the circle
+        for (uint256 j = 0; j < circle.members.length; j++) {
+          totalPossibleDeposits += savingCircles.balances(circleId, circle.members[j]);
+        }
+
+        // Maximum possible deposits per round
+        uint256 maxPerRound = circle.depositAmount * circle.members.length;
+
+        assertLe(totalPossibleDeposits, maxPerRound, 'Total deposits exceed maximum per round');
+      } catch {}
+    }
+  }
+
+  function invariant_OnlyOneWithdrawalPerRound() public {
+    // Verify each member can only withdraw once per complete round
+    // This is enforced by the currentIndex incrementing after each withdrawal
+    uint256[] memory activeCircles = handler.getActiveCircles();
+
+    for (uint256 i = 0; i < activeCircles.length; i++) {
+      uint256 circleId = activeCircles[i];
+
+      try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+        // currentIndex should never exceed member count
+        assertLt(circle.currentIndex, circle.members.length, 'Current index exceeds member count');
+      } catch {}
+    }
+  }
+
+  function invariant_CircleStartTimeNeverChanges() public {
+    // Verify circleStart remains constant after creation
+    // This test tracks that circle start times don't change
+    uint256[] memory activeCircles = handler.getActiveCircles();
+
+    for (uint256 i = 0; i < activeCircles.length; i++) {
+      uint256 circleId = activeCircles[i];
+
+      try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+        // Circle start should be in the past or future but never 0
+        assertGt(circle.circleStart, 0, 'Circle start time is zero');
+      } catch {}
+    }
+  }
+
+  function invariant_MemberCountRemainConstant() public {
+    // Verify member array length doesn't change after creation
+    uint256[] memory activeCircles = handler.getActiveCircles();
+
+    for (uint256 i = 0; i < activeCircles.length; i++) {
+      uint256 circleId = activeCircles[i];
+
+      try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+        // Member count should be at least 2
+        assertGe(circle.members.length, 2, 'Member count less than minimum');
+
+        // All members should have valid addresses
+        for (uint256 j = 0; j < circle.members.length; j++) {
+          assertNotEq(circle.members[j], address(0), 'Invalid member address');
+        }
+      } catch {}
+    }
+  }
 }

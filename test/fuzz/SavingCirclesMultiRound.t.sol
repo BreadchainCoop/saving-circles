@@ -466,6 +466,138 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
     return savingCircles.create(circle);
   }
 
+  // ============ Complex Multi-Round Edge Cases ============
+
+  function testFuzz_IncompleteRoundsRecovery(uint8 _memberCount, uint8 _missedDeposits) public {
+    // Test recovery from incomplete rounds where some members miss deposits
+    _memberCount = uint8(bound(uint256(_memberCount), 3, 6));
+    _missedDeposits = uint8(bound(uint256(_missedDeposits), 1, _memberCount - 1));
+
+    address[] memory members = new address[](_memberCount);
+    for (uint256 i = 0; i < _memberCount; i++) {
+      members[i] = makeAddr(string(abi.encodePacked('member', i)));
+    }
+
+    uint256 depositInterval = 1 days;
+    uint256 startTime = block.timestamp + 1 hours;
+
+    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
+      owner: members[0],
+      members: members,
+      token: address(token),
+      depositAmount: 1000,
+      depositInterval: depositInterval,
+      maxDeposits: _memberCount,
+      circleStart: startTime,
+      currentIndex: 0
+    });
+
+    vm.prank(members[0]);
+    uint256 circleId = savingCircles.create(circle);
+
+    vm.warp(startTime);
+
+    // First round with missed deposits
+    uint256 depositedCount = _memberCount - _missedDeposits;
+    for (uint256 i = 0; i < depositedCount; i++) {
+      token.mint(members[i], 1000);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), 1000);
+      savingCircles.deposit(circleId, 1000);
+      vm.stopPrank();
+    }
+
+    // Move past deposit window - should not be withdrawable due to incomplete deposits
+    vm.warp(startTime + depositInterval + 1);
+    assertFalse(savingCircles.isWithdrawable(circleId), 'Should not be withdrawable with incomplete deposits');
+
+    // Now complete the missed deposits (recovery)
+    for (uint256 i = depositedCount; i < _memberCount; i++) {
+      token.mint(members[i], 1000);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), 1000);
+
+      // Should revert as deposit window is closed
+      vm.expectRevert(ISavingCircles.DepositWindowClosed.selector);
+      savingCircles.deposit(circleId, 1000);
+      vm.stopPrank();
+    }
+
+    // Owner decommissions due to incomplete round
+    vm.prank(members[0]);
+    savingCircles.decommission(circleId);
+
+    // Verify refunds
+    for (uint256 i = 0; i < depositedCount; i++) {
+      assertEq(token.balanceOf(members[i]), 1000, 'Should refund deposited amount');
+    }
+  }
+
+  function testFuzz_WithdrawalOrderConsistency(uint8 _memberCount, uint8 _rounds) public {
+    // Verify withdrawal order follows currentIndex correctly
+    _memberCount = uint8(bound(uint256(_memberCount), 2, 5));
+    _rounds = uint8(bound(uint256(_rounds), 1, _memberCount));
+
+    address[] memory members = new address[](_memberCount);
+    for (uint256 i = 0; i < _memberCount; i++) {
+      members[i] = makeAddr(string(abi.encodePacked('member', i)));
+    }
+
+    uint256 depositInterval = 1 days;
+    uint256 startTime = block.timestamp + 1 hours;
+
+    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
+      owner: members[0],
+      members: members,
+      token: address(token),
+      depositAmount: 1000,
+      depositInterval: depositInterval,
+      maxDeposits: _memberCount,
+      circleStart: startTime,
+      currentIndex: 0
+    });
+
+    vm.prank(members[0]);
+    uint256 circleId = savingCircles.create(circle);
+
+    vm.warp(startTime);
+
+    // Track who withdraws in each round
+    address[] memory withdrawalOrder = new address[](_rounds);
+
+    for (uint256 round = 0; round < _rounds; round++) {
+      // All members deposit
+      for (uint256 i = 0; i < _memberCount; i++) {
+        token.mint(members[i], 1000);
+        vm.startPrank(members[i]);
+        token.approve(address(savingCircles), 1000);
+        savingCircles.deposit(circleId, 1000);
+        vm.stopPrank();
+      }
+
+      // Move to withdrawal time
+      vm.warp(startTime + (depositInterval * (round + 1)));
+
+      // Check who should withdraw
+      ISavingCircles.Circle memory currentCircle = savingCircles.getCircle(circleId);
+      address expectedWithdrawer = savingCircles.withdrawableBy(circleId);
+
+      // Verify it's the correct member based on currentIndex
+      assertEq(expectedWithdrawer, members[currentCircle.currentIndex], 'Wrong withdrawal order');
+
+      // Perform withdrawal
+      vm.prank(expectedWithdrawer);
+      savingCircles.withdraw(circleId);
+
+      withdrawalOrder[round] = expectedWithdrawer;
+    }
+
+    // Verify each member withdrew in the correct order
+    for (uint256 i = 0; i < _rounds; i++) {
+      assertEq(withdrawalOrder[i], members[i % _memberCount], 'Withdrawal order inconsistent');
+    }
+  }
+
   function _processCircleRound(
     uint256 circleId,
     address[] memory members,

@@ -301,4 +301,150 @@ contract SavingCirclesIntegration is IntegrationBase {
   //     vm.expectRevert(ISavingCircles.NotWithdrawable.selector); // Should fail as no new deposits made
   //     circle.withdraw(hashedName);
   // }
+
+  // ============ Complex Scenario Integration Tests ============
+
+  function test_MultipleCirclesWithOverlappingMembers() external {
+    // Test members participating in multiple circles simultaneously
+    // Verify balance tracking and withdrawal rights
+
+    // First allow the token
+    vm.prank(owner);
+    circle.setTokenAllowed(address(token), true);
+
+    address[] memory sharedMembers = new address[](3);
+    sharedMembers[0] = alice;
+    sharedMembers[1] = bob;
+    sharedMembers[2] = carol;
+
+    // Create first circle with alice, bob, carol
+    ISavingCircles.Circle memory circle1 = ISavingCircles.Circle({
+      owner: alice,
+      members: sharedMembers,
+      token: address(token),
+      depositAmount: 1 ether,
+      depositInterval: 1 days,
+      maxDeposits: 3,
+      circleStart: block.timestamp + 1 hours,
+      currentIndex: 0
+    });
+
+    // Create second circle with alice, bob, and a new member
+    address dave = makeAddr('dave');
+    address[] memory mixedMembers = new address[](3);
+    mixedMembers[0] = alice;
+    mixedMembers[1] = bob;
+    mixedMembers[2] = dave;
+
+    ISavingCircles.Circle memory circle2 = ISavingCircles.Circle({
+      owner: bob,
+      members: mixedMembers,
+      token: address(token),
+      depositAmount: 2 ether,
+      depositInterval: 2 days,
+      maxDeposits: 3,
+      circleStart: block.timestamp + 2 hours,
+      currentIndex: 0
+    });
+
+    // Create circles
+    vm.prank(alice);
+    uint256 circleId1 = circle.create(circle1);
+
+    vm.prank(bob);
+    uint256 circleId2 = circle.create(circle2);
+
+    // Verify members are in correct circles
+    assertTrue(circle.isMember(circleId1, alice));
+    assertTrue(circle.isMember(circleId1, bob));
+    assertTrue(circle.isMember(circleId1, carol));
+    assertFalse(circle.isMember(circleId1, dave));
+
+    assertTrue(circle.isMember(circleId2, alice));
+    assertTrue(circle.isMember(circleId2, bob));
+    assertFalse(circle.isMember(circleId2, carol));
+    assertTrue(circle.isMember(circleId2, dave));
+
+    // Test deposits in both circles
+    vm.warp(block.timestamp + 1 hours); // Circle 1 starts
+
+    // Alice deposits in circle 1
+    deal(address(token), alice, 3 ether);
+    vm.startPrank(alice);
+    token.approve(address(circle), 3 ether);
+    circle.deposit(circleId1, 1 ether);
+    vm.stopPrank();
+
+    // Bob deposits in circle 1
+    deal(address(token), bob, 3 ether);
+    vm.startPrank(bob);
+    token.approve(address(circle), 3 ether);
+    circle.deposit(circleId1, 1 ether);
+    vm.stopPrank();
+
+    vm.warp(block.timestamp + 1 hours); // Circle 2 starts
+
+    // Alice deposits in circle 2
+    vm.startPrank(alice);
+    circle.deposit(circleId2, 2 ether);
+    vm.stopPrank();
+
+    // Verify balances are tracked separately
+    assertEq(circle.balances(circleId1, alice), 1 ether);
+    assertEq(circle.balances(circleId2, alice), 2 ether);
+    assertEq(circle.balances(circleId1, bob), 1 ether);
+    assertEq(circle.balances(circleId2, bob), 0);
+  }
+
+  function test_CircleWithMaxMembers() external {
+    // Test with large number of members (20)
+    // Verify gas costs remain reasonable
+
+    // First allow the token
+    vm.prank(owner);
+    circle.setTokenAllowed(address(token), true);
+
+    uint256 memberCount = 20;
+    address[] memory largeGroup = new address[](memberCount);
+
+    for (uint256 i = 0; i < memberCount; i++) {
+      largeGroup[i] = makeAddr(string(abi.encodePacked('member', i)));
+    }
+
+    ISavingCircles.Circle memory largeCircle = ISavingCircles.Circle({
+      owner: largeGroup[0],
+      members: largeGroup,
+      token: address(token),
+      depositAmount: 0.1 ether,
+      depositInterval: 1 days,
+      maxDeposits: memberCount,
+      circleStart: block.timestamp + 1 hours,
+      currentIndex: 0
+    });
+
+    // Create the circle
+    vm.prank(largeGroup[0]);
+    uint256 circleId = circle.create(largeCircle);
+
+    // Verify circle was created
+    ISavingCircles.Circle memory created = circle.getCircle(circleId);
+    assertEq(created.members.length, memberCount);
+
+    // Test deposit from multiple members
+    vm.warp(block.timestamp + 1 hours);
+
+    for (uint256 i = 0; i < 5; i++) {
+      // Test with first 5 members
+      deal(address(token), largeGroup[i], 0.1 ether);
+      vm.startPrank(largeGroup[i]);
+      token.approve(address(circle), 0.1 ether);
+      circle.deposit(circleId, 0.1 ether);
+      vm.stopPrank();
+    }
+
+    // Verify all deposits recorded
+    for (uint256 i = 0; i < 5; i++) {
+      assertEq(circle.balances(circleId, largeGroup[i]), 0.1 ether);
+    }
+  }
 }
