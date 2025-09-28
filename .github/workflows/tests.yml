@@ -64,6 +64,63 @@ jobs:
       - name: Run tests
         run: yarn test:integration
 
+  fuzz-tests:
+    name: Run Fuzz Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn --frozen-lockfile --network-concurrency 1
+
+      - name: Precompile
+        run: yarn build
+
+      - name: Run fuzz tests
+        run: forge test --match-path "test/fuzz/**" -vvv
+        env:
+          FOUNDRY_FUZZ_RUNS: 10000
+
+  invariant-tests:
+    name: Run Invariant Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn --frozen-lockfile --network-concurrency 1
+
+      - name: Precompile
+        run: yarn build
+
+      - name: Run invariant tests
+        run: forge test --match-path "test/invariants/**" -vvv
+        env:
+          FOUNDRY_INVARIANT_RUNS: 512
+          FOUNDRY_INVARIANT_DEPTH: 25
+
   halmos-tests:
     name: Run symbolic execution tests
     runs-on: ubuntu-latest

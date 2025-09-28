@@ -8,6 +8,16 @@
 
 <div align="center">Forked by Breadchain</div>
 
+<br />
+
+<div align="center">
+  
+[![CI](https://github.com/BreadchainCoop/saving-circles/actions/workflows/tests.yml/badge.svg)](https://github.com/BreadchainCoop/saving-circles/actions/workflows/tests.yml)
+[![Coverage](https://github.com/BreadchainCoop/saving-circles/actions/workflows/coverage.yml/badge.svg)](https://github.com/BreadchainCoop/saving-circles/actions/workflows/coverage.yml)
+[![Coverage](https://img.shields.io/badge/Coverage-86%25-green)](https://github.com/BreadchainCoop/saving-circles/actions/workflows/coverage.yml)
+
+</div>
+
 ## Breadchain Developers
 
 <dl>
@@ -27,10 +37,16 @@
   <dt>Required Testing</dt>
   <li><b>Integration/E2E</b> - should fork chain intended for deployment (likely gnosis or optimism) and should use the deploy script found in `Script/Common.sol` in the `test/integration/IntegrationBase.sol`.</li>
   <li><b>Unit</b> - should test and branch all contract functionality, with mock contracts or mock function calls added as needed to mock inter-contract calls. `.tree` files are there for example, but not necessary.</li>
+  <li><b>Fuzz Testing</b> - property-based testing with random inputs to discover edge cases. Tests in `test/fuzz/` use Foundry's fuzzing capabilities.</li>
+  <li><b>Invariant Testing</b> - stateful testing that verifies system properties hold true across multiple transactions. Tests in `test/invariants/` use handler contracts.</li>
 
   <dt>Test Coverage</dt>
   <li>Run `yarn coverage` to generate a coverage report for tests</li>
-  <li>Unit and Integration should be 100%, with branch testing reasonably high</li>
+  <li>Run `forge coverage --report summary` for a quick overview</li>
+  <li>Unit and Integration should aim for 100%, with branch testing reasonably high</li>
+  <li>Current coverage threshold: 80% (enforced in CI)</li>
+  <li>Coverage reports are automatically generated and uploaded as artifacts in CI</li>
+  <li>HTML coverage reports available in GitHub Actions artifacts</li>
 
   <dt>Advice for Writing Tests</dt>
   <li>Make use of `setUp` overrides and inheritance to cut down on redundant setups.</li>
