@@ -22,6 +22,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
   using ECDSA for bytes32;
 
   uint256 public constant MINIMUM_MEMBERS = 2;
+
+  // EIP-712 type hash for delegated deposits signature verification
+  // This must match the exact struct definition used by off-chain signers
+  // Type string: "SetDelegatedDeposits(address member,bool enabled,uint256 nonce,uint256 deadline)"
   bytes32 private constant _DELEGATION_TYPEHASH =
     keccak256('SetDelegatedDeposits(address member,bool enabled,uint256 nonce,uint256 deadline)');
 
@@ -255,12 +259,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
   }
 
   /// @inheritdoc ISavingCircles
-  function getAddressesForDeposit(uint256 _circleId)
-    external
-    view
-    override
-    returns (address[] memory _eligibleMembers)
-  {
+  function getAddressesForDeposit(uint256 _circleId) external view override returns (address[] memory _eligibleMembers) {
     Circle memory _circle = circles[_circleId];
     if (_isDecommissioned(_circle)) revert NotCommissioned();
 
