@@ -88,12 +88,6 @@ interface ISavingCircles {
   );
 
   /**
-   * @notice Emitted when a batch deposit operation is completed
-   * @param count The number of deposits made
-   */
-  event BatchDepositCompleted(uint256 count);
-
-  /**
    * @notice Thrown when a member attempts to redundantly deposit funds into a circle
    */
   error AlreadyDeposited();

@@ -113,8 +113,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
     for (uint256 i = 0; i < _circleIds.length; i++) {
       _depositIfAllowed(_circleIds[i], _members[i]);
     }
-
-    emit BatchDepositCompleted(_circleIds.length);
   }
 
   /// @inheritdoc ISavingCircles
@@ -259,12 +257,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
   }
 
   /// @inheritdoc ISavingCircles
-  function getAddressesForDeposit(uint256 _circleId)
-    external
-    view
-    override
-    returns (address[] memory _eligibleMembers)
-  {
+  function getAddressesForDeposit(uint256 _circleId) external view override returns (address[] memory _eligibleMembers) {
     Circle memory _circle = circles[_circleId];
     if (_isDecommissioned(_circle)) revert NotCommissioned();
 

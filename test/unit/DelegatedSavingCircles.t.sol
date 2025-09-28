@@ -278,8 +278,6 @@ contract DelegatedSavingCirclesUnit is Test {
     membersArray[1] = bob;
 
     // Perform batch deposit
-    vm.expectEmit(true, true, true, true);
-    emit ISavingCircles.BatchDepositCompleted(2);
     savingCircles.batchDepositIfAllowed(circleIds, membersArray);
 
     // Verify deposits
