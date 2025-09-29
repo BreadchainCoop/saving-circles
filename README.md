@@ -27,8 +27,6 @@
   <dt>Required Testing</dt>
   <li><b>Integration/E2E</b> - should fork chain intended for deployment (likely gnosis or optimism) and should use the deploy script found in `Script/Common.sol` in the `test/integration/IntegrationBase.sol`.</li>
   <li><b>Unit</b> - should test and branch all contract functionality, with mock contracts or mock function calls added as needed to mock inter-contract calls. `.tree` files are there for example, but not necessary.</li>
-  <li><b>Fuzz Testing</b> - property-based testing with random inputs to discover edge cases. Tests in `test/fuzz/` use Foundry's fuzzing capabilities.</li>
-  <li><b>Invariant Testing</b> - stateful testing that verifies system properties hold true across multiple transactions. Tests in `test/invariants/` use handler contracts.</li>
 
   <dt>Test Coverage</dt>
   <li>Run `yarn coverage` to generate a coverage report for tests</li>
