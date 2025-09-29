@@ -3,15 +3,15 @@ pragma solidity 0.8.28;
 
 import {IDelegatedSavingCircles} from '../interfaces/IDelegatedSavingCircles.sol';
 import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
-import {SavingCircles} from './SavingCircles.sol';
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
+import {ReentrancyGuard} from '@openzeppelin/utils/ReentrancyGuard.sol';
 
 /**
  * @title DelegatedSavingCircles
  * @notice Extension contract for delegated deposits in SavingCircles
  * @dev This contract enables delegated ERC20 allowance-based deposits and batch operations
  */
-contract DelegatedSavingCircles is IDelegatedSavingCircles, SavingCircles {
+contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
   /// @notice The main SavingCircles contract
   ISavingCircles public immutable SAVING_CIRCLES;
 
