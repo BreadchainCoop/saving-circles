@@ -366,7 +366,12 @@ contract SavingCirclesIntegration is IntegrationBase {
     assertTrue(circle.isMember(circleId2, dave));
 
     // Test deposits in both circles
-    vm.warp(block.timestamp + 1 hours); // Circle 1 starts
+    // Get actual circle start times
+    ISavingCircles.Circle memory c1 = circle.getCircle(circleId1);
+    ISavingCircles.Circle memory c2 = circle.getCircle(circleId2);
+
+    // Warp to circle 1 start time
+    vm.warp(c1.circleStart);
 
     // Alice deposits in circle 1
     deal(address(token), alice, 3 ether);
@@ -382,7 +387,8 @@ contract SavingCirclesIntegration is IntegrationBase {
     circle.deposit(circleId1, 1 ether);
     vm.stopPrank();
 
-    vm.warp(block.timestamp + 1 hours); // Circle 2 starts
+    // Warp to circle 2 start time
+    vm.warp(c2.circleStart);
 
     // Alice deposits in circle 2
     vm.startPrank(alice);

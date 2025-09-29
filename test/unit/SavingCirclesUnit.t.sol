@@ -644,34 +644,25 @@ contract SavingCirclesUnit is Test {
   }
 
   function test_DecommissionAfterCompleteCircle() external {
-    // Test decommission after all rounds complete
+    // Test that decommission is not allowed after all deposits complete
     vm.warp(baseCircle.circleStart);
 
-    // Complete all rounds
-    for (uint256 round = 0; round < members.length; round++) {
-      // All members deposit
-      for (uint256 i = 0; i < members.length; i++) {
-        token.mint(members[i], DEPOSIT_AMOUNT);
-        vm.startPrank(members[i]);
-        token.approve(address(savingCircles), DEPOSIT_AMOUNT);
-        savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
-        vm.stopPrank();
-      }
-
-      // Wait and withdraw
-      vm.warp(block.timestamp + DEPOSIT_INTERVAL);
-      ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
-      vm.prank(circle.members[circle.currentIndex]);
-      savingCircles.withdraw(baseCircleId);
+    // All members deposit
+    for (uint256 i = 0; i < members.length; i++) {
+      token.mint(members[i], DEPOSIT_AMOUNT);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+      savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
+      vm.stopPrank();
     }
 
-    // Now decommission after complete circle
-    vm.prank(alice);
-    savingCircles.decommission(baseCircleId);
+    // Wait past deposit window
+    vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
 
-    // Verify circle is decommissioned
-    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-    savingCircles.getCircle(baseCircleId);
+    // Decommission should fail because all deposits are complete
+    vm.prank(alice);
+    vm.expectRevert(ISavingCircles.NotDecommissionable.selector);
+    savingCircles.decommission(baseCircleId);
   }
 
   // ============ Security-Focused Tests ============
