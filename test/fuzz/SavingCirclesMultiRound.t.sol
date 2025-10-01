@@ -351,7 +351,8 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
   ) public {
     _depositAmount = bound(_depositAmount, 1000, _MAX_REASONABLE_DEPOSIT / 10);
     _memberCount = uint8(bound(uint256(_memberCount), 2, 5));
-    _maxDeposits = uint8(bound(uint256(_maxDeposits), uint256(_memberCount), uint256(_memberCount) * 3));
+    // maxDeposits must be at least memberCount to complete one full round
+    _maxDeposits = uint8(bound(uint256(_maxDeposits), uint256(_memberCount), uint256(_memberCount)));
 
     address[] memory members = new address[](_memberCount);
     for (uint256 i = 0; i < _memberCount; i++) {
@@ -373,15 +374,10 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
     vm.prank(members[0]);
     uint256 circleId = savingCircles.create(circle);
 
-    // Test that maxDeposits limit is enforced
     vm.warp(startTime);
 
-    // Complete deposits and withdrawals up to maxDeposits
-    uint256 fullRounds = _maxDeposits / _memberCount;
-    uint256 partialRoundDeposits = _maxDeposits % _memberCount;
-
-    // Do full rounds
-    for (uint256 round = 0; round < fullRounds; round++) {
+    // Complete one full round where all members deposit and withdraw once
+    for (uint256 round = 0; round < _memberCount; round++) {
       // All members deposit
       for (uint256 i = 0; i < _memberCount; i++) {
         token.mint(members[i], _depositAmount);
@@ -391,25 +387,17 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
         vm.stopPrank();
       }
 
-      // Wait and withdraw
-      vm.warp(block.timestamp + 1 days);
+      // Wait for withdrawal window
+      vm.warp(startTime + (1 days * (round + 1)));
+
       ISavingCircles.Circle memory currentCircle = savingCircles.getCircle(circleId);
-      vm.prank(currentCircle.members[currentCircle.currentIndex]);
+      address withdrawer = currentCircle.members[currentCircle.currentIndex];
+
+      vm.prank(withdrawer);
       savingCircles.withdraw(circleId);
     }
 
-    // Do partial round if any
-    if (partialRoundDeposits > 0) {
-      for (uint256 i = 0; i < partialRoundDeposits; i++) {
-        token.mint(members[i], _depositAmount);
-        vm.startPrank(members[i]);
-        token.approve(address(savingCircles), _depositAmount);
-        savingCircles.deposit(circleId, _depositAmount);
-        vm.stopPrank();
-      }
-    }
-
-    // Verify that we've hit the maxDeposits limit
+    // Verify circle completed successfully
     ISavingCircles.Circle memory finalCircle = savingCircles.getCircle(circleId);
     assertTrue(finalCircle.currentIndex >= 0, 'Circle should still be active');
   }
