@@ -176,7 +176,7 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
 
       try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
         // currentIndex should never exceed member count
-        assertLt(circle.currentIndex, circle.members.length, 'Current index exceeds member count');
+        assertLt(circle.currentIndex, circle.members.length, 'Current index is not less than member count');
       } catch {}
     }
   }
@@ -196,7 +196,7 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
     }
   }
 
-  function invariant_MemberCountRemainConstant() public {
+  function invariant_MemberCountRemainsConstant() public {
     // Verify member array length doesn't change after creation
     uint256[] memory activeCircles = handler.getActiveCircles();
 

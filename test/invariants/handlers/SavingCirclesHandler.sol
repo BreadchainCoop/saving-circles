@@ -157,9 +157,10 @@ contract SavingCirclesHandler is Test {
       try savingCircles.withdraw(circleId) {
         uint256 balanceAfter = token.balanceOf(msg.sender);
         uint256 withdrawnAmount = balanceAfter - balanceBefore;
+        uint256 expectedWithdrawal = circle.depositAmount * circle.members.length;
         totalWithdrawn += withdrawnAmount;
-        expectedWithdrawals += withdrawnAmount;
         totalDeposits -= withdrawnAmount;
+        expectedWithdrawals += expectedWithdrawal;
       } catch {}
     } catch {}
   }

@@ -494,7 +494,6 @@ contract SavingCirclesUnit is Test {
     uint256 circleId = savingCircles.create(circle);
 
     // Warp to after circle has expired (past maxDeposits intervals)
-    // This should be: circleStart + (depositInterval * maxDeposits)
     uint256 expiredTime = circle.circleStart + (circle.depositInterval * circle.maxDeposits) + 1;
     vm.warp(expiredTime);
 
