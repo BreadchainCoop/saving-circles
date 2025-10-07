@@ -247,12 +247,14 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (block.timestamp < circles[_id].circleStart) {
       revert DepositBeforeCircleStart();
     }
+    // Check if the entire circle has expired (all rounds completed)
+    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].maxDeposits)) {
+      revert CircleExpired();
+    }
+    // Check if current deposit window is closed
     if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * (circles[_id].currentIndex + 1)))
     {
       revert DepositWindowClosed();
-    }
-    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].maxDeposits)) {
-      revert CircleExpired();
     }
     if (balances[_id][_member] + _value > circles[_id].depositAmount) {
       revert ExceedsDepositAmount();
