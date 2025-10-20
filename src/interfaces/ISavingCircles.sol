@@ -24,14 +24,6 @@ interface ISavingCircles {
     uint256 maxDeposits;
   }
 
-  /// @notice Struct defining an invite to join a circle
-  /// @param circleId ID of the Circle
-  /// @param nonce Unique nonce for the invite
-  struct Invite {
-    uint256 circleId;
-    uint256 nonce;
-  }
-
   // =======================
   // EVENTS
   // =======================
@@ -265,10 +257,11 @@ interface ISavingCircles {
 
   /**
    * @notice Redeems an invite signed by the Circle owner
-   * @param invite The invite data containing the Circle ID and nonce
+   * @param id The ID of the Circle
+   * @param nonce Unique nonce for the invite
    * @param signature The owner's EIP-712 signature
    */
-  function redeemInvite(Invite calldata invite, bytes calldata signature) external;
+  function redeemInvite(uint256 id, uint256 nonce, bytes calldata signature) external;
 
   /**
    * @notice Get a single circle

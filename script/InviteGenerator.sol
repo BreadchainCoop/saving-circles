@@ -26,12 +26,12 @@ contract InviteGenerator is Script {
   /// @notice Error for empty invite signature version
   error InvalidSignatureVersion();
 
-  constructor(string memory inviteSigningDomain, string memory inviteSignatureVersion, string memory structName) {
+  constructor(string memory inviteSigningDomain, string memory inviteSignatureVersion) {
     if (bytes(inviteSigningDomain).length == 0) revert InvalidSigningDomain();
     if (bytes(inviteSignatureVersion).length == 0) revert InvalidSignatureVersion();
     _inviteDomainNameHash = keccak256(bytes(inviteSigningDomain));
     _inviteDomainVersionHash = keccak256(bytes(inviteSignatureVersion));
-    string memory inviteTypeString = string(abi.encodePacked('Invite(uint256 ', structName, 'Id,uint256 nonce)'));
+    string memory inviteTypeString = string(abi.encodePacked('Invite(uint256 id,uint256 nonce)'));
     _inviteTypeHash = keccak256(bytes(inviteTypeString));
   }
 

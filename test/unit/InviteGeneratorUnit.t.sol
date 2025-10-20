@@ -9,7 +9,6 @@ contract InviteGeneratorUnit is Test {
   string internal constant _INVITE_SIGNING_DOMAIN = 'StacksInvite';
   string internal constant _INVITE_SIGNATURE_VERSION = '1';
   uint256 internal constant _STRUCT_ID = 1;
-  string internal constant _STRUCT_NAME = 'circle';
   uint256 internal constant _NONCE = 1;
   uint256 internal constant _CHAIN_ID = 1;
   address internal _VERIFYING_CONTRACT;
@@ -17,14 +16,14 @@ contract InviteGeneratorUnit is Test {
   address internal _OWNER_ADDRESS;
 
   function setUp() public {
-    _inviteGenerator = new InviteGenerator(_INVITE_SIGNING_DOMAIN, _INVITE_SIGNATURE_VERSION, _STRUCT_NAME);
+    _inviteGenerator = new InviteGenerator(_INVITE_SIGNING_DOMAIN, _INVITE_SIGNATURE_VERSION);
     _VERIFYING_CONTRACT = address(_inviteGenerator);
     (_OWNER_ADDRESS, _OWNER_PRIVATE_KEY) = makeAddrAndKey('owner');
   }
 
   function test_shouldReturnsHashInvite() public {
     bytes32 expectedHash =
-      keccak256(abi.encodePacked(keccak256('Invite(uint256 circleId,uint256 nonce)'), _STRUCT_ID, _NONCE));
+      keccak256(abi.encodePacked(keccak256('Invite(uint256 id,uint256 nonce)'), _STRUCT_ID, _NONCE));
     bytes32 actualHash = _inviteGenerator.hashInvite(_STRUCT_ID, _NONCE);
     assertEq(expectedHash, actualHash);
   }

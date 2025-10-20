@@ -140,24 +140,24 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function redeemInvite(Invite calldata _invite, bytes calldata _signature) external override nonReentrant {
-    Circle storage _circle = circles[_invite.circleId];
+  function redeemInvite(uint256 _id, uint256 _nonce, bytes calldata _signature) external override nonReentrant {
+    Circle storage _circle = circles[_id];
 
     if (_circle.owner == address(0)) revert NotCommissioned();
-    if (usedNonces[_invite.circleId][_invite.nonce]) revert InviteAlreadyUsed();
-    if (isMember[_invite.circleId][msg.sender]) revert AlreadyMember();
+    if (usedNonces[_id][_nonce]) revert InviteAlreadyUsed();
+    if (isMember[_id][msg.sender]) revert AlreadyMember();
 
-    bytes32 _digest = _hashInvite(_invite);
+    bytes32 _digest = _hashInvite(_id, _nonce);
     address _signer = ECDSA.recover(_digest, _signature);
 
     if (_signer != _circle.owner) revert InvalidSigner();
 
-    usedNonces[_invite.circleId][_invite.nonce] = true;
-    isMember[_invite.circleId][msg.sender] = true;
-    memberCircles[msg.sender].push(_invite.circleId);
+    usedNonces[_id][_nonce] = true;
+    isMember[_id][msg.sender] = true;
+    memberCircles[msg.sender].push(_id);
     _circle.members.push(msg.sender);
 
-    emit InviteRedeemed(_invite.circleId, msg.sender);
+    emit InviteRedeemed(_id, msg.sender);
   }
 
   /// @inheritdoc ISavingCircles
@@ -322,9 +322,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   /**
    * @dev Computes the EIP-712 hash for an invite
    */
-  function _hashInvite(Invite calldata _invite) private view returns (bytes32) {
-    bytes32 _inviteTypehash = keccak256('Invite(uint256 circleId,uint256 nonce)');
-    bytes32 _structHash = keccak256(abi.encode(_inviteTypehash, _invite.circleId, _invite.nonce));
+  function _hashInvite(uint256 _id, uint256 _nonce) private view returns (bytes32) {
+    bytes32 _inviteTypehash = keccak256('Invite(uint256 id,uint256 nonce)');
+    bytes32 _structHash = keccak256(abi.encode(_inviteTypehash, _id, _nonce));
     bytes32 _eip712DomainTypehash =
       keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)');
     bytes32 _inviteDomainNameHash = keccak256(bytes('StacksInvite'));
