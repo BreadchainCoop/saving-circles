@@ -35,8 +35,8 @@ contract InviteGenerator is Script {
     string memory inviteTypeString = string(abi.encodePacked('Invite(uint256 ', structName, 'Id,uint256 nonce)'));
     _inviteTypeHash = keccak256(bytes(inviteTypeString));
   }
-  /// @notice Returns the struct hash of an invite
 
+  /// @notice Returns the struct hash of an invite
   function hashInvite(uint256 _structId, uint256 _nonce) public view returns (bytes32) {
     return keccak256(abi.encode(_inviteTypeHash, _structId, _nonce));
   }
