@@ -7,6 +7,7 @@ import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/Trans
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
 import {Test} from 'forge-std/Test.sol';
 
+import {InviteGenerator} from 'script/InviteGenerator.sol';
 import {SavingCircles} from 'src/contracts/SavingCircles.sol';
 import {ISavingCircles} from 'src/interfaces/ISavingCircles.sol';
 import {MockERC20} from 'test/mocks/MockERC20.sol';
@@ -17,15 +18,24 @@ contract SavingCirclesUnit is Test {
   uint256 public constant DEPOSIT_INTERVAL = 1 days;
   uint256 public constant CIRCLE_DURATION = 30 days;
   uint256 public constant MAX_DEPOSITS = 1000;
+  string public constant INVITE_SIGNING_DOMAIN = 'StacksInvite';
+  string public constant INVITE_SIGNATURE_VERSION = '1';
+  uint256 public constant CHAIN_ID = 1;
 
   SavingCircles public savingCircles;
   MockERC20 public token;
+  InviteGenerator public inviteGenerator;
 
   // Test addresses
   address public owner;
+  uint256 public ownerKey;
   address public alice;
   address public bob;
+  address public dave;
+  address public eve;
   address public carol;
+  address public impostor;
+  uint256 public impostorKey;
   address public immutable STRANGER = makeAddr('stranger');
 
   // Test data
@@ -35,10 +45,16 @@ contract SavingCirclesUnit is Test {
 
   function setUp() external {
     // Setup test addresses
-    owner = makeAddr('owner');
     alice = makeAddr('alice');
     bob = makeAddr('bob');
     carol = makeAddr('carol');
+    dave = makeAddr('dave');
+    eve = makeAddr('eve');
+    (owner, ownerKey) = makeAddrAndKey('owner');
+    (impostor, impostorKey) = makeAddrAndKey('impostor');
+
+    // Setup InviteGenerator
+    inviteGenerator = new InviteGenerator(INVITE_SIGNING_DOMAIN, INVITE_SIGNATURE_VERSION, 'circle');
 
     // Deploy and initialize the contract
     vm.startPrank(owner);
@@ -77,6 +93,11 @@ contract SavingCirclesUnit is Test {
     // Create an initial test circle
     vm.prank(alice);
     baseCircleId = savingCircles.create(baseCircle);
+  }
+
+  function _createBaseCircle() internal returns (uint256) {
+    vm.prank(alice);
+    return savingCircles.create(baseCircle);
   }
 
   function test_SetTokenAllowedWhenCallerIsNotOwner() external {
@@ -860,5 +881,81 @@ contract SavingCirclesUnit is Test {
     assertFalse(strangerStatuses[0]); // Not in baseCircle
     assertFalse(strangerStatuses[1]); // Not in secondCircle
     assertFalse(strangerStatuses[2]); // Not in non-existent circle
+  }
+
+  function test_shouldRedeemInvite() external {
+    vm.chainId(CHAIN_ID);
+    uint256 nonce = 1;
+    ISavingCircles.Invite memory invite = ISavingCircles.Invite(baseCircleId, nonce);
+
+    vm.prank(owner);
+    savingCircles.setTokenAllowed(address(token), true);
+    bytes memory signature = inviteGenerator.generateInvite(ownerKey, baseCircleId, nonce, address(savingCircles));
+
+    vm.prank(dave);
+    vm.expectEmit(true, true, false, true, address(savingCircles));
+    emit ISavingCircles.InviteRedeemed(invite.circleId, dave);
+    savingCircles.redeemInvite(invite, signature);
+  }
+
+  function test_rejectInvalidSigner() external {
+    vm.chainId(CHAIN_ID);
+    vm.prank(owner);
+    savingCircles.setTokenAllowed(address(token), true);
+    uint256 nonce = 1;
+    ISavingCircles.Invite memory invite = ISavingCircles.Invite(baseCircleId, nonce);
+
+    bytes memory signature = inviteGenerator.generateInvite(impostorKey, baseCircleId, nonce, address(savingCircles));
+
+    vm.prank(dave);
+    vm.expectRevert(ISavingCircles.InvalidSigner.selector);
+    savingCircles.redeemInvite(invite, signature);
+  }
+
+  function test_rejectAlreadyUsedInvite() external {
+    vm.chainId(CHAIN_ID);
+    uint256 nonce = 1;
+    ISavingCircles.Invite memory invite = ISavingCircles.Invite(baseCircleId, nonce);
+
+    vm.prank(owner);
+    savingCircles.setTokenAllowed(address(token), true);
+    bytes memory signature = inviteGenerator.generateInvite(ownerKey, baseCircleId, nonce, address(savingCircles));
+
+    vm.prank(dave);
+    savingCircles.redeemInvite(invite, signature);
+
+    vm.prank(eve);
+    vm.expectRevert(ISavingCircles.InviteAlreadyUsed.selector);
+    savingCircles.redeemInvite(invite, signature);
+  }
+
+  function test_rejectAlreadyAMember() external {
+    vm.chainId(CHAIN_ID);
+    uint256 nonce = 1;
+    ISavingCircles.Invite memory invite = ISavingCircles.Invite(baseCircleId, nonce);
+
+    vm.prank(owner);
+    savingCircles.setTokenAllowed(address(token), true);
+    bytes memory signature = inviteGenerator.generateInvite(ownerKey, baseCircleId, nonce, address(savingCircles));
+
+    vm.prank(alice);
+    vm.expectRevert(ISavingCircles.AlreadyMember.selector);
+    savingCircles.redeemInvite(invite, signature);
+  }
+
+  function test_rejectIfCircleDoesNotExist() external {
+    vm.chainId(CHAIN_ID);
+
+    uint256 nonce = 1;
+    uint256 circleId = 999;
+    ISavingCircles.Invite memory invite = ISavingCircles.Invite(circleId, nonce);
+
+    vm.prank(owner);
+    savingCircles.setTokenAllowed(address(token), true);
+    bytes memory signature = inviteGenerator.generateInvite(ownerKey, circleId, nonce, address(savingCircles));
+
+    vm.prank(dave);
+    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
+    savingCircles.redeemInvite(invite, signature);
   }
 }

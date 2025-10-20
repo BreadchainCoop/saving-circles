@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
 import {ReentrancyGuard} from '@openzeppelin/utils/ReentrancyGuard.sol';
+import {ECDSA} from '@openzeppelin/utils/cryptography/ECDSA.sol';
 
 import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
 
@@ -19,12 +20,32 @@ import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
 contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   uint256 public constant MINIMUM_MEMBERS = 2;
 
+  /// @notice Invite signing domain name used for EIP-712 signatures
+  string private constant _INVITE_SIGNING_DOMAIN = 'StacksInvite';
+
+  /// @notice Invite signing version used for EIP-712 signatures
+  string private constant _INVITE_SIGNATURE_VERSION = '1';
+
+  /// @notice EIP-712 type hash for invite signatures
+  bytes32 private constant _INVITE_TYPEHASH = keccak256('Invite(uint256 circleId,uint256 nonce)');
+
+  /// @notice EIP-712 domain type hash
+  bytes32 private constant _EIP712_DOMAIN_TYPEHASH =
+    keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)');
+
+  /// @notice Hashed domain name for invite signatures
+  bytes32 private constant _INVITE_DOMAIN_NAME_HASH = keccak256(bytes(_INVITE_SIGNING_DOMAIN));
+
+  /// @notice Hashed version for invite signatures
+  bytes32 private constant _INVITE_DOMAIN_VERSION_HASH = keccak256(bytes(_INVITE_SIGNATURE_VERSION));
+
   uint256 public nextId;
   mapping(uint256 id => Circle circle) public circles;
   mapping(uint256 id => mapping(address token => uint256 balance)) public balances;
   mapping(uint256 id => mapping(address member => bool status)) public isMember;
   mapping(address member => uint256[] ids) public memberCircles;
   mapping(address token => bool status) public allowedTokens;
+  mapping(uint256 id => mapping(uint256 nonce => bool used)) public usedNonces;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -135,6 +156,27 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     delete circles[_id];
 
     emit CircleDecommissioned(_id);
+  }
+
+  /// @inheritdoc ISavingCircles
+  function redeemInvite(Invite calldata _invite, bytes calldata _signature) external override nonReentrant {
+    Circle storage _circle = circles[_invite.circleId];
+
+    if (_circle.owner == address(0)) revert NotCommissioned();
+    if (usedNonces[_invite.circleId][_invite.nonce]) revert InviteAlreadyUsed();
+    if (isMember[_invite.circleId][msg.sender]) revert AlreadyMember();
+
+    bytes32 _digest = _hashInvite(_invite);
+    address _signer = ECDSA.recover(_digest, _signature);
+
+    if (_signer != _circle.owner) revert InvalidSigner();
+
+    usedNonces[_invite.circleId][_invite.nonce] = true;
+    isMember[_invite.circleId][msg.sender] = true;
+    memberCircles[msg.sender].push(_invite.circleId);
+    _circle.members.push(msg.sender);
+
+    emit InviteRedeemed(_invite.circleId, msg.sender);
   }
 
   /// @inheritdoc ISavingCircles
@@ -294,5 +336,18 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    */
   function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
     return _circle.owner == address(0);
+  }
+
+  /// @dev Builds the EIP-712 digest for an invite
+  function _hashInvite(Invite calldata _invite) private view returns (bytes32) {
+    bytes32 _structHash = keccak256(abi.encode(_INVITE_TYPEHASH, _invite.circleId, _invite.nonce));
+
+    bytes32 _domainSeparator = keccak256(
+      abi.encode(
+        _EIP712_DOMAIN_TYPEHASH, _INVITE_DOMAIN_NAME_HASH, _INVITE_DOMAIN_VERSION_HASH, block.chainid, address(this)
+      )
+    );
+
+    return keccak256(abi.encodePacked('\x19\x01', _domainSeparator, _structHash));
   }
 }

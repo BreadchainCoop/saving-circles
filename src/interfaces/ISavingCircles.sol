@@ -24,6 +24,14 @@ interface ISavingCircles {
     uint256 maxDeposits;
   }
 
+  /// @notice Struct defining an invite to join a circle
+  /// @param circleId ID of the Circle
+  /// @param nonce Unique nonce for the invite
+  struct Invite {
+    uint256 circleId;
+    uint256 nonce;
+  }
+
   // =======================
   // EVENTS
   // =======================
@@ -68,6 +76,13 @@ interface ISavingCircles {
    * @param allowed Whether the token is allowed
    */
   event TokenAllowed(address indexed token, bool indexed allowed);
+
+  /**
+   * @notice Emitted when an invite is successfully redeemed
+   * @param id The ID of the circle
+   * @param redeemer The address of the redeemer
+   */
+  event InviteRedeemed(uint256 indexed id, address indexed redeemer);
 
   /**
    * @notice Thrown when a member attempts to redundantly deposit funds into a circle
@@ -180,6 +195,21 @@ interface ISavingCircles {
   error InvalidMemberAddress();
 
   /**
+   * @notice Thrown when the signer of an invite is invalid
+   */
+  error InvalidSigner();
+
+  /**
+   * @notice Thrown when the caller is already a member of the Circle
+   */
+  error AlreadyMember();
+
+  /**
+   * @notice Thrown when an invite nonce has already been used
+   */
+  error InviteAlreadyUsed();
+
+  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -232,6 +262,13 @@ interface ISavingCircles {
    * @param id The ID of the circle
    */
   function decommission(uint256 id) external;
+
+  /**
+   * @notice Redeems an invite signed by the Circle owner
+   * @param invite The invite data containing the Circle ID and nonce
+   * @param signature The owner's EIP-712 signature
+   */
+  function redeemInvite(Invite calldata invite, bytes calldata signature) external;
 
   /**
    * @notice Get a single circle
