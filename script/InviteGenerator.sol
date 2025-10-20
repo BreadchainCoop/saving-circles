@@ -17,9 +17,8 @@ contract InviteGenerator is Script {
   /// @notice EIP-712 type hash for invite signatures
   bytes32 private _inviteTypeHash;
 
-  /// @notice EIP-712 domain type hash
-  bytes32 private constant _EIP712_DOMAIN_TYPEHASH =
-    keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)');
+  /// @notice EIP-712 domain type hash of 'EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'
+  bytes32 private constant _EIP712_DOMAIN_TYPEHASH = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
 
   /// @notice Error for empty invite signing domain
   error InvalidSigningDomain();
