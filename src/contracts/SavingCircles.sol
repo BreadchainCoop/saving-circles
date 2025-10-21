@@ -321,14 +321,16 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
   /**
    * @dev Computes the EIP-712 hash for an invite
+   * @notice _inviteTypehash is keccak256('Invite(uint256 id,uint256 nonce)')
+   * @notice _eip712DomainTypehash is keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')
+   * @notice Domain name is 'StacksInvite' and version is '1'
    */
   function _hashInvite(uint256 _id, uint256 _nonce) private view returns (bytes32) {
-    bytes32 _inviteTypehash = keccak256('Invite(uint256 id,uint256 nonce)');
+    bytes32 _inviteTypehash = 0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3;
     bytes32 _structHash = keccak256(abi.encode(_inviteTypehash, _id, _nonce));
-    bytes32 _eip712DomainTypehash =
-      keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)');
-    bytes32 _inviteDomainNameHash = keccak256(bytes('StacksInvite'));
-    bytes32 _inviteDomainVersionHash = keccak256(bytes('1'));
+    bytes32 _eip712DomainTypehash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
+    bytes32 _inviteDomainNameHash = 0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
+    bytes32 _inviteDomainVersionHash = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
 
     bytes32 _domainSeparator = keccak256(
       abi.encode(_eip712DomainTypehash, _inviteDomainNameHash, _inviteDomainVersionHash, block.chainid, address(this))

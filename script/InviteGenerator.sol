@@ -14,8 +14,8 @@ contract InviteGenerator is Script {
   /// @notice Hashed signing version used for EIP-712 signatures
   bytes32 private _inviteDomainVersionHash;
 
-  /// @notice EIP-712 type hash for invite signatures
-  bytes32 private _inviteTypeHash;
+  /// @notice EIP-712 type hash of 'Invite(uint256 id,uint256 nonce)'
+  bytes32 private _INVITE_TYPEHASH = 0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3;
 
   /// @notice EIP-712 domain type hash of 'EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'
   bytes32 private constant _EIP712_DOMAIN_TYPEHASH = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
@@ -26,18 +26,16 @@ contract InviteGenerator is Script {
   /// @notice Error for empty invite signature version
   error InvalidSignatureVersion();
 
-  constructor(string memory inviteSigningDomain, string memory inviteSignatureVersion) {
-    if (bytes(inviteSigningDomain).length == 0) revert InvalidSigningDomain();
-    if (bytes(inviteSignatureVersion).length == 0) revert InvalidSignatureVersion();
-    _inviteDomainNameHash = keccak256(bytes(inviteSigningDomain));
-    _inviteDomainVersionHash = keccak256(bytes(inviteSignatureVersion));
-    string memory inviteTypeString = string(abi.encodePacked('Invite(uint256 id,uint256 nonce)'));
-    _inviteTypeHash = keccak256(bytes(inviteTypeString));
+  constructor(bytes32 inviteSigningDomain, bytes32 inviteSignatureVersion) {
+    if (inviteSigningDomain == bytes32(0)) revert InvalidSigningDomain();
+    if (inviteSignatureVersion == bytes32(0)) revert InvalidSignatureVersion();
+    _inviteDomainNameHash = inviteSigningDomain;
+    _inviteDomainVersionHash = inviteSignatureVersion;
   }
 
   /// @notice Returns the struct hash of an invite
   function hashInvite(uint256 _structId, uint256 _nonce) public view returns (bytes32) {
-    return keccak256(abi.encode(_inviteTypeHash, _structId, _nonce));
+    return keccak256(abi.encode(_INVITE_TYPEHASH, _structId, _nonce));
   }
 
   /// @notice Returns the domain separator for a struct contract on a given chain

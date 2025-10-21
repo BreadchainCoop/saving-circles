@@ -6,8 +6,10 @@ import {InviteGenerator} from 'script/InviteGenerator.sol';
 
 contract InviteGeneratorUnit is Test {
   InviteGenerator internal _inviteGenerator;
-  string internal constant _INVITE_SIGNING_DOMAIN = 'StacksInvite';
-  string internal constant _INVITE_SIGNATURE_VERSION = '1';
+  bytes32 internal constant _INVITE_SIGNING_DOMAIN_HASH =
+    0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
+  bytes32 internal constant _INVITE_SIGNATURE_VERSION_HASH =
+    0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
   uint256 internal constant _STRUCT_ID = 1;
   uint256 internal constant _NONCE = 1;
   uint256 internal constant _CHAIN_ID = 1;
@@ -16,7 +18,7 @@ contract InviteGeneratorUnit is Test {
   address internal _OWNER_ADDRESS;
 
   function setUp() public {
-    _inviteGenerator = new InviteGenerator(_INVITE_SIGNING_DOMAIN, _INVITE_SIGNATURE_VERSION);
+    _inviteGenerator = new InviteGenerator(_INVITE_SIGNING_DOMAIN_HASH, _INVITE_SIGNATURE_VERSION_HASH);
     _VERIFYING_CONTRACT = address(_inviteGenerator);
     (_OWNER_ADDRESS, _OWNER_PRIVATE_KEY) = makeAddrAndKey('owner');
   }
@@ -32,8 +34,8 @@ contract InviteGeneratorUnit is Test {
     bytes32 expectedDomainSeparator = keccak256(
       abi.encode(
         keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'),
-        keccak256(bytes(_INVITE_SIGNING_DOMAIN)),
-        keccak256(bytes(_INVITE_SIGNATURE_VERSION)),
+        _INVITE_SIGNING_DOMAIN_HASH,
+        _INVITE_SIGNATURE_VERSION_HASH,
         _CHAIN_ID,
         _VERIFYING_CONTRACT
       )

@@ -18,8 +18,10 @@ contract SavingCirclesUnit is Test {
   uint256 public constant DEPOSIT_INTERVAL = 1 days;
   uint256 public constant CIRCLE_DURATION = 30 days;
   uint256 public constant MAX_DEPOSITS = 1000;
-  string public constant INVITE_SIGNING_DOMAIN = 'StacksInvite';
-  string public constant INVITE_SIGNATURE_VERSION = '1';
+  bytes32 internal constant _INVITE_SIGNING_DOMAIN_HASH =
+    0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
+  bytes32 internal constant _INVITE_SIGNATURE_VERSION_HASH =
+    0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
   uint256 public constant CHAIN_ID = 1;
 
   SavingCircles public savingCircles;
@@ -54,7 +56,7 @@ contract SavingCirclesUnit is Test {
     (impostor, impostorKey) = makeAddrAndKey('impostor');
 
     // Setup InviteGenerator
-    inviteGenerator = new InviteGenerator(INVITE_SIGNING_DOMAIN, INVITE_SIGNATURE_VERSION);
+    inviteGenerator = new InviteGenerator(_INVITE_SIGNING_DOMAIN_HASH, _INVITE_SIGNATURE_VERSION_HASH);
 
     // Deploy and initialize the contract
     vm.startPrank(owner);
