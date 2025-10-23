@@ -180,6 +180,9 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
 
   /// @inheritdoc IDelegatedSavingCircles
   function depositChecker() external view override returns (bool canExec, bytes memory execPayload) {
+    // Reject if gas price exceeds maximum limit
+    if (tx.gasprice > MAX_GAS_PRICE) return (false, bytes('Gas price exceeds maximum limit'));
+
     // First, count eligible members across all circles
     uint256 eligibleCount = _getEligibleMembersCount(true);
     AutomationRecord[] memory records = new AutomationRecord[](eligibleCount);
@@ -215,7 +218,6 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
         continue;
       }
     }
-    if (tx.gasprice > MAX_GAS_PRICE) return (false, bytes('Gas price exceeds maximum limit'));
     if (index > 0) {
       canExec = true;
       execPayload = abi.encodeCall(IDelegatedSavingCircles.autoDeposit, (records));
