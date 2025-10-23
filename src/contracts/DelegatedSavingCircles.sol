@@ -231,6 +231,7 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     for (uint256 i = 0; i < records.length; i++) {
       uint256 _circleId = records[i].circleId;
       address _member = records[i].member;
+      if (!automationsEnabled[_member]) continue;
       ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
 
       // Calculate the remaining deposit amount needed

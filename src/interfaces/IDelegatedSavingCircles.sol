@@ -47,6 +47,11 @@ interface IDelegatedSavingCircles {
   error DelegatedDepositsNotEnabled();
 
   /**
+   * @notice Thrown when automations are not enabled for a member
+   */
+  error AutomationsNotEnabled();
+
+  /**
    * @notice Enable or disable delegated deposits for the caller
    * @param enabled Whether to enable delegated deposits
    */
