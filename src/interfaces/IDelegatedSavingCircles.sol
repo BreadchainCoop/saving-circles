@@ -101,14 +101,14 @@ interface IDelegatedSavingCircles {
    * @return canExec Whether there are deposits to be made
    * @return execPayload The payload to execute deposits
    */
-  function depositChecker() external returns (bool canExec, bytes memory execPayload);
+  function depositChecker() external view returns (bool canExec, bytes memory execPayload);
 
   /**
    * @notice Checker function for automated withdrawals
    * @return canExec Whether there are withdrawals to be made
    * @return execPayload The payload to execute withdrawals
    */
-  function withdrawalChecker() external returns (bool canExec, bytes memory execPayload);
+  function withdrawalChecker() external view returns (bool canExec, bytes memory execPayload);
 
   /**
    * @notice Execute automated deposits for multiple members across multiple circles
