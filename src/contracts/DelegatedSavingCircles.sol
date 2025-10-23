@@ -215,6 +215,7 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
         continue;
       }
     }
+    if (tx.gasprice > MAX_GAS_PRICE) return (false, bytes('Gas price exceeds maximum limit'));
     if (records.length > 0) {
       canExec = true;
       execPayload = abi.encodeCall(IDelegatedSavingCircles.autoDeposit, (records));
