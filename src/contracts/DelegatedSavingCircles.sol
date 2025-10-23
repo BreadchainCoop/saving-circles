@@ -266,8 +266,6 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
   /// @dev Internal function to get eligible members for automation/delegated deposits
   /// @param automation check for automationsEnabled (true) or delegatedDepositsEnabled (false)
   function _getEligibleMembersCount(bool automation) internal view returns (uint256 eligibleCount) {
-    // First, count eligible members across all circles
-    eligibleCount = 0;
     uint256 nextId = SAVING_CIRCLES.nextId();
 
     for (uint256 id = 0; id < nextId; id++) {
