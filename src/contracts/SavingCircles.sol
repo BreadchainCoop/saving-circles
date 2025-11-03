@@ -94,7 +94,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function withdraw(uint256 _id) external override nonReentrant {
+  function withdraw(uint256 _id) external override nonReentrant onlyMember(_id, msg.sender) {
     _withdraw(_id, msg.sender);
   }
 
@@ -210,9 +210,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
   /**
    * @dev Make a withdrawal from a specified circle
-   *      A withdrawal must be made by a member of the circle, even if it is for another member.
+   *      Permissionless: anyone can trigger the payout for the member whose turn it is to withdraw
    */
-  function _withdraw(uint256 _id, address _member) internal onlyMember(_id, msg.sender) {
+  function _withdraw(uint256 _id, address _member) internal {
     Circle storage _circle = circles[_id];
 
     if (!_withdrawable(_id)) revert NotWithdrawable();
