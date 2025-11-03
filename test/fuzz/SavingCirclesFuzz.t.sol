@@ -58,7 +58,6 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
-      maxDeposits: _maxDeposits,
       circleStart: _circleStart,
       currentIndex: 0
     });
@@ -70,7 +69,6 @@ contract SavingCirclesFuzzTest is Test {
     assertEq(retrievedCircle.owner, alice);
     assertEq(retrievedCircle.depositAmount, _depositAmount);
     assertEq(retrievedCircle.depositInterval, _depositInterval);
-    assertEq(retrievedCircle.maxDeposits, _maxDeposits);
     assertEq(retrievedCircle.circleStart, _circleStart);
     assertEq(retrievedCircle.members.length, _memberCount);
   }
@@ -89,7 +87,6 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _totalDeposit,
       depositInterval: 1 days,
-      maxDeposits: 2,
       circleStart: block.timestamp,
       currentIndex: 0
     });
@@ -139,7 +136,6 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: 1 days,
-      maxDeposits: _memberCount,
       circleStart: block.timestamp,
       currentIndex: 0
     });
@@ -195,7 +191,6 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: 1 days,
-      maxDeposits: totalMembers,
       circleStart: block.timestamp,
       currentIndex: 0
     });
@@ -252,7 +247,6 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
-      maxDeposits: _maxDeposits,
       circleStart: block.timestamp + 1,
       currentIndex: 0
     });
@@ -260,14 +254,12 @@ contract SavingCirclesFuzzTest is Test {
     vm.startPrank(alice);
 
     if (_depositAmount == 0 || _depositInterval == 0 || _maxDeposits == 0) {
-      // The contract checks in order: depositInterval, depositAmount, maxDeposits
+      // The contract checks in order: depositInterval, depositAmount
       // Multiple conditions could be zero, so we need to check which error is thrown first
       if (_depositInterval == 0) {
         vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
       } else if (_depositAmount == 0) {
         vm.expectRevert(ISavingCircles.InvalidDepositAmount.selector);
-      } else {
-        vm.expectRevert(ISavingCircles.InvalidMaxDeposits.selector);
       }
       savingCircles.create(circle);
     } else {
@@ -295,7 +287,6 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: depositAmount,
       depositInterval: _depositInterval,
-      maxDeposits: 2,
       circleStart: circleStart,
       currentIndex: 0
     });
@@ -351,7 +342,6 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: 1 days,
-      maxDeposits: _memberCount,
       circleStart: block.timestamp + 1 hours,
       currentIndex: 0
     });
@@ -399,7 +389,6 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: depositInterval,
-      maxDeposits: _memberCount,
       circleStart: startTime,
       currentIndex: 0
     });

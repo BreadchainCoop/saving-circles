@@ -11,7 +11,6 @@ interface ISavingCircles {
    * @param token The token of the circle
    * @param depositInterval The deposit interval of the circle
    * @param circleStart The start time of the circle
-   * @param maxDeposits The maximum number of deposits for the circle
    */
   struct Circle {
     address owner;
@@ -21,7 +20,6 @@ interface ISavingCircles {
     address token;
     uint256 depositInterval;
     uint256 circleStart;
-    uint256 maxDeposits;
   }
 
   // =======================
@@ -148,11 +146,6 @@ interface ISavingCircles {
    * @notice Thrown when a deposit amount is invalid
    */
   error InvalidDepositAmount();
-
-  /**
-   * @notice Thrown when a max deposits is invalid
-   */
-  error InvalidMaxDeposits();
 
   /**
    * @notice Thrown when a circle start time is invalid

@@ -62,8 +62,7 @@ contract DelegatedSavingCirclesUnit is Test {
       circleStart: block.timestamp,
       token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL,
-      maxDeposits: MAX_DEPOSITS
+      depositInterval: DEPOSIT_INTERVAL
     });
 
     vm.prank(owner);

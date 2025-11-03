@@ -46,8 +46,7 @@ contract IntegrationBase is Common, Test {
       circleStart: block.timestamp,
       token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL,
-      maxDeposits: BASE_MAX_DEPOSITS
+      depositInterval: DEPOSIT_INTERVAL
     });
   }
 
