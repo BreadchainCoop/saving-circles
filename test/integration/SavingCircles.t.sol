@@ -325,6 +325,7 @@ contract SavingCirclesIntegration is IntegrationBase {
       depositAmount: 1 ether,
       depositInterval: 1 days,
       circleStart: block.timestamp + 1 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -342,6 +343,7 @@ contract SavingCirclesIntegration is IntegrationBase {
       depositAmount: 2 ether,
       depositInterval: 2 days,
       circleStart: block.timestamp + 2 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -422,6 +424,7 @@ contract SavingCirclesIntegration is IntegrationBase {
       depositAmount: 0.1 ether,
       depositInterval: 1 days,
       circleStart: block.timestamp + 1 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 

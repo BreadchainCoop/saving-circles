@@ -53,6 +53,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -139,6 +140,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
         depositAmount: _depositAmount,
         depositInterval: _depositInterval,
         circleStart: startTimes[c],
+        circleEnd: 0,
         currentIndex: 0
       });
 
@@ -201,6 +203,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -299,6 +302,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
         depositAmount: circleDepositAmount,
         depositInterval: _depositInterval,
         circleStart: startTime,
+        circleEnd: 0,
         currentIndex: 0
       });
 
@@ -357,6 +361,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       depositAmount: _depositAmount,
       depositInterval: 1 days,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -436,6 +441,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       depositAmount: depositAmount,
       depositInterval: depositInterval,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -465,6 +471,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       depositAmount: 1000,
       depositInterval: depositInterval,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -529,6 +536,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       depositAmount: 1000,
       depositInterval: depositInterval,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 

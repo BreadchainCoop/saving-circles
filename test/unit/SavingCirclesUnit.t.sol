@@ -68,6 +68,7 @@ contract SavingCirclesUnit is Test {
       members: members,
       currentIndex: BASE_CURRENT_INDEX,
       circleStart: block.timestamp,
+      circleEnd: 0,
       token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
       depositInterval: DEPOSIT_INTERVAL
@@ -482,6 +483,7 @@ contract SavingCirclesUnit is Test {
       depositAmount: DEPOSIT_AMOUNT,
       depositInterval: 1 hours,
       circleStart: block.timestamp + 1 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -703,6 +705,7 @@ contract SavingCirclesUnit is Test {
       depositAmount: maxAmount,
       depositInterval: DEPOSIT_INTERVAL,
       circleStart: block.timestamp + 1 days,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -805,6 +808,7 @@ contract SavingCirclesUnit is Test {
           depositAmount: DEPOSIT_AMOUNT,
           depositInterval: DEPOSIT_INTERVAL,
           circleStart: block.timestamp + (i + 1) * 1 days,
+          circleEnd: 0,
           currentIndex: 0
         });
 

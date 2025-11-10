@@ -67,6 +67,7 @@ contract SavingCirclesHandler is Test {
       depositAmount: depositAmount,
       depositInterval: depositInterval,
       circleStart: currentTime + circleStartOffset,
+      circleEnd: 0,
       currentIndex: 0
     });
 

@@ -59,6 +59,7 @@ contract SavingCirclesFuzzTest is Test {
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
       circleStart: _circleStart,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -88,6 +89,7 @@ contract SavingCirclesFuzzTest is Test {
       depositAmount: _totalDeposit,
       depositInterval: 1 days,
       circleStart: block.timestamp,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -137,6 +139,7 @@ contract SavingCirclesFuzzTest is Test {
       depositAmount: _depositAmount,
       depositInterval: 1 days,
       circleStart: block.timestamp,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -192,6 +195,7 @@ contract SavingCirclesFuzzTest is Test {
       depositAmount: _depositAmount,
       depositInterval: 1 days,
       circleStart: block.timestamp,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -232,11 +236,7 @@ contract SavingCirclesFuzzTest is Test {
     savingCircles.getCircle(circleId);
   }
 
-  function testFuzz_InvalidCircleCreation_ZeroValues(
-    uint256 _depositAmount,
-    uint256 _depositInterval,
-    uint256 _maxDeposits
-  ) public {
+  function testFuzz_InvalidCircleCreation_ZeroValues(uint256 _depositAmount, uint256 _depositInterval) public {
     address[] memory members = new address[](2);
     members[0] = alice;
     members[1] = bob;
@@ -248,20 +248,24 @@ contract SavingCirclesFuzzTest is Test {
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
       circleStart: block.timestamp + 1,
+      circleEnd: 0,
       currentIndex: 0
     });
 
     vm.startPrank(alice);
 
-    if (_depositAmount == 0 || _depositInterval == 0 || _maxDeposits == 0) {
+    bool intervalWouldOverflow =
+      (_depositInterval != 0) && (_depositInterval > (type(uint256).max - circle.circleStart) / members.length);
+    if (_depositAmount == 0 || _depositInterval == 0 || intervalWouldOverflow) {
       // The contract checks in order: depositInterval, depositAmount
       // Multiple conditions could be zero, so we need to check which error is thrown first
-      if (_depositInterval == 0) {
+      if (_depositInterval == 0 || intervalWouldOverflow) {
         vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
+        savingCircles.create(circle);
       } else if (_depositAmount == 0) {
         vm.expectRevert(ISavingCircles.InvalidDepositAmount.selector);
+        savingCircles.create(circle);
       }
-      savingCircles.create(circle);
     } else {
       uint256 circleId = savingCircles.create(circle);
       assertGe(circleId, 0);
@@ -288,6 +292,7 @@ contract SavingCirclesFuzzTest is Test {
       depositAmount: depositAmount,
       depositInterval: _depositInterval,
       circleStart: circleStart,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -343,6 +348,7 @@ contract SavingCirclesFuzzTest is Test {
       depositAmount: _depositAmount,
       depositInterval: 1 days,
       circleStart: block.timestamp + 1 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -390,6 +396,7 @@ contract SavingCirclesFuzzTest is Test {
       depositAmount: _depositAmount,
       depositInterval: depositInterval,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 

@@ -71,6 +71,7 @@ contract SavingCirclesViewerUnit is Test {
       members: members,
       currentIndex: BASE_CURRENT_INDEX,
       circleStart: block.timestamp,
+      circleEnd: 0,
       token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
       depositInterval: DEPOSIT_INTERVAL

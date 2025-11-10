@@ -67,6 +67,12 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (_circle.currentIndex != 0) revert InvalidCurrentIndex();
     if (_circle.owner == address(0)) revert InvalidOwner();
     if (_circle.members.length < MINIMUM_MEMBERS) revert InvalidMemberCount();
+    // Prevent overflow in circleEnd = circleStart + (depositInterval * members.length)
+    {
+      uint256 len = _circle.members.length;
+      uint256 maxDelta = type(uint256).max - _circle.circleStart;
+      if (_circle.depositInterval > maxDelta / len) revert InvalidDepositInterval();
+    }
 
     for (uint256 i = 0; i < _circle.members.length; i++) {
       address _member = _circle.members[i];
@@ -75,6 +81,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
       memberCircles[_member].push(_id);
     }
 
+    _circle.circleEnd = _circle.circleStart + (_circle.depositInterval * _circle.members.length);
     circles[_id] = _circle;
 
     emit CircleCreated(_id, _circle.members, _circle.token, _circle.depositAmount, _circle.depositInterval);
@@ -247,7 +254,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
       revert DepositBeforeCircleStart();
     }
     // Check if the entire circle has expired (all rounds completed)
-    if (block.timestamp >= circles[_id].circleStart + (circles[_id].depositInterval * circles[_id].members.length)) {
+    if (block.timestamp >= _circle.circleEnd) {
       revert CircleExpired();
     }
     // Check if current deposit window is closed

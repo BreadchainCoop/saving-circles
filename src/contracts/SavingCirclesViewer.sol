@@ -301,8 +301,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     circleData.nextWithdrawTime = circle.circleStart + (circle.depositInterval * circle.currentIndex);
     circleData.depositWindowEnd = currentPeriodEnd;
 
-    uint256 circleEndTime = circle.circleStart + (circle.depositInterval * circle.members.length);
-    circleData.isExpired = (block.timestamp >= circleEndTime);
+    circleData.isExpired = (block.timestamp >= circle.circleEnd);
 
     circleData.completedRounds = circle.currentIndex;
     circleData.totalRounds = circle.members.length;
