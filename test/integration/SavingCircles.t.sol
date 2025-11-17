@@ -324,8 +324,8 @@ contract SavingCirclesIntegration is IntegrationBase {
       token: address(token),
       depositAmount: 1 ether,
       depositInterval: 1 days,
-      maxDeposits: 3,
       circleStart: block.timestamp + 1 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -342,8 +342,8 @@ contract SavingCirclesIntegration is IntegrationBase {
       token: address(token),
       depositAmount: 2 ether,
       depositInterval: 2 days,
-      maxDeposits: 3,
       circleStart: block.timestamp + 2 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -423,8 +423,8 @@ contract SavingCirclesIntegration is IntegrationBase {
       token: address(token),
       depositAmount: 0.1 ether,
       depositInterval: 1 days,
-      maxDeposits: memberCount,
       circleStart: block.timestamp + 1 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 

@@ -131,7 +131,6 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
 
       assertGt(circle.depositAmount, 0, 'Deposit amount should be greater than 0');
       assertGt(circle.depositInterval, 0, 'Deposit interval should be greater than 0');
-      assertGt(circle.maxDeposits, 0, 'Max deposits should be greater than 0');
       assertGt(circle.circleStart, 0, 'Circle start time should be greater than 0');
       assertTrue(circle.owner != address(0), 'Circle should have valid owner');
     }
@@ -144,7 +143,7 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
   // ============ Additional Invariants ============
 
   function invariant_TotalDepositsNeverExceedMaximum() public {
-    // Verify total deposits for a circle never exceed depositAmount * members * maxDeposits
+    // Verify total deposits for a circle never exceed depositAmount * members * circle member length
     uint256[] memory activeCircles = handler.getActiveCircles();
 
     for (uint256 i = 0; i < activeCircles.length; i++) {

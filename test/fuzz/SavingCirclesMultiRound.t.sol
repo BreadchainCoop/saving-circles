@@ -52,8 +52,8 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
-      maxDeposits: _memberCount,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -139,8 +139,8 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
         token: address(token),
         depositAmount: _depositAmount,
         depositInterval: _depositInterval,
-        maxDeposits: _memberCount,
         circleStart: startTimes[c],
+        circleEnd: 0,
         currentIndex: 0
       });
 
@@ -202,8 +202,8 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
-      maxDeposits: _memberCount,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -301,8 +301,8 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
         token: address(token),
         depositAmount: circleDepositAmount,
         depositInterval: _depositInterval,
-        maxDeposits: _memberCount,
         circleStart: startTime,
+        circleEnd: 0,
         currentIndex: 0
       });
 
@@ -344,15 +344,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
     }
   }
 
-  function testFuzz_MaxDepositBoundaryWithMultipleRounds(
-    uint256 _depositAmount,
-    uint8 _memberCount,
-    uint8 _maxDeposits
-  ) public {
+  function testFuzz_MaxDepositBoundaryWithMultipleRounds(uint256 _depositAmount, uint8 _memberCount) public {
     _depositAmount = bound(_depositAmount, 1000, _MAX_REASONABLE_DEPOSIT / 10);
     _memberCount = uint8(bound(uint256(_memberCount), 2, 5));
-    // maxDeposits must be at least memberCount to complete one full round
-    _maxDeposits = uint8(bound(uint256(_maxDeposits), uint256(_memberCount), uint256(_memberCount)));
 
     address[] memory members = new address[](_memberCount);
     for (uint256 i = 0; i < _memberCount; i++) {
@@ -366,8 +360,8 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: 1 days,
-      maxDeposits: _maxDeposits,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -446,8 +440,8 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       token: address(token),
       depositAmount: depositAmount,
       depositInterval: depositInterval,
-      maxDeposits: members.length,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -476,8 +470,8 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       token: address(token),
       depositAmount: 1000,
       depositInterval: depositInterval,
-      maxDeposits: _memberCount,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -541,8 +535,8 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       token: address(token),
       depositAmount: 1000,
       depositInterval: depositInterval,
-      maxDeposits: _memberCount,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 

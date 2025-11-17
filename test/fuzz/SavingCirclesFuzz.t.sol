@@ -58,8 +58,8 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
-      maxDeposits: _maxDeposits,
       circleStart: _circleStart,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -70,7 +70,6 @@ contract SavingCirclesFuzzTest is Test {
     assertEq(retrievedCircle.owner, alice);
     assertEq(retrievedCircle.depositAmount, _depositAmount);
     assertEq(retrievedCircle.depositInterval, _depositInterval);
-    assertEq(retrievedCircle.maxDeposits, _maxDeposits);
     assertEq(retrievedCircle.circleStart, _circleStart);
     assertEq(retrievedCircle.members.length, _memberCount);
   }
@@ -89,8 +88,8 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _totalDeposit,
       depositInterval: 1 days,
-      maxDeposits: 2,
       circleStart: block.timestamp,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -139,8 +138,8 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: 1 days,
-      maxDeposits: _memberCount,
       circleStart: block.timestamp,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -195,8 +194,8 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: 1 days,
-      maxDeposits: totalMembers,
       circleStart: block.timestamp,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -237,11 +236,7 @@ contract SavingCirclesFuzzTest is Test {
     savingCircles.getCircle(circleId);
   }
 
-  function testFuzz_InvalidCircleCreation_ZeroValues(
-    uint256 _depositAmount,
-    uint256 _depositInterval,
-    uint256 _maxDeposits
-  ) public {
+  function testFuzz_InvalidCircleCreation_ZeroValues(uint256 _depositAmount, uint256 _depositInterval) public {
     address[] memory members = new address[](2);
     members[0] = alice;
     members[1] = bob;
@@ -252,24 +247,25 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
-      maxDeposits: _maxDeposits,
       circleStart: block.timestamp + 1,
+      circleEnd: 0,
       currentIndex: 0
     });
 
     vm.startPrank(alice);
 
-    if (_depositAmount == 0 || _depositInterval == 0 || _maxDeposits == 0) {
-      // The contract checks in order: depositInterval, depositAmount, maxDeposits
+    bool intervalWouldOverflow =
+      (_depositInterval != 0) && (_depositInterval > (type(uint256).max - circle.circleStart) / members.length);
+    if (_depositAmount == 0 || _depositInterval == 0 || intervalWouldOverflow) {
+      // The contract checks in order: depositInterval, depositAmount
       // Multiple conditions could be zero, so we need to check which error is thrown first
-      if (_depositInterval == 0) {
+      if (_depositInterval == 0 || intervalWouldOverflow) {
         vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
+        savingCircles.create(circle);
       } else if (_depositAmount == 0) {
         vm.expectRevert(ISavingCircles.InvalidDepositAmount.selector);
-      } else {
-        vm.expectRevert(ISavingCircles.InvalidMaxDeposits.selector);
+        savingCircles.create(circle);
       }
-      savingCircles.create(circle);
     } else {
       uint256 circleId = savingCircles.create(circle);
       assertGe(circleId, 0);
@@ -295,8 +291,8 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: depositAmount,
       depositInterval: _depositInterval,
-      maxDeposits: 2,
       circleStart: circleStart,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -351,8 +347,8 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: 1 days,
-      maxDeposits: _memberCount,
       circleStart: block.timestamp + 1 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -399,8 +395,8 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: depositInterval,
-      maxDeposits: _memberCount,
       circleStart: startTime,
+      circleEnd: 0,
       currentIndex: 0
     });
 

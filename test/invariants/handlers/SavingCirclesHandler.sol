@@ -47,14 +47,12 @@ contract SavingCirclesHandler is Test {
     uint256 memberCountSeed,
     uint256 depositAmount,
     uint256 depositInterval,
-    uint256 maxDeposits,
     uint256 circleStartOffset,
     uint256 _actorSeed // solhint-disable-line no-unused-vars
   ) public useActor(_actorSeed) {
     uint256 memberCount = bound(memberCountSeed, 2, 5);
     depositAmount = bound(depositAmount, 100, 1e18);
     depositInterval = bound(depositInterval, 1 hours, 7 days);
-    maxDeposits = bound(maxDeposits, memberCount, memberCount * 2);
     circleStartOffset = bound(circleStartOffset, 1, 30 days);
 
     address[] memory members = new address[](memberCount);
@@ -68,8 +66,8 @@ contract SavingCirclesHandler is Test {
       token: address(token),
       depositAmount: depositAmount,
       depositInterval: depositInterval,
-      maxDeposits: maxDeposits,
       circleStart: currentTime + circleStartOffset,
+      circleEnd: 0,
       currentIndex: 0
     });
 

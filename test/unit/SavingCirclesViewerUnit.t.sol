@@ -71,10 +71,10 @@ contract SavingCirclesViewerUnit is Test {
       members: members,
       currentIndex: BASE_CURRENT_INDEX,
       circleStart: block.timestamp,
+      circleEnd: 0,
       token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL,
-      maxDeposits: MAX_DEPOSITS
+      depositInterval: DEPOSIT_INTERVAL
     });
 
     // Create an initial test circle
@@ -170,7 +170,7 @@ contract SavingCirclesViewerUnit is Test {
     assertTrue(userData.circleData[0].isCurrentWithdrawer);
     assertFalse(userData.circleData[0].canWithdraw);
     assertEq(userData.circleData[0].completedRounds, 0);
-    assertEq(userData.circleData[0].totalRounds, MAX_DEPOSITS);
+    assertEq(userData.circleData[0].totalRounds, members.length);
 
     // Second circle data
     assertEq(userData.circleData[1].circleId, secondCircleId);

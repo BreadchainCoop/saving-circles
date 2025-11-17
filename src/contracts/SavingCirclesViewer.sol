@@ -301,11 +301,10 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     circleData.nextWithdrawTime = circle.circleStart + (circle.depositInterval * circle.currentIndex);
     circleData.depositWindowEnd = currentPeriodEnd;
 
-    uint256 circleEndTime = circle.circleStart + (circle.depositInterval * circle.maxDeposits);
-    circleData.isExpired = (block.timestamp >= circleEndTime);
+    circleData.isExpired = (block.timestamp >= circle.circleEnd);
 
     circleData.completedRounds = circle.currentIndex;
-    circleData.totalRounds = circle.maxDeposits;
+    circleData.totalRounds = circle.members.length;
   }
 
   function _setDepositProgress(UserCircleData memory circleData, uint256 _circleId) internal view {

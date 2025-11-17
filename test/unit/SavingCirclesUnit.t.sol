@@ -86,10 +86,10 @@ contract SavingCirclesUnit is Test {
       members: members,
       currentIndex: BASE_CURRENT_INDEX,
       circleStart: block.timestamp,
+      circleEnd: 0,
       token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL,
-      maxDeposits: MAX_DEPOSITS
+      depositInterval: DEPOSIT_INTERVAL
     });
 
     // Create an initial test circle
@@ -353,7 +353,6 @@ contract SavingCirclesUnit is Test {
     assertEq(_circle.token, address(token));
     assertEq(_circle.depositAmount, DEPOSIT_AMOUNT);
     assertEq(_circle.depositInterval, DEPOSIT_INTERVAL);
-    assertEq(_circle.maxDeposits, MAX_DEPOSITS);
 
     // Verify members array
     assertEq(_circle.members.length, members.length);
@@ -468,7 +467,6 @@ contract SavingCirclesUnit is Test {
     assertEq(circles[0].token, baseCircle.token);
     assertEq(circles[0].depositAmount, baseCircle.depositAmount);
     assertEq(circles[0].depositInterval, baseCircle.depositInterval);
-    assertEq(circles[0].maxDeposits, baseCircle.maxDeposits);
 
     // Verify second circle
     assertEq(circles[1].owner, secondCircle.owner);
@@ -478,7 +476,6 @@ contract SavingCirclesUnit is Test {
     assertEq(circles[1].token, secondCircle.token);
     assertEq(circles[1].depositAmount, secondCircle.depositAmount);
     assertEq(circles[1].depositInterval, secondCircle.depositInterval);
-    assertEq(circles[1].maxDeposits, secondCircle.maxDeposits);
   }
 
   function test_GetCirclesWhenCircleDoesNotExist() external {
@@ -508,16 +505,16 @@ contract SavingCirclesUnit is Test {
       token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
       depositInterval: 1 hours,
-      maxDeposits: 2, // Only 2 rounds
       circleStart: block.timestamp + 1 hours,
+      circleEnd: 0,
       currentIndex: 0
     });
 
     vm.prank(alice);
     uint256 circleId = savingCircles.create(circle);
 
-    // Warp to after circle has expired (past maxDeposits intervals)
-    uint256 expiredTime = circle.circleStart + (circle.depositInterval * circle.maxDeposits) + 1;
+    // Warp to after circle has expired
+    uint256 expiredTime = circle.circleStart + (circle.depositInterval * circle.members.length) + 1;
     vm.warp(expiredTime);
 
     // Try to deposit after expiration
@@ -730,8 +727,8 @@ contract SavingCirclesUnit is Test {
       token: address(token),
       depositAmount: maxAmount,
       depositInterval: DEPOSIT_INTERVAL,
-      maxDeposits: 2,
       circleStart: block.timestamp + 1 days,
+      circleEnd: 0,
       currentIndex: 0
     });
 
@@ -833,8 +830,8 @@ contract SavingCirclesUnit is Test {
           token: address(token),
           depositAmount: DEPOSIT_AMOUNT,
           depositInterval: DEPOSIT_INTERVAL,
-          maxDeposits: 2,
           circleStart: block.timestamp + (i + 1) * 1 days,
+          circleEnd: 0,
           currentIndex: 0
         });
 

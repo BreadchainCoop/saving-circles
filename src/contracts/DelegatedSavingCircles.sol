@@ -75,8 +75,7 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
         uint256 depositWindowEnd = _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1));
         if (block.timestamp >= depositWindowEnd) continue;
 
-        uint256 circleEnd = _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits);
-        if (block.timestamp >= circleEnd) continue;
+        if (block.timestamp >= _circle.circleEnd) continue;
 
         for (uint256 j = 0; j < _circle.members.length; j++) {
           address member = _circle.members[j];
@@ -111,8 +110,7 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
         uint256 depositWindowEnd = _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1));
         if (block.timestamp >= depositWindowEnd) continue;
 
-        uint256 circleEnd = _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits);
-        if (block.timestamp >= circleEnd) continue;
+        if (block.timestamp >= _circle.circleEnd) continue;
 
         for (uint256 j = 0; j < _circle.members.length; j++) {
           address member = _circle.members[j];
@@ -176,8 +174,8 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
       revert ISavingCircles.DepositWindowClosed();
     }
-    // Check if all deposit periods have passed (maxDeposits * depositInterval = total circle duration)
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * _circle.maxDeposits)) {
+    // Check if all deposit periods have passed
+    if (block.timestamp >= _circle.circleEnd) {
       revert ISavingCircles.CircleExpired();
     }
 
