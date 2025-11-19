@@ -93,13 +93,17 @@ contract SavingCirclesUnit is Test {
     });
 
     // Create an initial test circle
-    vm.prank(alice);
+    vm.prank(owner);
     baseCircleId = savingCircles.create(baseCircle);
+    vm.prank(owner);
+    savingCircles.start(baseCircleId);
   }
 
   function _createBaseCircle() internal returns (uint256) {
     vm.prank(alice);
-    return savingCircles.create(baseCircle);
+    uint256 _id = savingCircles.create(baseCircle);
+    savingCircles.start(_id);
+    return _id;
   }
 
   function test_SetTokenAllowedWhenCallerIsNotOwner() external {
@@ -134,11 +138,11 @@ contract SavingCirclesUnit is Test {
     assertFalse(savingCircles.isTokenAllowed(address(token)));
   }
 
-  function test_DepositWhenCircleDoesNotExist() external {
+  function test_DepositWhenCircleIsNotActive() external {
     uint256 nonExistentCircleId = uint256(keccak256(abi.encodePacked('Non Existent Circle')));
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotActive.selector));
     savingCircles.deposit(nonExistentCircleId, DEPOSIT_AMOUNT);
   }
 
@@ -191,11 +195,11 @@ contract SavingCirclesUnit is Test {
     uint256 nonExistentCircleId = uint256(keccak256(abi.encodePacked('Non Existent Circle')));
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotActive.selector));
     savingCircles.isWithdrawable(nonExistentCircleId);
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotActive.selector));
     savingCircles.withdraw(nonExistentCircleId);
   }
 
@@ -432,16 +436,18 @@ contract SavingCirclesUnit is Test {
     savingCircles.create(_invalidCircle);
   }
 
-  function test_CreateWhenMembersCountIsLessThanTwo() external {
+  function test_startWhenMembersCountIsLessThanTwo() external {
     address[] memory _oneMember = new address[](1);
-    _oneMember[0] = alice;
+    _oneMember[0] = owner;
 
     ISavingCircles.Circle memory _invalidCircle = baseCircle;
     _invalidCircle.members = _oneMember;
 
-    vm.prank(alice);
+    vm.prank(owner);
+    uint256 invalidCircleId = savingCircles.create(_invalidCircle);
+    vm.prank(owner);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidMemberCount.selector));
-    savingCircles.create(_invalidCircle);
+    savingCircles.start(invalidCircleId);
   }
 
   function test_GetCircles() external {
@@ -512,6 +518,8 @@ contract SavingCirclesUnit is Test {
 
     vm.prank(alice);
     uint256 circleId = savingCircles.create(circle);
+    vm.prank(alice);
+    savingCircles.start(circleId);
 
     // Warp to after circle has expired
     uint256 expiredTime = circle.circleStart + (circle.depositInterval * circle.members.length) + 1;
@@ -592,16 +600,6 @@ contract SavingCirclesUnit is Test {
 
     vm.prank(alice);
     vm.expectRevert(ISavingCircles.InvalidMemberAddress.selector);
-    savingCircles.create(circle);
-  }
-
-  function test_CreateWhenCircleStartTimeIsZero() external {
-    // Test InvalidCircleStartTime error
-    ISavingCircles.Circle memory circle = baseCircle;
-    circle.circleStart = 0;
-
-    vm.prank(alice);
-    vm.expectRevert(ISavingCircles.InvalidCircleStartTime.selector);
     savingCircles.create(circle);
   }
 
@@ -860,6 +858,8 @@ contract SavingCirclesUnit is Test {
     secondCircle.owner = carol;
     vm.prank(carol);
     uint256 secondCircleId = savingCircles.create(secondCircle);
+    vm.prank(carol);
+    savingCircles.start(secondCircleId);
 
     // Create array of circle IDs to check
     uint256[] memory circleIds = new uint256[](3);
