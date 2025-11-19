@@ -27,6 +27,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   mapping(address member => uint256[] ids) public memberCircles;
   mapping(address token => bool status) public allowedTokens;
   mapping(uint256 id => mapping(uint256 nonce => bool used)) public usedNonces;
+  mapping(uint256 id => bool active) public isActive;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -65,54 +66,64 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (!allowedTokens[_circle.token]) revert TokenNotAllowed();
     if (_circle.depositInterval == 0) revert InvalidDepositInterval();
     if (_circle.depositAmount == 0) revert InvalidDepositAmount();
-    if (_circle.circleStart == 0) revert InvalidCircleStartTime();
     if (_circle.currentIndex != 0) revert InvalidCurrentIndex();
     if (_circle.owner == address(0)) revert InvalidOwner();
+
+    circles[_id] = _circle;
+    isMember[_id][_circle.owner] = true;
+    memberCircles[_circle.owner].push(_id);
+
+    emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
+
+    return _id;
+  }
+
+  function start(uint256 _id) external override nonReentrant onlyCommissioned(_id) {
+    Circle storage _circle = circles[_id];
+    if (isActive[_id]) revert AlreadyActive();
+    if (msg.sender != circles[_id].owner) revert NotOwner();
     if (_circle.members.length < MINIMUM_MEMBERS) revert InvalidMemberCount();
+
+    _circle.circleStart = block.timestamp;
     // Prevent overflow in circleEnd = circleStart + (depositInterval * members.length)
     {
       uint256 len = _circle.members.length;
       uint256 maxDelta = type(uint256).max - _circle.circleStart;
       if (_circle.depositInterval > maxDelta / len) revert InvalidDepositInterval();
     }
-
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      address _member = _circle.members[i];
-      if (_member == address(0)) revert InvalidMemberAddress();
-      isMember[_id][_member] = true;
-      memberCircles[_member].push(_id);
-    }
-
     _circle.circleEnd = _circle.circleStart + (_circle.depositInterval * _circle.members.length);
     circles[_id] = _circle;
-
-    emit CircleCreated(_id, _circle.members, _circle.token, _circle.depositAmount, _circle.depositInterval);
-
-    return _id;
+    isActive[_id] = true;
+    emit CircleStarted(_id);
   }
 
   /// @inheritdoc ISavingCircles
   function deposit(uint256 _id, uint256 _value) external override nonReentrant {
+    if (!isActive[_id]) revert NotActive();
     _deposit(_id, _value, msg.sender);
   }
 
   /// @inheritdoc ISavingCircles
   function depositFor(uint256 _id, uint256 _value, address _member) external override nonReentrant {
+    if (!isActive[_id]) revert NotActive();
     _deposit(_id, _value, _member);
   }
 
   /// @inheritdoc ISavingCircles
   function withdraw(uint256 _id) external override nonReentrant {
+    if (!isActive[_id]) revert NotActive();
     _withdraw(_id, msg.sender);
   }
 
   /// @inheritdoc ISavingCircles
   function withdrawFor(uint256 _id, address _member) external override nonReentrant {
+    if (!isActive[_id]) revert NotActive();
     _withdraw(_id, _member);
   }
 
   /// @inheritdoc ISavingCircles
   function decommission(uint256 _id) external override nonReentrant {
+    if (!isActive[_id]) revert NotActive();
     Circle storage _circle = circles[_id];
 
     if (block.timestamp <= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
@@ -208,6 +219,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     override
     returns (address[] memory _members, uint256[] memory _balances)
   {
+    if (!isActive[_id]) revert NotActive();
+
     Circle memory _circle = circles[_id];
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
@@ -227,11 +240,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
   /// @inheritdoc ISavingCircles
   function isWithdrawable(uint256 _id) public view override returns (bool) {
+    if (!isActive[_id]) revert NotActive();
     return _withdrawable(_id);
   }
 
   /// @inheritdoc ISavingCircles
   function withdrawableBy(uint256 _id) public view override onlyCommissioned(_id) returns (address) {
+    if (!isActive[_id]) revert NotActive();
     Circle memory _circle = circles[_id];
 
     return _circle.members[_circle.currentIndex];

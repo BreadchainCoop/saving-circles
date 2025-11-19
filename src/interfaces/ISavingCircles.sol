@@ -31,14 +31,11 @@ interface ISavingCircles {
   /**
    * @notice Emitted when a circle is created
    * @param id The ID of the circle
-   * @param members The members of the circle
    * @param token The token of the circle
    * @param depositAmount The deposit amount of the circle
    * @param depositInterval The deposit interval of the circle
    */
-  event CircleCreated(
-    uint256 indexed id, address[] members, address token, uint256 depositAmount, uint256 depositInterval
-  );
+  event CircleCreated(uint256 indexed id, address token, uint256 depositAmount, uint256 depositInterval);
 
   /**
    * @notice Emitted when a circle is decommissioned
@@ -75,6 +72,11 @@ interface ISavingCircles {
    * @param redeemer The address of the redeemer
    */
   event InviteRedeemed(uint256 indexed id, address indexed redeemer);
+  /**
+   * @notice Emitted when a saving circle is started
+   * @param id The ID of the circle
+   */
+  event CircleStarted(uint256 indexed id);
 
   /**
    * @notice Thrown when a member attempts to redundantly deposit funds into a circle
@@ -195,6 +197,18 @@ interface ISavingCircles {
    * @notice Thrown when an invite nonce has already been used
    */
   error InviteAlreadyUsed();
+  /**
+   * @notice Thrown when the caller is not the owner of the Circle
+   */
+  error NotOwner();
+  /**
+   * @notice Thrown when the circle is already active
+   */
+  error AlreadyActive();
+  /**
+   * @notice Thrown when the circle is not active
+   */
+  error NotActive();
 
   /**
    * @notice Initialize the contract
@@ -215,6 +229,12 @@ interface ISavingCircles {
    * @return id The ID of the circle
    */
   function create(Circle memory circle) external returns (uint256);
+
+  /**
+   * @notice Start a circle
+   * @param id The ID of the circle
+   */
+  function start(uint256 id) external;
 
   /**
    * @notice Deposit funds into a circle
