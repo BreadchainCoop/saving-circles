@@ -171,6 +171,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (_circle.owner == address(0)) revert NotCommissioned();
     if (usedNonces[_id][_nonce]) revert InviteAlreadyUsed();
     if (isMember[_id][msg.sender]) revert AlreadyMember();
+    if (isActive[_id]) revert AlreadyActive();
 
     bytes32 _digest = _hashInvite(_id, _nonce);
     address _signer = ECDSA.recover(_digest, _signature);
