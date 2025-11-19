@@ -256,16 +256,18 @@ contract SavingCirclesFuzzTest is Test {
 
     bool intervalWouldOverflow =
       (_depositInterval != 0) && (_depositInterval > (type(uint256).max - circle.circleStart) / members.length);
-    if (_depositAmount == 0 || _depositInterval == 0 || intervalWouldOverflow) {
-      // The contract checks in order: depositInterval, depositAmount
-      // Multiple conditions could be zero, so we need to check which error is thrown first
-      if (_depositInterval == 0 || intervalWouldOverflow) {
-        vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
-        savingCircles.create(circle);
-      } else if (_depositAmount == 0) {
+
+    bool amountInvalid = _depositAmount == 0;
+    bool intervalInvalid = _depositInterval == 0 || intervalWouldOverflow;
+
+    if (amountInvalid || intervalInvalid) {
+      // The contract checks in order: depositAmount, then depositInterval
+      if (amountInvalid) {
         vm.expectRevert(ISavingCircles.InvalidDepositAmount.selector);
-        savingCircles.create(circle);
+      } else {
+        vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
       }
+      savingCircles.create(circle);
     } else {
       uint256 circleId = savingCircles.create(circle);
       assertGe(circleId, 0);
