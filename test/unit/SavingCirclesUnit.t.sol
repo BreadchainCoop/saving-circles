@@ -651,12 +651,9 @@ contract SavingCirclesUnit is Test {
     // Wait for withdrawal time
     vm.warp(block.timestamp + DEPOSIT_INTERVAL);
 
-    // Non-member can now trigger withdrawFor successfully
-    uint256 aliceBefore = token.balanceOf(alice);
-    vm.prank(STRANGER);
+    vm.prank(STRANGER); // Non-member trying to call withdrawFor
+    vm.expectRevert(ISavingCircles.NotMember.selector);
     savingCircles.withdrawFor(baseCircleId, alice);
-
-    assertEq(token.balanceOf(alice), aliceBefore + (DEPOSIT_AMOUNT * members.length));
   }
 
   // ============ Edge Case Tests for Decommission ============
