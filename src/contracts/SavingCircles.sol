@@ -119,7 +119,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function withdraw(uint256 _id) external override nonReentrant {
+  function withdraw(uint256 _id) external override nonReentrant onlyMember(_id, msg.sender) {
     if (!isActive[_id]) revert NotActive();
     _withdraw(_id, msg.sender);
   }
