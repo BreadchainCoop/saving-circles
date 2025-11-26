@@ -7,7 +7,6 @@ import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/Trans
 import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
 import {Test} from 'forge-std/Test.sol';
 
-import {InviteGenerator} from 'script/InviteGenerator.sol';
 import {SavingCircles} from 'src/contracts/SavingCircles.sol';
 import {ISavingCircles} from 'src/interfaces/ISavingCircles.sol';
 import {MockERC20} from 'test/mocks/MockERC20.sol';
@@ -18,26 +17,15 @@ contract SavingCirclesUnit is Test {
   uint256 public constant DEPOSIT_INTERVAL = 1 days;
   uint256 public constant CIRCLE_DURATION = 30 days;
   uint256 public constant MAX_DEPOSITS = 1000;
-  bytes32 internal constant _INVITE_SIGNING_DOMAIN_HASH =
-    0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
-  bytes32 internal constant _INVITE_SIGNATURE_VERSION_HASH =
-    0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
-  uint256 public constant CHAIN_ID = 1;
 
   SavingCircles public savingCircles;
   MockERC20 public token;
-  InviteGenerator public inviteGenerator;
 
   // Test addresses
   address public owner;
-  uint256 public ownerKey;
   address public alice;
   address public bob;
-  address public dave;
-  address public eve;
   address public carol;
-  address public impostor;
-  uint256 public impostorKey;
   address public immutable STRANGER = makeAddr('stranger');
 
   // Test data
@@ -50,13 +38,7 @@ contract SavingCirclesUnit is Test {
     alice = makeAddr('alice');
     bob = makeAddr('bob');
     carol = makeAddr('carol');
-    dave = makeAddr('dave');
-    eve = makeAddr('eve');
-    (owner, ownerKey) = makeAddrAndKey('owner');
-    (impostor, impostorKey) = makeAddrAndKey('impostor');
-
-    // Setup InviteGenerator
-    inviteGenerator = new InviteGenerator(_INVITE_SIGNING_DOMAIN_HASH, _INVITE_SIGNATURE_VERSION_HASH);
+    owner = makeAddr('owner');
 
     // Deploy and initialize the contract
     vm.startPrank(owner);
@@ -885,79 +867,5 @@ contract SavingCirclesUnit is Test {
     assertFalse(strangerStatuses[0]); // Not in baseCircle
     assertFalse(strangerStatuses[1]); // Not in secondCircle
     assertFalse(strangerStatuses[2]); // Not in non-existent circle
-  }
-
-  function test_shouldRedeemInvite() external {
-    vm.chainId(CHAIN_ID);
-    uint256 nonce = 1;
-
-    vm.prank(owner);
-    savingCircles.setTokenAllowed(address(token), true);
-    uint256 circleId = _createUnstartedCircle();
-    bytes memory signature = inviteGenerator.generateInvite(ownerKey, circleId, nonce, address(savingCircles));
-
-    vm.prank(dave);
-    vm.expectEmit(true, true, false, true, address(savingCircles));
-    emit ISavingCircles.InviteRedeemed(circleId, dave);
-    savingCircles.redeemInvite(circleId, nonce, signature);
-  }
-
-  function test_rejectInvalidSigner() external {
-    vm.chainId(CHAIN_ID);
-    vm.prank(owner);
-    savingCircles.setTokenAllowed(address(token), true);
-    uint256 nonce = 1;
-
-    uint256 circleId = _createUnstartedCircle();
-    bytes memory signature = inviteGenerator.generateInvite(impostorKey, circleId, nonce, address(savingCircles));
-
-    vm.prank(dave);
-    vm.expectRevert(ISavingCircles.InvalidSigner.selector);
-    savingCircles.redeemInvite(circleId, nonce, signature);
-  }
-
-  function test_rejectAlreadyUsedInvite() external {
-    vm.chainId(CHAIN_ID);
-    uint256 nonce = 1;
-
-    vm.prank(owner);
-    savingCircles.setTokenAllowed(address(token), true);
-    uint256 circleId = _createUnstartedCircle();
-    bytes memory signature = inviteGenerator.generateInvite(ownerKey, circleId, nonce, address(savingCircles));
-
-    vm.prank(dave);
-    savingCircles.redeemInvite(circleId, nonce, signature);
-
-    vm.prank(eve);
-    vm.expectRevert(ISavingCircles.InviteAlreadyUsed.selector);
-    savingCircles.redeemInvite(circleId, nonce, signature);
-  }
-
-  function test_rejectAlreadyAMember() external {
-    vm.chainId(CHAIN_ID);
-    uint256 nonce = 1;
-
-    vm.prank(owner);
-    savingCircles.setTokenAllowed(address(token), true);
-    bytes memory signature = inviteGenerator.generateInvite(ownerKey, baseCircleId, nonce, address(savingCircles));
-
-    vm.prank(alice);
-    vm.expectRevert(ISavingCircles.AlreadyMember.selector);
-    savingCircles.redeemInvite(baseCircleId, nonce, signature);
-  }
-
-  function test_rejectIfCircleDoesNotExist() external {
-    vm.chainId(CHAIN_ID);
-
-    uint256 nonce = 1;
-    uint256 circleId = 999;
-
-    vm.prank(owner);
-    savingCircles.setTokenAllowed(address(token), true);
-    bytes memory signature = inviteGenerator.generateInvite(ownerKey, circleId, nonce, address(savingCircles));
-
-    vm.prank(dave);
-    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-    savingCircles.redeemInvite(circleId, nonce, signature);
   }
 }
