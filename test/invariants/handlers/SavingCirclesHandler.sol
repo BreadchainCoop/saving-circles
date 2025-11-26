@@ -72,8 +72,10 @@ contract SavingCirclesHandler is Test {
     });
 
     try savingCircles.create(circle) returns (uint256 circleId) {
-      activeCircles.push(circleId);
-      isActive[circleId] = true;
+      try savingCircles.start(circleId) {
+        activeCircles.push(circleId);
+        isActive[circleId] = true;
+      } catch {}
     } catch {}
   }
 
