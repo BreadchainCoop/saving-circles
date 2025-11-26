@@ -80,6 +80,8 @@ contract SavingCirclesViewerUnit is Test {
     // Create an initial test circle
     vm.prank(alice);
     baseCircleId = savingCircles.create(baseCircle);
+    vm.prank(owner);
+    savingCircles.start(baseCircleId);
   }
 
   /**
@@ -91,6 +93,8 @@ contract SavingCirclesViewerUnit is Test {
     secondCircle.owner = bob;
     vm.prank(bob);
     uint256 secondCircleId = savingCircles.create(secondCircle);
+    vm.prank(bob);
+    savingCircles.start(secondCircleId);
 
     // Prepare deposits: full amount in first circle, half in second
     uint256 firstDeposit = DEPOSIT_AMOUNT;
@@ -127,6 +131,8 @@ contract SavingCirclesViewerUnit is Test {
     secondCircle.owner = bob;
     vm.prank(bob);
     uint256 secondCircleId = savingCircles.create(secondCircle);
+    vm.prank(bob);
+    savingCircles.start(secondCircleId);
 
     // Make deposits in both circles
     token.mint(alice, DEPOSIT_AMOUNT * 2);
@@ -253,6 +259,8 @@ contract SavingCirclesViewerUnit is Test {
     secondCircle.depositAmount = DEPOSIT_AMOUNT * 2;
     vm.prank(bob);
     uint256 secondCircleId = savingCircles.create(secondCircle);
+    vm.prank(bob);
+    savingCircles.start(secondCircleId);
 
     // Make deposits
     token.mint(alice, DEPOSIT_AMOUNT * 3);

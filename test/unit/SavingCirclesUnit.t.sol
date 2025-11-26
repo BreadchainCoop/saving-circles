@@ -106,6 +106,11 @@ contract SavingCirclesUnit is Test {
     return _id;
   }
 
+  function _createUnstartedCircle() internal returns (uint256) {
+    vm.prank(owner);
+    return savingCircles.create(baseCircle);
+  }
+
   function test_SetTokenAllowedWhenCallerIsNotOwner() external {
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
@@ -888,12 +893,13 @@ contract SavingCirclesUnit is Test {
 
     vm.prank(owner);
     savingCircles.setTokenAllowed(address(token), true);
-    bytes memory signature = inviteGenerator.generateInvite(ownerKey, baseCircleId, nonce, address(savingCircles));
+    uint256 circleId = _createUnstartedCircle();
+    bytes memory signature = inviteGenerator.generateInvite(ownerKey, circleId, nonce, address(savingCircles));
 
     vm.prank(dave);
     vm.expectEmit(true, true, false, true, address(savingCircles));
-    emit ISavingCircles.InviteRedeemed(baseCircleId, dave);
-    savingCircles.redeemInvite(baseCircleId, nonce, signature);
+    emit ISavingCircles.InviteRedeemed(circleId, dave);
+    savingCircles.redeemInvite(circleId, nonce, signature);
   }
 
   function test_rejectInvalidSigner() external {
@@ -902,11 +908,12 @@ contract SavingCirclesUnit is Test {
     savingCircles.setTokenAllowed(address(token), true);
     uint256 nonce = 1;
 
-    bytes memory signature = inviteGenerator.generateInvite(impostorKey, baseCircleId, nonce, address(savingCircles));
+    uint256 circleId = _createUnstartedCircle();
+    bytes memory signature = inviteGenerator.generateInvite(impostorKey, circleId, nonce, address(savingCircles));
 
     vm.prank(dave);
     vm.expectRevert(ISavingCircles.InvalidSigner.selector);
-    savingCircles.redeemInvite(baseCircleId, nonce, signature);
+    savingCircles.redeemInvite(circleId, nonce, signature);
   }
 
   function test_rejectAlreadyUsedInvite() external {
@@ -915,14 +922,15 @@ contract SavingCirclesUnit is Test {
 
     vm.prank(owner);
     savingCircles.setTokenAllowed(address(token), true);
-    bytes memory signature = inviteGenerator.generateInvite(ownerKey, baseCircleId, nonce, address(savingCircles));
+    uint256 circleId = _createUnstartedCircle();
+    bytes memory signature = inviteGenerator.generateInvite(ownerKey, circleId, nonce, address(savingCircles));
 
     vm.prank(dave);
-    savingCircles.redeemInvite(baseCircleId, nonce, signature);
+    savingCircles.redeemInvite(circleId, nonce, signature);
 
     vm.prank(eve);
     vm.expectRevert(ISavingCircles.InviteAlreadyUsed.selector);
-    savingCircles.redeemInvite(baseCircleId, nonce, signature);
+    savingCircles.redeemInvite(circleId, nonce, signature);
   }
 
   function test_rejectAlreadyAMember() external {

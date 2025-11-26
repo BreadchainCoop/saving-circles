@@ -68,6 +68,8 @@ contract DelegatedSavingCirclesUnit is Test {
 
     vm.prank(owner);
     baseCircleId = savingCircles.create(baseCircle);
+    vm.prank(owner);
+    savingCircles.start(baseCircleId);
   }
 
   function test_SetDelegatedDepositsEnabled() external {
