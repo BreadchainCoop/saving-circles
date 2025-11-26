@@ -59,6 +59,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
 
     vm.prank(members[0]);
     uint256 circleId = savingCircles.create(circle);
+    if (block.timestamp < startTime) vm.warp(startTime);
+    vm.prank(members[0]);
+    savingCircles.start(circleId);
 
     uint256[] memory memberWithdrawals = new uint256[](_memberCount);
     uint256 totalExpectedPayout = _depositAmount * _memberCount;
@@ -146,6 +149,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
 
       vm.prank(members[0]);
       circleIds[c] = savingCircles.create(circle);
+      if (block.timestamp < startTimes[c]) vm.warp(startTimes[c]);
+      vm.prank(members[0]);
+      savingCircles.start(circleIds[c]);
     }
 
     // Process first round for all circles
@@ -209,7 +215,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
 
     vm.prank(members[0]);
     uint256 circleId = savingCircles.create(circle);
-
+    if (block.timestamp < startTime) vm.warp(startTime);
+    vm.prank(members[0]);
+    savingCircles.start(circleId);
     vm.warp(startTime);
 
     // Complete some rounds
@@ -308,13 +316,17 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
 
       vm.prank(members[0]);
       uint256 circleId = savingCircles.create(circle);
-
-      vm.warp(startTime);
+      if (block.timestamp < startTime) vm.warp(startTime);
+      vm.prank(members[0]);
+      savingCircles.start(circleId);
+      ISavingCircles.Circle memory liveCircle = savingCircles.getCircle(circleId);
+      vm.warp(liveCircle.circleStart);
 
       uint256[] memory payouts = new uint256[](_memberCount);
 
       // Complete full circle
       for (uint256 round = 0; round < _memberCount; round++) {
+        vm.warp(liveCircle.circleStart + (liveCircle.depositInterval * round));
         for (uint256 i = 0; i < _memberCount; i++) {
           token.mint(members[i], circleDepositAmount);
           vm.startPrank(members[i]);
@@ -323,7 +335,7 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
           vm.stopPrank();
         }
 
-        vm.warp(startTime + (_depositInterval * (round + 1)));
+        vm.warp(liveCircle.circleStart + (liveCircle.depositInterval * (round + 1)));
 
         ISavingCircles.Circle memory currentCircle = savingCircles.getCircle(circleId);
         address recipient = currentCircle.members[currentCircle.currentIndex];
@@ -367,7 +379,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
 
     vm.prank(members[0]);
     uint256 circleId = savingCircles.create(circle);
-
+    if (block.timestamp < startTime) vm.warp(startTime);
+    vm.prank(members[0]);
+    savingCircles.start(circleId);
     vm.warp(startTime);
 
     // Complete one full round where all members deposit and withdraw once
@@ -446,7 +460,11 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
     });
 
     vm.prank(members[0]);
-    return savingCircles.create(circle);
+    uint256 circleId = savingCircles.create(circle);
+    if (block.timestamp < startTime) vm.warp(startTime);
+    vm.prank(members[0]);
+    savingCircles.start(circleId);
+    return circleId;
   }
 
   // ============ Complex Multi-Round Edge Cases ============
@@ -477,7 +495,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
 
     vm.prank(members[0]);
     uint256 circleId = savingCircles.create(circle);
-
+    if (block.timestamp < startTime) vm.warp(startTime);
+    vm.prank(members[0]);
+    savingCircles.start(circleId);
     vm.warp(startTime);
 
     // First round with missed deposits
@@ -542,7 +562,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
 
     vm.prank(members[0]);
     uint256 circleId = savingCircles.create(circle);
-
+    if (block.timestamp < startTime) vm.warp(startTime);
+    vm.prank(members[0]);
+    savingCircles.start(circleId);
     vm.warp(startTime);
 
     // Track who withdraws in each round

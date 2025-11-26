@@ -44,7 +44,6 @@ contract SavingCirclesFuzzTest is Test {
     _depositAmount = bound(_depositAmount, 1, _MAX_REASONABLE_DEPOSIT);
     _depositInterval = bound(_depositInterval, _MIN_DEPOSIT_INTERVAL, _MAX_REASONABLE_INTERVAL);
     _maxDeposits = bound(_maxDeposits, 1, 100);
-    _circleStart = bound(_circleStart, block.timestamp + 1, block.timestamp + 365 days);
     _memberCount = uint8(bound(_memberCount, 2, 10));
 
     address[] memory members = new address[](_memberCount);
@@ -58,19 +57,21 @@ contract SavingCirclesFuzzTest is Test {
       token: address(token),
       depositAmount: _depositAmount,
       depositInterval: _depositInterval,
-      circleStart: _circleStart,
+      circleStart: block.timestamp,
       circleEnd: 0,
       currentIndex: 0
     });
 
     vm.prank(alice);
     uint256 circleId = savingCircles.create(circle);
+    vm.prank(alice);
+    savingCircles.start(circleId);
 
     ISavingCircles.Circle memory retrievedCircle = savingCircles.getCircle(circleId);
     assertEq(retrievedCircle.owner, alice);
     assertEq(retrievedCircle.depositAmount, _depositAmount);
     assertEq(retrievedCircle.depositInterval, _depositInterval);
-    assertEq(retrievedCircle.circleStart, _circleStart);
+    assertEq(retrievedCircle.circleStart, block.timestamp);
     assertEq(retrievedCircle.members.length, _memberCount);
   }
 
@@ -95,6 +96,8 @@ contract SavingCirclesFuzzTest is Test {
 
     vm.prank(alice);
     uint256 circleId = savingCircles.create(circle);
+    vm.prank(alice);
+    savingCircles.start(circleId);
 
     token.mint(alice, _totalDeposit);
     vm.startPrank(alice);
@@ -145,6 +148,8 @@ contract SavingCirclesFuzzTest is Test {
 
     vm.prank(alice);
     uint256 circleId = savingCircles.create(circle);
+    vm.prank(alice);
+    savingCircles.start(circleId);
 
     for (uint256 i = 0; i < _memberCount; i++) {
       token.mint(members[i], _depositAmount);
@@ -201,6 +206,8 @@ contract SavingCirclesFuzzTest is Test {
 
     vm.prank(alice);
     uint256 circleId = savingCircles.create(circle);
+    vm.prank(alice);
+    savingCircles.start(circleId);
 
     for (uint256 i = 0; i < _completeMembers; i++) {
       token.mint(members[i], _depositAmount);
@@ -300,24 +307,26 @@ contract SavingCirclesFuzzTest is Test {
 
     vm.prank(alice);
     uint256 circleId = savingCircles.create(circle);
+    vm.prank(alice);
+    savingCircles.start(circleId);
 
     token.mint(alice, depositAmount);
     vm.startPrank(alice);
     token.approve(address(savingCircles), depositAmount);
 
-    if (block.timestamp < circleStart && _timeOffset < circleStart - block.timestamp) {
-      vm.expectRevert(ISavingCircles.DepositBeforeCircleStart.selector);
+    uint256 startTime = savingCircles.getCircle(circleId).circleStart;
+    vm.warp(startTime + _timeOffset);
+
+    uint256 maxDuration = _depositInterval * circle.members.length;
+    if (_timeOffset >= maxDuration) {
+      vm.expectRevert(ISavingCircles.CircleExpired.selector);
+      savingCircles.deposit(circleId, depositAmount);
+    } else if (_timeOffset >= _depositInterval) {
+      vm.expectRevert(ISavingCircles.DepositWindowClosed.selector);
       savingCircles.deposit(circleId, depositAmount);
     } else {
-      vm.warp(block.timestamp + _timeOffset);
-
-      if (block.timestamp >= circleStart + _depositInterval) {
-        vm.expectRevert(ISavingCircles.DepositWindowClosed.selector);
-        savingCircles.deposit(circleId, depositAmount);
-      } else if (block.timestamp >= circleStart) {
-        savingCircles.deposit(circleId, depositAmount);
-        assertEq(savingCircles.balances(circleId, alice), depositAmount);
-      }
+      savingCircles.deposit(circleId, depositAmount);
+      assertEq(savingCircles.balances(circleId, alice), depositAmount);
     }
 
     vm.stopPrank();
@@ -356,6 +365,9 @@ contract SavingCirclesFuzzTest is Test {
 
     vm.prank(members[0]);
     uint256 circleId = savingCircles.create(circle);
+    if (block.timestamp < circle.circleStart) vm.warp(circle.circleStart);
+    vm.prank(members[0]);
+    savingCircles.start(circleId);
 
     vm.warp(circle.circleStart);
 
@@ -389,7 +401,7 @@ contract SavingCirclesFuzzTest is Test {
     }
 
     uint256 depositInterval = 1 days;
-    uint256 startTime = block.timestamp + 1 hours;
+    uint256 startTime = block.timestamp;
 
     ISavingCircles.Circle memory circle = ISavingCircles.Circle({
       owner: members[0],
@@ -404,9 +416,11 @@ contract SavingCirclesFuzzTest is Test {
 
     vm.prank(members[0]);
     uint256 circleId = savingCircles.create(circle);
+    vm.prank(members[0]);
+    savingCircles.start(circleId);
 
     // Warp to near the end of deposit window
-    uint256 nearWindowClose = startTime + depositInterval - _timeDelta;
+    uint256 nearWindowClose = startTime + depositInterval - _timeDelta - 1 hours;
     vm.warp(nearWindowClose);
 
     // Try to deposit for all members rapidly
