@@ -57,6 +57,8 @@ contract IntegrationBase is Common, Test {
 
     vm.prank(alice);
     baseCircleId = circle.create(baseCircle);
+    vm.prank(alice);
+    circle.start(baseCircleId);
   }
 
   function _setUpAccounts() internal {

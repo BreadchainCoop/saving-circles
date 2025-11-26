@@ -350,9 +350,13 @@ contract SavingCirclesIntegration is IntegrationBase {
     // Create circles
     vm.prank(alice);
     uint256 circleId1 = circle.create(circle1);
+    vm.prank(alice);
+    circle.start(circleId1);
 
     vm.prank(bob);
     uint256 circleId2 = circle.create(circle2);
+    vm.prank(bob);
+    circle.start(circleId2);
 
     // Verify members are in correct circles
     assertTrue(circle.isMember(circleId1, alice));
@@ -431,6 +435,8 @@ contract SavingCirclesIntegration is IntegrationBase {
     // Create the circle
     vm.prank(largeGroup[0]);
     uint256 circleId = circle.create(largeCircle);
+    vm.prank(largeGroup[0]);
+    circle.start(circleId);
 
     // Verify circle was created
     ISavingCircles.Circle memory created = circle.getCircle(circleId);
