@@ -204,7 +204,7 @@ contract SavingCirclesUnit is Test {
     savingCircles.isWithdrawable(nonExistentCircleId);
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotActive.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
     savingCircles.withdraw(nonExistentCircleId);
   }
 
