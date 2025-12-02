@@ -68,10 +68,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (_circle.depositAmount == 0) revert InvalidDepositAmount();
     if (_circle.currentIndex != 0) revert InvalidCurrentIndex();
     if (_circle.owner == address(0)) revert InvalidOwner();
-    if (_circle.members.length > 0) {
-      uint256 maxDelta = type(uint256).max - _circle.circleStart;
-      if (_circle.depositInterval > maxDelta / _circle.members.length) revert InvalidDepositInterval();
-    }
 
     circles[_id] = _circle;
     for (uint256 i = 0; i < _circle.members.length; i++) {
@@ -82,9 +78,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
       isMember[_id][member] = true;
       memberCircles[member].push(_id);
     }
-    isMember[_id][_circle.owner] = true;
-    memberCircles[_circle.owner].push(_id);
-
     emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
 
     return _id;
@@ -94,7 +87,25 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     Circle storage _circle = circles[_id];
     if (isActive[_id]) revert AlreadyActive();
     if (msg.sender != _circle.owner) revert NotOwner();
-    if (_circle.members.length < MINIMUM_MEMBERS) revert InvalidMemberCount();
+    uint256 membersCount = 0;
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      if (_circle.members[i] != address(0)) {
+        membersCount++;
+      }
+    }
+    if (membersCount < MINIMUM_MEMBERS) revert InvalidMemberCount();
+
+    address[] memory members = new address[](membersCount);
+    uint256 memberIndex = 0;
+    for (uint256 i = 0; i < _circle.members.length; i++) {
+      address member = _circle.members[i];
+      if (member == address(0)) {
+        continue;
+      }
+      members[memberIndex] = member;
+      memberIndex++;
+    }
+    circles[_id].members = members;
 
     _circle.circleStart = block.timestamp;
     uint256 len = _circle.members.length;

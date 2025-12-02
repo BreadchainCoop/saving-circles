@@ -261,23 +261,32 @@ contract SavingCirclesFuzzTest is Test {
 
     vm.startPrank(alice);
 
-    bool intervalWouldOverflow =
-      (_depositInterval != 0) && (_depositInterval > (type(uint256).max - circle.circleStart) / members.length);
-
-    bool amountInvalid = _depositAmount == 0;
-    bool intervalInvalid = _depositInterval == 0 || intervalWouldOverflow;
-
-    if (amountInvalid || intervalInvalid) {
-      // The contract checks in order: depositAmount, then depositInterval
-      if (amountInvalid) {
-        vm.expectRevert(ISavingCircles.InvalidDepositAmount.selector);
-      } else {
-        vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
-      }
+    if (_depositAmount == 0) {
+      vm.expectRevert(ISavingCircles.InvalidDepositAmount.selector);
       savingCircles.create(circle);
+      vm.stopPrank();
+      return;
+    }
+
+    if (_depositInterval == 0) {
+      vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
+      savingCircles.create(circle);
+      vm.stopPrank();
+      return;
+    }
+
+    uint256 circleId = savingCircles.create(circle);
+    assertGe(circleId, 0);
+
+    // start() resets circleStart to the current block timestamp, so check overflow against it
+    uint256 startTime = block.timestamp;
+    bool intervalWouldOverflow = _depositInterval > (type(uint256).max - startTime) / members.length;
+
+    if (intervalWouldOverflow) {
+      vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
+      savingCircles.start(circleId);
     } else {
-      uint256 circleId = savingCircles.create(circle);
-      assertGe(circleId, 0);
+      savingCircles.start(circleId);
     }
 
     vm.stopPrank();
