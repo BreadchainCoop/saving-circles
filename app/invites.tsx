@@ -4,8 +4,10 @@ import type { TypedDataDomain, TypedDataField } from 'ethers';
 import { BrowserProvider, Contract } from 'ethers';
 
 const PRIVY_APP_ID = (import.meta as any).env?.VITE_PRIVY_APP_ID ?? 'privy-app-id';
-const DEFAULT_SAVING_CIRCLES_ADDRESS =
-  (import.meta as any).env?.VITE_SAVING_CIRCLES_ADDRESS ?? '0x0000000000000000000000000000000000000000';
+const APP_SAVING_CIRCLES_ADDRESS =
+  (import.meta as any).env?.VITE_APP_SAVING_CIRCLES_ADDRESS ??
+  (import.meta as any).env?.VITE_SAVING_CIRCLES_ADDRESS ??
+  '0x0000000000000000000000000000000000000000';
 
 export const INVITE_TYPEHASH = '0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3';
 export const INVITE_DOMAIN_NAME = 'StacksInvite';
@@ -15,7 +17,8 @@ const savingCirclesAbi = [
   'function usedNonces(uint256 id, uint256 nonce) view returns (bool)',
   'function redeemInvite(uint256 id, uint256 nonce, bytes signature)',
   'function isMember(uint256 id, address member) view returns (bool)',
-  'function owner() view returns (address)'
+  'function owner() view returns (address)',
+  'function getCircle(uint256 id) view returns (address owner, address[] members, uint256 currentIndex, uint256 depositAmount, address token, uint256 depositInterval, uint256 circleStart, uint256 circleEnd)'
 ] as const;
 
 type InviteTypes = { Invite: TypedDataField[] };
@@ -168,12 +171,17 @@ function inviteStatusLabel(invite: InviteLink) {
   return 'checking...';
 }
 
+function initialCircleId() {
+  if (typeof window === 'undefined') return '';
+  const params = new URLSearchParams(window.location.search);
+  return params.get('circleId') ?? '';
+}
+
 function SavingCircleInvitesContent() {
   const { ready: privyReady, authenticated, user, login, logout } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
 
-  const [contractAddress, setContractAddress] = useState(DEFAULT_SAVING_CIRCLES_ADDRESS);
-  const [circleId, setCircleId] = useState('');
+  const [circleId] = useState(initialCircleId());
   const [inviteCount, setInviteCount] = useState(3);
   const [status, setStatus] = useState('');
   const [invites, setInvites] = useState<InviteLink[]>([]);
@@ -181,6 +189,8 @@ function SavingCircleInvitesContent() {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemNonce, setRedeemNonce] = useState('');
   const [redeemSignature, setRedeemSignature] = useState('');
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+  const [signingProgress, setSigningProgress] = useState('');
 
   const activeWallet = useMemo(() => wallets.find((w) => w.walletClientType === 'privy') ?? wallets[0], [wallets]);
   const parsedCircleId = useMemo(() => {
@@ -207,45 +217,71 @@ function SavingCircleInvitesContent() {
       return;
     }
     if (!parsedCircleId) {
-      setStatus('Circle id must be a number.');
+      setStatus('Circle id is required in the URL (?circleId=...).');
       return;
     }
-    if (!contractAddress) {
+    if (!APP_SAVING_CIRCLES_ADDRESS) {
       setStatus('SavingCircles contract address is required.');
       return;
     }
     const invitesToCreate = Number.isFinite(inviteCount) && inviteCount > 0 ? inviteCount : 1;
 
     setIsGenerating(true);
+    setSigningProgress('');
     try {
       const signer = await getSignerFromPrivyWallet(activeWallet);
       const network = await signer.provider?.getNetwork();
       const chainId = network?.chainId ?? 0n;
-      const contract = new Contract(contractAddress, savingCirclesAbi, signer);
+      const contract = new Contract(APP_SAVING_CIRCLES_ADDRESS, savingCirclesAbi, signer);
+
+      const circle = await contract.getCircle(parsedCircleId);
+      const circleOwner: string | undefined = (circle as any)?.owner ?? circle?.[0];
+      const signerAddress = (await signer.getAddress()).toLowerCase();
+      if (!circleOwner) {
+        setStatus('Circle not found on SavingCircles.');
+        setIsOwner(false);
+        return;
+      }
+      if (circleOwner.toLowerCase() !== signerAddress) {
+        setStatus('You are not the owner of this circle, so you cannot issue invites.');
+        setIsOwner(false);
+        return;
+      }
+      setIsOwner(true);
+
       const baseUrl =
         typeof window === 'undefined' ? 'https://savingcircles.local/invite' : `${window.location.origin}/invite`;
 
-      const generated: InviteLink[] = [];
+      const invitePayloads: { nonce: bigint; typedData: InviteTypedData }[] = [];
       let candidate = BigInt(Date.now());
-      while (generated.length < invitesToCreate) {
+      while (invitePayloads.length < invitesToCreate) {
         const alreadyUsed = await contract.usedNonces(parsedCircleId, candidate);
         if (!alreadyUsed) {
-          const typedData = buildInviteTypedData(parsedCircleId, candidate, chainId, contractAddress);
-          const signature = await signInvite(signer, typedData);
-          const url = buildInviteUrl(baseUrl, contractAddress, parsedCircleId, candidate, signature);
-          generated.push({ nonce: candidate, signature, url, used: false });
+          const typedData = buildInviteTypedData(parsedCircleId, candidate, chainId, APP_SAVING_CIRCLES_ADDRESS);
+          invitePayloads.push({ nonce: candidate, typedData });
         }
         candidate += 1n;
       }
 
-      setStatus(`Created ${generated.length} invite${generated.length === 1 ? '' : 's'}.`);
-      setInvites(await refreshInviteStatuses(contract, parsedCircleId, generated));
+      const signedInvites: InviteLink[] = [];
+      for (let i = 0; i < invitePayloads.length; i++) {
+        setSigningProgress(`Signing invite ${i + 1} of ${invitePayloads.length}...`);
+        const { nonce, typedData } = invitePayloads[i];
+        const signature = await signInvite(signer, typedData);
+        const url = buildInviteUrl(baseUrl, APP_SAVING_CIRCLES_ADDRESS, parsedCircleId, nonce, signature);
+        signedInvites.push({ nonce, signature, url, used: false });
+      }
+
+      setSigningProgress('');
+      setStatus(`Created ${signedInvites.length} invite${signedInvites.length === 1 ? '' : 's'}.`);
+      setInvites(await refreshInviteStatuses(contract, parsedCircleId, signedInvites));
     } catch (error) {
+      setSigningProgress('');
       setStatus(`Invite creation failed: ${formatError(error)}`);
     } finally {
       setIsGenerating(false);
     }
-  }, [activeWallet, authenticated, contractAddress, inviteCount, login, parsedCircleId, ready]);
+  }, [activeWallet, authenticated, inviteCount, login, parsedCircleId, ready]);
 
   const redeemInvite = useCallback(async () => {
     if (!authenticated) {
@@ -264,7 +300,7 @@ function SavingCircleInvitesContent() {
       setStatus('Circle id must be a number.');
       return;
     }
-    if (!contractAddress) {
+    if (!APP_SAVING_CIRCLES_ADDRESS) {
       setStatus('SavingCircles contract address is required.');
       return;
     }
@@ -283,7 +319,7 @@ function SavingCircleInvitesContent() {
     setIsRedeeming(true);
     try {
       const signer = await getSignerFromPrivyWallet(activeWallet);
-      const contract = new Contract(contractAddress, savingCirclesAbi, signer);
+      const contract = new Contract(APP_SAVING_CIRCLES_ADDRESS, savingCirclesAbi, signer);
       const tx = await contract.redeemInvite(parsedCircleId, nonce, redeemSignature.trim());
       await tx.wait?.();
       setStatus(`Redeemed invite ${nonce.toString()} for circle ${parsedCircleId.toString()}.`);
@@ -295,19 +331,19 @@ function SavingCircleInvitesContent() {
     } finally {
       setIsRedeeming(false);
     }
-  }, [activeWallet, authenticated, contractAddress, login, parsedCircleId, ready, redeemNonce, redeemSignature]);
+  }, [activeWallet, authenticated, login, parsedCircleId, ready, redeemNonce, redeemSignature]);
 
   const refreshStatuses = useCallback(async () => {
-    if (!activeWallet || !parsedCircleId || invites.length === 0 || !contractAddress) return;
+    if (!activeWallet || !parsedCircleId || invites.length === 0 || !APP_SAVING_CIRCLES_ADDRESS) return;
     try {
       const signer = await getSignerFromPrivyWallet(activeWallet);
-      const contract = new Contract(contractAddress, savingCirclesAbi, signer);
+      const contract = new Contract(APP_SAVING_CIRCLES_ADDRESS, savingCirclesAbi, signer);
       setInvites(await refreshInviteStatuses(contract, parsedCircleId, invites));
       setStatus('Invite statuses refreshed from SavingCircles.');
     } catch (error) {
       setStatus(`Refresh failed: ${formatError(error)}`);
     }
-  }, [activeWallet, contractAddress, invites, parsedCircleId]);
+  }, [activeWallet, invites, parsedCircleId]);
 
   return (
     <div
@@ -345,21 +381,37 @@ function SavingCircleInvitesContent() {
       </header>
 
       <section style={{ marginBottom: 18 }}>
-        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-          SavingCircles contract address
-        </label>
-        <input
-          value={contractAddress}
-          onChange={(event) => setContractAddress(event.target.value)}
-          placeholder="0x..."
+        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>Circle & contract</label>
+        <div
           style={{
-            width: '100%',
             padding: '10px 12px',
             borderRadius: 10,
             border: '1px solid #cbd5e1',
-            fontSize: 14
+            background: '#fff',
+            display: 'grid',
+            gap: 6
           }}
-        />
+        >
+          <div style={{ fontSize: 13 }}>
+            <strong>Circle ID:</strong> {circleId || 'not provided (add ?circleId=...)'}
+          </div>
+          <div style={{ fontSize: 13, wordBreak: 'break-all' }}>
+            <strong>SavingCircles:</strong> {APP_SAVING_CIRCLES_ADDRESS}
+          </div>
+          {isOwner === false && (
+            <div
+              style={{
+                background: '#fee2e2',
+                color: '#991b1b',
+                padding: '6px 8px',
+                borderRadius: 8,
+                fontSize: 12
+              }}
+            >
+              You are not the owner of this circle. Only the owner can create invites.
+            </div>
+          )}
+        </div>
       </section>
 
       <section
@@ -370,21 +422,6 @@ function SavingCircleInvitesContent() {
           marginBottom: 18
         }}
       >
-        <div>
-          <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>Circle id</label>
-          <input
-            value={circleId}
-            onChange={(event) => setCircleId(event.target.value)}
-            placeholder="e.g. 0"
-            style={{
-              width: '100%',
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: '1px solid #cbd5e1',
-              fontSize: 14
-            }}
-          />
-        </div>
         <div>
           <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>Number of invites</label>
           <input
@@ -540,7 +577,7 @@ function SavingCircleInvitesContent() {
         )}
       </section>
 
-      {status && (
+      {(status || signingProgress) && (
         <div
           style={{
             marginTop: 12,
@@ -550,7 +587,7 @@ function SavingCircleInvitesContent() {
             color: '#0f172a'
           }}
         >
-          {status}
+          {signingProgress || status}
         </div>
       )}
       <footer style={{ marginTop: 10, color: '#475569', fontSize: 12 }}>
