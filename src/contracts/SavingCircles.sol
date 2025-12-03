@@ -276,13 +276,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
   /**
    * @dev Make a withdrawal from a specified circle
+   *      Permissionless: anyone can trigger the payout for the member whose turn it is to withdraw
    *      A withdrawal must be made by a member of the circle, even if it is for another member.
    */
   function _withdraw(uint256 _id, address _member) internal onlyMember(_id, msg.sender) {
     Circle storage _circle = circles[_id];
 
     if (!_withdrawable(_id)) revert NotWithdrawable();
-    if (_circle.members[_circle.currentIndex] != _member) revert NotWithdrawable();
     if (_circle.currentIndex >= _circle.members.length) revert NotWithdrawable();
 
     uint256 _withdrawAmount = _circle.depositAmount * (_circle.members.length);
@@ -291,9 +291,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
       balances[_id][_circle.members[i]] = 0;
     }
 
-    _circle.currentIndex = (_circle.currentIndex + 1) % _circle.members.length;
-    bool success = IERC20(_circle.token).transfer(_member, _withdrawAmount);
+    bool success = IERC20(_circle.token).transfer(_circle.members[_circle.currentIndex], _withdrawAmount);
     if (!success) revert TransferFailed();
+    _circle.currentIndex = (_circle.currentIndex + 1) % _circle.members.length;
 
     emit FundsWithdrawn(_id, _member, _withdrawAmount);
   }
