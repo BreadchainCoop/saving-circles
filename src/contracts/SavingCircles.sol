@@ -69,7 +69,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (_circle.currentIndex != 0) revert InvalidCurrentIndex();
     if (_circle.owner == address(0)) revert InvalidOwner();
 
-    circles[_id] = _circle;
     for (uint256 i = 0; i < _circle.members.length; i++) {
       address member = _circle.members[i];
       if (member == address(0)) revert InvalidMemberAddress();
@@ -78,6 +77,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
       isMember[_id][member] = true;
       memberCircles[member].push(_id);
     }
+    circles[_id] = _circle;
     emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
 
     return _id;
