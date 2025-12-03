@@ -87,23 +87,22 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     Circle storage _circle = circles[_id];
     if (isActive[_id]) revert AlreadyActive();
     if (msg.sender != _circle.owner) revert NotOwner();
+    // Single pass: count and collect non-null members
+    address[] memory tempMembers = new address[](_circle.members.length);
     uint256 membersCount = 0;
     for (uint256 i = 0; i < _circle.members.length; i++) {
-      if (_circle.members[i] != address(0)) {
+      address member = _circle.members[i];
+      if (member != address(0)) {
+        tempMembers[membersCount] = member;
         membersCount++;
       }
     }
     if (membersCount < MINIMUM_MEMBERS) revert InvalidMemberCount();
 
+    // Copy to correctly sized array
     address[] memory members = new address[](membersCount);
-    uint256 memberIndex = 0;
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      address member = _circle.members[i];
-      if (member == address(0)) {
-        continue;
-      }
-      members[memberIndex] = member;
-      memberIndex++;
+    for (uint256 i = 0; i < membersCount; i++) {
+      members[i] = tempMembers[i];
     }
     circles[_id].members = members;
 
