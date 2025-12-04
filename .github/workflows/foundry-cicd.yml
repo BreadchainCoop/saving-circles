@@ -2,11 +2,6 @@ name: Foundry CI & Deploy
 
 on:
   pull_request:
-    paths:
-      - 'src/**'
-      - 'script/**'
-      - 'test/**'
-      - '.github/**'
   push:
     branches:
       - main
@@ -19,33 +14,10 @@ jobs:
       check-formatting: true
       test-verbosity: 'vvv'
 
-      # --- Upgrade safety options ---
-      # Start with false; we can enable once we have baseline snapshots & validation script
-      run-upgrade-safety: false
-      baseline-path: 'test/upgrades/baseline'
-      validation-script: 'script/upgrades/ValidateUpgrade.s.sol'
-
-      # --- Deploy options ---
       # Deploy to testnet on PRs
-      deploy-on-pr: false # will enable later when secrets are configured
+      deploy-on-pr: false 
 
       # Start with false for mainnet until we're ready
       deploy-on-main: false
 
-      # Deploy script is Deploy.sol
-      deploy-script: 'script/Deploy.sol:Deploy'
-
-      # Use the network config from this repository path
-      network-config-path: '.github/deploy-networks.json'
-
-      # Time for Blockscout to index before verification
-      indexing-wait: 60
-
-      # Snapshot/flattening config (for when mainnet deploys are enabled)
-      flatten-contracts: true
-      upgrades-path: 'test/upgrades'
-    secrets:
-      PRIVATE_KEY:   ${{ secrets.DEPLOYER_PRIVATE_KEY }}
-      RPC_URL:       ${{ secrets.SEPOLIA_RPC_URL }}
-      ADMIN_ADDRESS: ${{ secrets.ADMIN_ADDRESS }}
-      GH_TOKEN:      ${{ secrets.GH_TOKEN }}
+    secrets: inherit
