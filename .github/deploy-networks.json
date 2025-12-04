@@ -1,0 +1,18 @@
+{
+  "testnets": [
+    {
+      "name": "sepolia",
+      "chain_id": 11155111,
+      "blockscout_url": "https://eth-sepolia.blockscout.com",
+      "environment": "testnet"
+    }
+  ],
+  "mainnets": [
+    {
+      "name": "gnosis",
+      "chain_id": 100,
+      "blockscout_url": "https://gnosis.blockscout.com",
+      "environment": "production-gnosis"
+    }
+  ]
+}
