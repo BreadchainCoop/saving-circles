@@ -423,7 +423,123 @@ contract SavingCirclesUnit is Test {
     savingCircles.create(_invalidCircle);
   }
 
-  function test_startWhenMembersCountIsLessThanTwo() external {
+  function test_StartWhenCallerIsOwnerActivatesCircle() external {
+    uint256 circleId = _createUnstartedCircle();
+    uint256 startTime = block.timestamp + 1 hours;
+    vm.warp(startTime);
+
+    vm.startPrank(owner);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.CircleStarted(circleId);
+    savingCircles.start(circleId);
+    vm.stopPrank();
+
+    assertTrue(savingCircles.isActive(circleId));
+
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(circleId);
+    assertEq(circle.circleStart, startTime);
+    assertEq(circle.circleEnd, startTime + (circle.depositInterval * circle.members.length));
+  }
+
+  function test_StartWhenCallerIsNotOwner() external {
+    uint256 circleId = _createUnstartedCircle();
+
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotOwner.selector));
+    savingCircles.start(circleId);
+  }
+
+  function test_StartWhenCircleAlreadyActive() external {
+    uint256 circleId = _createUnstartedCircle();
+
+    vm.prank(owner);
+    savingCircles.start(circleId);
+
+    vm.prank(owner);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyActive.selector));
+    savingCircles.start(circleId);
+  }
+
+  function test_StartWithOnlyTwoMembers() external {
+    uint256 memberCount = 2;
+    uint256 arrayLength = 7;
+    address[] memory emptyMembers = new address[](arrayLength);
+    for (uint256 i = 0; i < memberCount; i++) {
+      emptyMembers[i] = makeAddr(string(abi.encodePacked('member', i)));
+    }
+    for (uint256 i = memberCount; i < arrayLength; i++) {
+      emptyMembers[i] = address(0);
+    }
+
+    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
+      owner: owner,
+      members: emptyMembers,
+      token: address(token),
+      depositAmount: DEPOSIT_AMOUNT,
+      depositInterval: DEPOSIT_INTERVAL,
+      circleStart: block.timestamp,
+      circleEnd: 0,
+      currentIndex: 0
+    });
+
+    vm.prank(owner);
+    uint256 circleId = savingCircles.create(circle);
+
+    vm.prank(owner);
+    savingCircles.start(circleId);
+
+    ISavingCircles.Circle memory created = savingCircles.getCircle(circleId);
+    assertEq(created.members.length, memberCount);
+    assertTrue(savingCircles.isActive(circleId));
+  }
+
+  function test_StartWhenCircleEndWouldOverflow() external {
+    address[] memory twoMembers = new address[](2);
+    twoMembers[0] = owner;
+    twoMembers[1] = alice;
+
+    uint256 startTime = block.timestamp + 1;
+    uint256 overflowingInterval = ((type(uint256).max - startTime) / twoMembers.length) + 1;
+
+    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
+      owner: owner,
+      members: twoMembers,
+      token: address(token),
+      depositAmount: DEPOSIT_AMOUNT,
+      depositInterval: overflowingInterval,
+      circleStart: 0,
+      circleEnd: 0,
+      currentIndex: 0
+    });
+
+    vm.prank(owner);
+    uint256 circleId = savingCircles.create(circle);
+
+    vm.warp(startTime);
+    vm.prank(owner);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidDepositInterval.selector));
+    savingCircles.start(circleId);
+  }
+
+  function test_StartUpdatesCircleStartTimestamp() external {
+    ISavingCircles.Circle memory circle = baseCircle;
+    circle.circleStart = block.timestamp + 10 days;
+
+    vm.prank(owner);
+    uint256 circleId = savingCircles.create(circle);
+
+    uint256 expectedStart = block.timestamp + 5 hours;
+    vm.warp(expectedStart);
+
+    vm.prank(owner);
+    savingCircles.start(circleId);
+
+    ISavingCircles.Circle memory started = savingCircles.getCircle(circleId);
+    assertEq(started.circleStart, expectedStart);
+    assertEq(started.circleEnd, expectedStart + (started.depositInterval * started.members.length));
+  }
+
+  function test_StartWhenMembersCountIsLessThanTwo() external {
     address[] memory _oneMember = new address[](1);
     _oneMember[0] = owner;
 
