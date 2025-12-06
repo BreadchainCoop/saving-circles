@@ -575,21 +575,6 @@ contract SavingCirclesUnit is Test {
     savingCircles.create(circle);
   }
 
-  function test_CreateWhenInvalidMemberAddress() external {
-    // Test creating circle with zero address member
-    address[] memory invalidMembers = new address[](3);
-    invalidMembers[0] = alice;
-    invalidMembers[1] = address(0); // Invalid member
-    invalidMembers[2] = bob;
-
-    ISavingCircles.Circle memory circle = baseCircle;
-    circle.members = invalidMembers;
-
-    vm.prank(alice);
-    vm.expectRevert(ISavingCircles.InvalidMemberAddress.selector);
-    savingCircles.create(circle);
-  }
-
   function test_DepositExceedsDepositAmount() external {
     // Test depositing more than allowed amount
     vm.warp(baseCircle.circleStart);

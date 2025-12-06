@@ -71,9 +71,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
     for (uint256 i = 0; i < _circle.members.length; i++) {
       address member = _circle.members[i];
-      if (member == address(0)) revert InvalidMemberAddress();
+      if (member == address(0)) continue;
       if (isMember[_id][member]) revert AlreadyMember();
-
       isMember[_id][member] = true;
       memberCircles[member].push(_id);
     }
@@ -87,7 +86,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     Circle storage _circle = circles[_id];
     if (isActive[_id]) revert AlreadyActive();
     if (msg.sender != _circle.owner) revert NotOwner();
-    // Single pass: count and collect non-null members
+
     address[] memory tempMembers = new address[](_circle.members.length);
     uint256 membersCount = 0;
     for (uint256 i = 0; i < _circle.members.length; i++) {
@@ -99,13 +98,12 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     }
     if (membersCount < MINIMUM_MEMBERS) revert InvalidMemberCount();
 
-    // Copy to correctly sized array
     address[] memory members = new address[](membersCount);
     for (uint256 i = 0; i < membersCount; i++) {
       members[i] = tempMembers[i];
     }
-    circles[_id].members = members;
 
+    circles[_id].members = members;
     _circle.circleStart = block.timestamp;
     uint256 len = _circle.members.length;
     uint256 maxDelta = type(uint256).max - _circle.circleStart;
