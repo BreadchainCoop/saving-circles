@@ -27,6 +27,10 @@ contract SavingCirclesUnit is Test {
   address public bob;
   address public carol;
   address public immutable STRANGER = makeAddr('stranger');
+  address internal ownerWithKey;
+  address internal nonOwnerSigner;
+  uint256 internal ownerPrivateKey;
+  uint256 internal nonOwnerPrivateKey;
 
   // Test data
   uint256 public baseCircleId;
@@ -39,6 +43,8 @@ contract SavingCirclesUnit is Test {
     bob = makeAddr('bob');
     carol = makeAddr('carol');
     owner = makeAddr('owner');
+    (ownerWithKey, ownerPrivateKey) = makeAddrAndKey('ownerWithKey');
+    (nonOwnerSigner, nonOwnerPrivateKey) = makeAddrAndKey('nonOwnerSigner');
 
     // Deploy and initialize the contract
     vm.startPrank(owner);
@@ -91,6 +97,44 @@ contract SavingCirclesUnit is Test {
   function _createUnstartedCircle() internal returns (uint256) {
     vm.prank(owner);
     return savingCircles.create(baseCircle);
+  }
+
+  function _createInviteCircle() internal returns (uint256) {
+    address[] memory inviteMembers = new address[](2);
+    inviteMembers[0] = ownerWithKey;
+    inviteMembers[1] = alice;
+
+    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
+      owner: ownerWithKey,
+      members: inviteMembers,
+      currentIndex: BASE_CURRENT_INDEX,
+      circleStart: block.timestamp,
+      circleEnd: 0,
+      token: address(token),
+      depositAmount: DEPOSIT_AMOUNT,
+      depositInterval: DEPOSIT_INTERVAL
+    });
+
+    vm.prank(ownerWithKey);
+    return savingCircles.create(circle);
+  }
+
+  function _signInvite(uint256 _circleId, uint256 _nonce, uint256 _signerKey) internal view returns (bytes memory) {
+    bytes32 inviteTypehash = 0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3;
+    bytes32 structHash = keccak256(abi.encode(inviteTypehash, _circleId, _nonce));
+    bytes32 eip712DomainTypehash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
+    bytes32 inviteDomainNameHash = 0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
+    bytes32 inviteDomainVersionHash = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
+
+    bytes32 domainSeparator = keccak256(
+      abi.encode(
+        eip712DomainTypehash, inviteDomainNameHash, inviteDomainVersionHash, block.chainid, address(savingCircles)
+      )
+    );
+
+    bytes32 digest = keccak256(abi.encodePacked('\x19\x01', domainSeparator, structHash));
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_signerKey, digest);
+    return abi.encodePacked(r, s, v);
   }
 
   function test_SetTokenAllowedWhenCallerIsNotOwner() external {
@@ -537,6 +581,89 @@ contract SavingCirclesUnit is Test {
     ISavingCircles.Circle memory started = savingCircles.getCircle(circleId);
     assertEq(started.circleStart, expectedStart);
     assertEq(started.circleEnd, expectedStart + (started.depositInterval * started.members.length));
+  }
+
+  function test_RedeemInviteWhenSignatureIsValid() external {
+    uint256 circleId = _createInviteCircle();
+    uint256 nonce = 1;
+    address invitee = STRANGER;
+    bytes memory signature = _signInvite(circleId, nonce, ownerPrivateKey);
+
+    vm.prank(invitee);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.InviteRedeemed(circleId, invitee);
+    savingCircles.redeemInvite(circleId, nonce, signature);
+
+    assertTrue(savingCircles.isMember(circleId, invitee));
+    uint256[] memory inviteeCircles = savingCircles.getMemberCircles(invitee);
+    assertEq(inviteeCircles.length, 1);
+    assertEq(inviteeCircles[0], circleId);
+    assertTrue(savingCircles.usedNonces(circleId, nonce));
+
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(circleId);
+    assertEq(circle.members[circle.members.length - 1], invitee);
+  }
+
+  function test_RedeemInviteRejectsInvalidSignature() external {
+    uint256 circleId = _createInviteCircle();
+    uint256 otherCircleId = _createInviteCircle();
+    uint256 nonce = 1;
+    bytes memory signatureForOtherCircle = _signInvite(otherCircleId, nonce, ownerPrivateKey);
+
+    vm.prank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidSigner.selector));
+    savingCircles.redeemInvite(circleId, nonce, signatureForOtherCircle);
+  }
+
+  function test_RedeemInvitePreventsNonceReplay() external {
+    uint256 circleId = _createInviteCircle();
+    uint256 nonce = 1;
+    bytes memory signature = _signInvite(circleId, nonce, ownerPrivateKey);
+
+    vm.prank(STRANGER);
+    savingCircles.redeemInvite(circleId, nonce, signature);
+
+    address anotherInvitee = makeAddr('anotherInvitee');
+    vm.prank(anotherInvitee);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InviteAlreadyUsed.selector));
+    savingCircles.redeemInvite(circleId, nonce, signature);
+  }
+
+  function test_RedeemInviteRejectsExistingMember() external {
+    uint256 circleId = _createInviteCircle();
+    uint256 nonce = 1;
+    bytes memory signature = _signInvite(circleId, nonce, ownerPrivateKey);
+
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyMember.selector));
+    savingCircles.redeemInvite(circleId, nonce, signature);
+  }
+
+  function test_RedeemInviteWhenCircleNotFound() external {
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
+    savingCircles.redeemInvite(999, 1, hex'');
+  }
+
+  function test_RedeemInviteRejectsActiveCircle() external {
+    uint256 circleId = _createInviteCircle();
+    vm.prank(ownerWithKey);
+    savingCircles.start(circleId);
+
+    bytes memory signature = _signInvite(circleId, 1, ownerPrivateKey);
+
+    vm.prank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyActive.selector));
+    savingCircles.redeemInvite(circleId, 1, signature);
+  }
+
+  function test_RedeemInviteRejectsNonOwnerSignature() external {
+    uint256 circleId = _createInviteCircle();
+    uint256 nonce = 1;
+    bytes memory signature = _signInvite(circleId, nonce, nonOwnerPrivateKey);
+
+    vm.prank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidSigner.selector));
+    savingCircles.redeemInvite(circleId, nonce, signature);
   }
 
   function test_StartWhenMembersCountIsLessThanTwo() external {
