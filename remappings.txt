@@ -1,11 +1,10 @@
-forge-std/=node_modules/forge-std/src/
-halmos-cheatcodes=node_modules/halmos-cheatcodes
+forge-std/=lib/forge-std/src/
 
-@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
-@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/
-@openzeppelin/=node_modules/@openzeppelin/contracts/
-@openzeppelin-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/
+@openzeppelin/=lib/openzeppelin-contracts/
+@openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 
-contracts/=src/contracts
-interfaces/=src/interfaces
+contracts/=src/contracts/
+interfaces/=src/interfaces/
 test/=test/
+
+halmos-cheatcodes=node_modules/halmos-cheatcodes
