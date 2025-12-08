@@ -20,7 +20,4 @@ jobs:
       # Start with false for mainnet until we're ready
       deploy-on-main: false
 
-    secrets:
-      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-      RPC_URL: ${{ secrets.RPC_URL }}
-      ADMIN_ADDRESS: "0xB11865e35A9dAaD8050AA67A6808776EC0Ad2E34"
+    secrets: inherit
