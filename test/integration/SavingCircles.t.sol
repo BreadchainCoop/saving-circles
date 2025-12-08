@@ -317,45 +317,27 @@ contract SavingCirclesIntegration is IntegrationBase {
     sharedMembers[1] = bob;
     sharedMembers[2] = carol;
 
-    // Create first circle with alice, bob, carol
-    ISavingCircles.Circle memory circle1 = ISavingCircles.Circle({
-      owner: alice,
-      members: sharedMembers,
-      token: address(token),
-      depositAmount: 1 ether,
-      depositInterval: 1 days,
-      circleStart: block.timestamp + 1 hours,
-      circleEnd: 0,
-      currentIndex: 0
-    });
-
-    // Create second circle with alice, bob, and a new member
     address dave = makeAddr('dave');
     address[] memory mixedMembers = new address[](3);
     mixedMembers[0] = alice;
     mixedMembers[1] = bob;
     mixedMembers[2] = dave;
 
-    ISavingCircles.Circle memory circle2 = ISavingCircles.Circle({
-      owner: bob,
-      members: mixedMembers,
-      token: address(token),
-      depositAmount: 2 ether,
-      depositInterval: 2 days,
-      circleStart: block.timestamp + 2 hours,
-      circleEnd: 0,
-      currentIndex: 0
-    });
+    uint256 startTime1 = block.timestamp + 1 hours;
+    uint256 startTime2 = block.timestamp + 2 hours;
 
-    // Create circles
-    vm.prank(alice);
-    uint256 circleId1 = circle.create(circle1);
-    vm.prank(alice);
+    ISavingCircles.Circle memory circle1 = _defaultCircle(alice, 1 ether, 1 days);
+    ISavingCircles.Circle memory circle2 = _defaultCircle(bob, 2 ether, 2 days);
+
+    uint256 circleId1 = _createCircle(circle1, sharedMembers, alicePrivateKey);
+    uint256 circleId2 = _createCircle(circle2, mixedMembers, bobPrivateKey);
+
+    vm.warp(startTime1);
+    vm.prank(circle1.owner);
     circle.start(circleId1);
 
-    vm.prank(bob);
-    uint256 circleId2 = circle.create(circle2);
-    vm.prank(bob);
+    vm.warp(startTime2);
+    vm.prank(circle2.owner);
     circle.start(circleId2);
 
     // Verify members are in correct circles
@@ -375,7 +357,7 @@ contract SavingCirclesIntegration is IntegrationBase {
     ISavingCircles.Circle memory c2 = circle.getCircle(circleId2);
 
     // Warp to circle 1 start time
-    vm.warp(c1.circleStart);
+    vm.warp(c1.effectiveCircleStartTime);
 
     // Alice deposits in circle 1
     deal(address(token), alice, 3 ether);
@@ -392,7 +374,7 @@ contract SavingCirclesIntegration is IntegrationBase {
     vm.stopPrank();
 
     // Warp to circle 2 start time
-    vm.warp(c2.circleStart);
+    vm.warp(c2.effectiveCircleStartTime);
 
     // Alice deposits in circle 2
     vm.startPrank(alice);
@@ -417,30 +399,20 @@ contract SavingCirclesIntegration is IntegrationBase {
     uint256 memberCount = 20;
     address[] memory largeGroup = new address[](memberCount);
 
-    for (uint256 i = 0; i < memberCount; i++) {
+    uint256 ownerKey;
+    (largeGroup[0], ownerKey) = makeAddrAndKey('member0');
+
+    for (uint256 i = 1; i < memberCount; i++) {
       largeGroup[i] = makeAddr(string(abi.encodePacked('member', i)));
     }
 
-    ISavingCircles.Circle memory largeCircle = ISavingCircles.Circle({
-      owner: largeGroup[0],
-      members: largeGroup,
-      token: address(token),
-      depositAmount: 0.1 ether,
-      depositInterval: 1 days,
-      circleStart: block.timestamp + 1 hours,
-      circleEnd: 0,
-      currentIndex: 0
-    });
+    ISavingCircles.Circle memory largeCircle = _defaultCircle(largeGroup[0], 0.1 ether, 1 days);
 
     // Create the circle
-    vm.prank(largeGroup[0]);
-    uint256 circleId = circle.create(largeCircle);
-    vm.prank(largeGroup[0]);
-    circle.start(circleId);
+    uint256 circleId = _createCircleWithMembers(largeCircle, largeGroup, ownerKey);
 
     // Verify circle was created
-    ISavingCircles.Circle memory created = circle.getCircle(circleId);
-    assertEq(created.members.length, memberCount);
+    assertEq(circle.getCircleMembers(circleId).length, memberCount);
 
     // Test deposit from multiple members
     vm.warp(block.timestamp + 1 hours);
