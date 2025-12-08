@@ -30,20 +30,24 @@ contract SavingCirclesUnit is Test {
   address internal ownerWithKey;
   address internal nonOwnerSigner;
   uint256 internal ownerPrivateKey;
+  uint256 internal alicePrivateKey;
+  uint256 internal bobPrivateKey;
+  uint256 internal carolPrivateKey;
   uint256 internal nonOwnerPrivateKey;
 
   // Test data
   uint256 public baseCircleId;
+  uint256 public baseCircleStart;
   address[] public members;
   ISavingCircles.Circle public baseCircle;
 
   function setUp() external {
     // Setup test addresses
-    alice = makeAddr('alice');
-    bob = makeAddr('bob');
-    carol = makeAddr('carol');
-    owner = makeAddr('owner');
-    (ownerWithKey, ownerPrivateKey) = makeAddrAndKey('ownerWithKey');
+    (owner, ownerPrivateKey) = makeAddrAndKey('owner');
+    ownerWithKey = owner;
+    (alice, alicePrivateKey) = makeAddrAndKey('alice');
+    (bob, bobPrivateKey) = makeAddrAndKey('bob');
+    (carol, carolPrivateKey) = makeAddrAndKey('carol');
     (nonOwnerSigner, nonOwnerPrivateKey) = makeAddrAndKey('nonOwnerSigner');
 
     // Deploy and initialize the contract
@@ -70,53 +74,93 @@ contract SavingCirclesUnit is Test {
 
     // Setup savingcircles parameters
     baseCircle = ISavingCircles.Circle({
-      owner: owner,
-      members: members,
+      owner: alice,
       currentIndex: BASE_CURRENT_INDEX,
-      circleStart: block.timestamp,
-      circleEnd: 0,
-      token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL
+      token: address(token),
+      depositInterval: DEPOSIT_INTERVAL,
+      effectiveCircleStartTime: 0,
+      circleEnd: 0
     });
 
     // Create an initial test circle
-    vm.prank(owner);
-    baseCircleId = savingCircles.create(baseCircle);
-    vm.prank(owner);
-    savingCircles.start(baseCircleId);
+    baseCircleId = _createCircleWithMembers(baseCircle, members, alicePrivateKey);
+    baseCircleStart = savingCircles.getCircle(baseCircleId).effectiveCircleStartTime;
   }
 
   function _createBaseCircle() internal returns (uint256) {
-    vm.prank(alice);
-    uint256 _id = savingCircles.create(baseCircle);
-    savingCircles.start(_id);
-    return _id;
+    return _createCircleWithMembers(baseCircle, members, alicePrivateKey);
   }
 
   function _createUnstartedCircle() internal returns (uint256) {
-    vm.prank(owner);
-    return savingCircles.create(baseCircle);
+    return _createCircle(baseCircle, members, alicePrivateKey);
   }
 
   function _createInviteCircle() internal returns (uint256) {
-    address[] memory inviteMembers = new address[](2);
+    address[] memory inviteMembers = new address[](1);
     inviteMembers[0] = ownerWithKey;
-    inviteMembers[1] = alice;
 
     ISavingCircles.Circle memory circle = ISavingCircles.Circle({
       owner: ownerWithKey,
-      members: inviteMembers,
       currentIndex: BASE_CURRENT_INDEX,
-      circleStart: block.timestamp,
-      circleEnd: 0,
-      token: address(token),
       depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL
+      token: address(token),
+      depositInterval: DEPOSIT_INTERVAL,
+      effectiveCircleStartTime: 0,
+      circleEnd: 0
     });
 
-    vm.prank(ownerWithKey);
-    return savingCircles.create(circle);
+    return _createCircle(circle, inviteMembers, ownerPrivateKey);
+  }
+
+  function _createCircleWithMembers(
+    ISavingCircles.Circle memory _circle,
+    address[] memory _members,
+    uint256 _ownerKey
+  ) internal returns (uint256 _id) {
+    _id = _createCircle(_circle, _members, _ownerKey);
+    vm.prank(_circle.owner);
+    savingCircles.start(_id);
+  }
+
+  function _createCircle(
+    ISavingCircles.Circle memory _circle,
+    address[] memory _members,
+    uint256 _ownerKey
+  ) internal returns (uint256 _id) {
+    vm.prank(_circle.owner);
+    _id = savingCircles.create(_circle);
+
+    _addMembers(_id, _circle.owner, _ownerKey, _members);
+  }
+
+  function _addMembers(uint256 _circleId, address _owner, uint256 _ownerKey, address[] memory _members) internal {
+    uint256 nonce = 1;
+    for (uint256 i = 0; i < _members.length; i++) {
+      address member = _members[i];
+      if (member == _owner) continue;
+
+      bytes memory signature = _signInvite(_circleId, nonce, _ownerKey);
+      vm.prank(member);
+      savingCircles.redeemInvite(_circleId, nonce, signature);
+      nonce++;
+    }
+  }
+
+  function _defaultCircle(
+    address _owner,
+    uint256 _depositAmount,
+    uint256 _depositInterval
+  ) internal view returns (ISavingCircles.Circle memory _circle) {
+    _circle = ISavingCircles.Circle({
+      owner: _owner,
+      currentIndex: BASE_CURRENT_INDEX,
+      depositAmount: _depositAmount,
+      token: address(token),
+      depositInterval: _depositInterval,
+      effectiveCircleStartTime: 0,
+      circleEnd: 0
+    });
   }
 
   function _signInvite(uint256 _circleId, uint256 _nonce, uint256 _signerKey) internal view returns (bytes memory) {
@@ -382,17 +426,18 @@ contract SavingCirclesUnit is Test {
     ISavingCircles.Circle memory _circle = savingCircles.getCircle(baseCircleId);
 
     // Verify all circle properties match expected values
-    assertEq(_circle.owner, owner);
+    assertEq(_circle.owner, baseCircle.owner);
     assertEq(_circle.currentIndex, BASE_CURRENT_INDEX);
-    assertEq(_circle.circleStart, block.timestamp);
+    assertEq(_circle.effectiveCircleStartTime, baseCircleStart);
     assertEq(_circle.token, address(token));
     assertEq(_circle.depositAmount, DEPOSIT_AMOUNT);
     assertEq(_circle.depositInterval, DEPOSIT_INTERVAL);
 
     // Verify members array
-    assertEq(_circle.members.length, members.length);
-    for (uint256 i = 0; i < members.length; i++) {
-      assertEq(_circle.members[i], members[i]);
+    address[] memory circleMembers = savingCircles.getCircleMembers(baseCircleId);
+    assertEq(circleMembers.length, members.length);
+    for (uint256 i = 0; i < circleMembers.length; i++) {
+      assertEq(circleMembers[i], members[i]);
     }
 
     // Verify initial balances are zero
@@ -472,7 +517,7 @@ contract SavingCirclesUnit is Test {
     uint256 startTime = block.timestamp + 1 hours;
     vm.warp(startTime);
 
-    vm.startPrank(owner);
+    vm.startPrank(alice);
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.CircleStarted(circleId);
     savingCircles.start(circleId);
@@ -481,14 +526,15 @@ contract SavingCirclesUnit is Test {
     assertTrue(savingCircles.isActive(circleId));
 
     ISavingCircles.Circle memory circle = savingCircles.getCircle(circleId);
-    assertEq(circle.circleStart, startTime);
-    assertEq(circle.circleEnd, startTime + (circle.depositInterval * circle.members.length));
+    assertEq(circle.effectiveCircleStartTime, startTime);
+    address[] memory circleMembers = savingCircles.getCircleMembers(circleId);
+    assertEq(circle.circleEnd, startTime + (circle.depositInterval * circleMembers.length));
   }
 
   function test_StartWhenCallerIsNotOwner() external {
     uint256 circleId = _createUnstartedCircle();
 
-    vm.prank(alice);
+    vm.prank(bob);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotOwner.selector));
     savingCircles.start(circleId);
   }
@@ -496,68 +542,38 @@ contract SavingCirclesUnit is Test {
   function test_StartWhenCircleAlreadyActive() external {
     uint256 circleId = _createUnstartedCircle();
 
-    vm.prank(owner);
+    vm.prank(alice);
     savingCircles.start(circleId);
 
-    vm.prank(owner);
+    vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyActive.selector));
     savingCircles.start(circleId);
   }
 
   function test_StartWithOnlyTwoMembers() external {
-    uint256 memberCount = 2;
-    uint256 arrayLength = 7;
-    address[] memory emptyMembers = new address[](arrayLength);
-    for (uint256 i = 0; i < memberCount; i++) {
-      emptyMembers[i] = makeAddr(string(abi.encodePacked('member', i)));
-    }
-    for (uint256 i = memberCount; i < arrayLength; i++) {
-      emptyMembers[i] = address(0);
-    }
+    address[] memory circleMembers = new address[](2);
+    circleMembers[0] = owner;
+    circleMembers[1] = makeAddr('secondMember');
 
-    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
-      owner: owner,
-      members: emptyMembers,
-      token: address(token),
-      depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL,
-      circleStart: block.timestamp,
-      circleEnd: 0,
-      currentIndex: 0
-    });
+    ISavingCircles.Circle memory circle = _defaultCircle(owner, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL);
 
-    vm.prank(owner);
-    uint256 circleId = savingCircles.create(circle);
+    uint256 circleId = _createCircleWithMembers(circle, circleMembers, ownerPrivateKey);
 
-    vm.prank(owner);
-    savingCircles.start(circleId);
-
-    ISavingCircles.Circle memory created = savingCircles.getCircle(circleId);
-    assertEq(created.members.length, memberCount);
+    address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
+    assertEq(storedMembers.length, circleMembers.length);
     assertTrue(savingCircles.isActive(circleId));
   }
 
   function test_StartWhenCircleEndWouldOverflow() external {
+    uint256 startTime = block.timestamp + 1;
     address[] memory twoMembers = new address[](2);
     twoMembers[0] = owner;
     twoMembers[1] = alice;
-
-    uint256 startTime = block.timestamp + 1;
     uint256 overflowingInterval = ((type(uint256).max - startTime) / twoMembers.length) + 1;
 
-    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
-      owner: owner,
-      members: twoMembers,
-      token: address(token),
-      depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: overflowingInterval,
-      circleStart: 0,
-      circleEnd: 0,
-      currentIndex: 0
-    });
+    ISavingCircles.Circle memory circle = _defaultCircle(owner, DEPOSIT_AMOUNT, overflowingInterval);
 
-    vm.prank(owner);
-    uint256 circleId = savingCircles.create(circle);
+    uint256 circleId = _createCircle(circle, twoMembers, ownerPrivateKey);
 
     vm.warp(startTime);
     vm.prank(owner);
@@ -566,21 +582,24 @@ contract SavingCirclesUnit is Test {
   }
 
   function test_StartUpdatesCircleStartTimestamp() external {
-    ISavingCircles.Circle memory circle = baseCircle;
-    circle.circleStart = block.timestamp + 10 days;
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL);
+    address[] memory circleMembers = new address[](3);
+    circleMembers[0] = alice;
+    circleMembers[1] = bob;
+    circleMembers[2] = carol;
 
-    vm.prank(owner);
-    uint256 circleId = savingCircles.create(circle);
+    uint256 circleId = _createCircle(circle, circleMembers, alicePrivateKey);
 
     uint256 expectedStart = block.timestamp + 5 hours;
     vm.warp(expectedStart);
 
-    vm.prank(owner);
+    vm.prank(alice);
     savingCircles.start(circleId);
 
     ISavingCircles.Circle memory started = savingCircles.getCircle(circleId);
-    assertEq(started.circleStart, expectedStart);
-    assertEq(started.circleEnd, expectedStart + (started.depositInterval * started.members.length));
+    assertEq(started.effectiveCircleStartTime, expectedStart);
+    address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
+    assertEq(started.circleEnd, expectedStart + (started.depositInterval * storedMembers.length));
   }
 
   function test_RedeemInviteWhenSignatureIsValid() external {
@@ -600,8 +619,8 @@ contract SavingCirclesUnit is Test {
     assertEq(inviteeCircles[0], circleId);
     assertTrue(savingCircles.usedNonces(circleId, nonce));
 
-    ISavingCircles.Circle memory circle = savingCircles.getCircle(circleId);
-    assertEq(circle.members[circle.members.length - 1], invitee);
+    address[] memory circleMembers = savingCircles.getCircleMembers(circleId);
+    assertEq(circleMembers[circleMembers.length - 1], invitee);
   }
 
   function test_RedeemInviteRejectsInvalidSignature() external {
@@ -635,8 +654,11 @@ contract SavingCirclesUnit is Test {
     bytes memory signature = _signInvite(circleId, nonce, ownerPrivateKey);
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyMember.selector));
     savingCircles.redeemInvite(circleId, nonce, signature);
+
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyMember.selector));
+    savingCircles.redeemInvite(circleId, nonce + 1, _signInvite(circleId, nonce + 1, ownerPrivateKey));
   }
 
   function test_RedeemInviteWhenCircleNotFound() external {
@@ -646,14 +668,18 @@ contract SavingCirclesUnit is Test {
 
   function test_RedeemInviteRejectsActiveCircle() external {
     uint256 circleId = _createInviteCircle();
+    uint256 nonce = 1;
+    bytes memory signature = _signInvite(circleId, nonce, ownerPrivateKey);
+
+    vm.prank(alice);
+    savingCircles.redeemInvite(circleId, nonce, signature);
+
     vm.prank(ownerWithKey);
     savingCircles.start(circleId);
 
-    bytes memory signature = _signInvite(circleId, 1, ownerPrivateKey);
-
     vm.prank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyActive.selector));
-    savingCircles.redeemInvite(circleId, 1, signature);
+    savingCircles.redeemInvite(circleId, nonce + 1, _signInvite(circleId, nonce + 1, ownerPrivateKey));
   }
 
   function test_RedeemInviteRejectsNonOwnerSignature() external {
@@ -670,11 +696,10 @@ contract SavingCirclesUnit is Test {
     address[] memory _oneMember = new address[](1);
     _oneMember[0] = owner;
 
-    ISavingCircles.Circle memory _invalidCircle = baseCircle;
-    _invalidCircle.members = _oneMember;
+    ISavingCircles.Circle memory _invalidCircle = _defaultCircle(owner, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL);
 
-    vm.prank(owner);
-    uint256 invalidCircleId = savingCircles.create(_invalidCircle);
+    uint256 invalidCircleId = _createCircle(_invalidCircle, _oneMember, ownerPrivateKey);
+
     vm.prank(owner);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidMemberCount.selector));
     savingCircles.start(invalidCircleId);
@@ -684,8 +709,7 @@ contract SavingCirclesUnit is Test {
     // Create a second circle
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = carol;
-    vm.prank(carol);
-    uint256 secondCircleId = savingCircles.create(secondCircle);
+    uint256 secondCircleId = _createCircleWithMembers(secondCircle, members, carolPrivateKey);
 
     // Create array of circle IDs to fetch
     uint256[] memory circleIds = new uint256[](2);
@@ -697,21 +721,21 @@ contract SavingCirclesUnit is Test {
 
     // Verify first circle
     assertEq(circles[0].owner, baseCircle.owner);
-    assertEq(circles[0].members.length, baseCircle.members.length);
     assertEq(circles[0].currentIndex, baseCircle.currentIndex);
-    assertEq(circles[0].circleStart, baseCircle.circleStart);
+    assertEq(circles[0].effectiveCircleStartTime, baseCircleStart);
     assertEq(circles[0].token, baseCircle.token);
     assertEq(circles[0].depositAmount, baseCircle.depositAmount);
     assertEq(circles[0].depositInterval, baseCircle.depositInterval);
+    assertEq(savingCircles.getCircleMembers(baseCircleId).length, members.length);
 
     // Verify second circle
     assertEq(circles[1].owner, secondCircle.owner);
-    assertEq(circles[1].members.length, secondCircle.members.length);
     assertEq(circles[1].currentIndex, secondCircle.currentIndex);
-    assertEq(circles[1].circleStart, secondCircle.circleStart);
+    assertEq(circles[1].effectiveCircleStartTime, savingCircles.getCircle(secondCircleId).effectiveCircleStartTime);
     assertEq(circles[1].token, secondCircle.token);
     assertEq(circles[1].depositAmount, secondCircle.depositAmount);
     assertEq(circles[1].depositInterval, secondCircle.depositInterval);
+    assertEq(savingCircles.getCircleMembers(secondCircleId).length, members.length);
   }
 
   function test_GetCirclesWhenCircleDoesNotExist() external {
@@ -731,28 +755,21 @@ contract SavingCirclesUnit is Test {
     // This tests the fix for the previously unreachable CircleExpired check
 
     // Create a circle with small intervals for testing
-    address[] memory members = new address[](2);
-    members[0] = alice;
-    members[1] = bob;
+    address[] memory circleMembers = new address[](2);
+    circleMembers[0] = alice;
+    circleMembers[1] = bob;
 
-    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
-      owner: alice,
-      members: members,
-      token: address(token),
-      depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: 1 hours,
-      circleStart: block.timestamp + 1 hours,
-      circleEnd: 0,
-      currentIndex: 0
-    });
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, 1 hours);
 
-    vm.prank(alice);
-    uint256 circleId = savingCircles.create(circle);
+    uint256 circleId = _createCircle(circle, circleMembers, alicePrivateKey);
+
+    uint256 startTime = block.timestamp + 1 hours;
+    vm.warp(startTime);
     vm.prank(alice);
     savingCircles.start(circleId);
 
     // Warp to after circle has expired
-    uint256 expiredTime = circle.circleStart + (circle.depositInterval * circle.members.length) + 1;
+    uint256 expiredTime = startTime + (circle.depositInterval * circleMembers.length) + 1;
     vm.warp(expiredTime);
 
     // Try to deposit after expiration
@@ -770,8 +787,7 @@ contract SavingCirclesUnit is Test {
     // Create a second circle that alice is also a member of
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = carol;
-    vm.prank(carol);
-    uint256 secondCircleId = savingCircles.create(secondCircle);
+    uint256 secondCircleId = _createCircleWithMembers(secondCircle, members, carolPrivateKey);
 
     // Get alice's circles
     uint256[] memory aliceCircles = savingCircles.getMemberCircles(alice);
@@ -820,7 +836,7 @@ contract SavingCirclesUnit is Test {
 
   function test_DepositExceedsDepositAmount() external {
     // Test depositing more than allowed amount
-    vm.warp(baseCircle.circleStart);
+    vm.warp(baseCircleStart);
 
     uint256 excessAmount = DEPOSIT_AMOUNT + 1;
     token.mint(alice, excessAmount);
@@ -834,7 +850,7 @@ contract SavingCirclesUnit is Test {
 
   function test_DepositForExceedsAmount() external {
     // Test depositFor exceeding allowed amount
-    vm.warp(baseCircle.circleStart);
+    vm.warp(baseCircleStart);
 
     uint256 excessAmount = DEPOSIT_AMOUNT + 1;
     token.mint(bob, excessAmount);
@@ -849,7 +865,7 @@ contract SavingCirclesUnit is Test {
   function test_WithdrawForNonMember() external {
     // Test withdrawFor when caller is not a member
     // Complete deposits first
-    vm.warp(baseCircle.circleStart);
+    vm.warp(baseCircleStart);
     for (uint256 i = 0; i < members.length; i++) {
       token.mint(members[i], DEPOSIT_AMOUNT);
       vm.startPrank(members[i]);
@@ -877,7 +893,7 @@ contract SavingCirclesUnit is Test {
 
   function test_DecommissionAfterCompleteCircle() external {
     // Test that decommission is not allowed after all deposits complete
-    vm.warp(baseCircle.circleStart);
+    vm.warp(baseCircleStart);
 
     // All members deposit
     for (uint256 i = 0; i < members.length; i++) {
@@ -904,7 +920,7 @@ contract SavingCirclesUnit is Test {
     // We'll simulate by trying to call withdraw again during withdrawal
     // The actual reentrancy guard should prevent this
 
-    vm.warp(baseCircle.circleStart);
+    vm.warp(baseCircleStart);
 
     // Complete deposits
     for (uint256 i = 0; i < members.length; i++) {
@@ -934,19 +950,9 @@ contract SavingCirclesUnit is Test {
     twoMembers[0] = alice;
     twoMembers[1] = bob;
 
-    ISavingCircles.Circle memory circle = ISavingCircles.Circle({
-      owner: alice,
-      members: twoMembers,
-      token: address(token),
-      depositAmount: maxAmount,
-      depositInterval: DEPOSIT_INTERVAL,
-      circleStart: block.timestamp + 1 days,
-      circleEnd: 0,
-      currentIndex: 0
-    });
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, maxAmount, DEPOSIT_INTERVAL);
 
-    vm.prank(alice);
-    uint256 circleId = savingCircles.create(circle);
+    uint256 circleId = _createCircle(circle, twoMembers, alicePrivateKey);
 
     // Verify circle was created with large values
     ISavingCircles.Circle memory created = savingCircles.getCircle(circleId);
@@ -965,7 +971,7 @@ contract SavingCirclesUnit is Test {
     assertFalse(savingCircles.isWithdrawable(circleId));
 
     // State 2: Active (deposits happening)
-    vm.warp(baseCircle.circleStart);
+    vm.warp(baseCircleStart);
     token.mint(alice, DEPOSIT_AMOUNT);
     vm.startPrank(alice);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
@@ -1005,11 +1011,8 @@ contract SavingCirclesUnit is Test {
     uint256[] memory circleIds = new uint256[](10);
 
     for (uint256 i = 0; i < 10; i++) {
-      ISavingCircles.Circle memory circle = baseCircle;
-      circle.circleStart = block.timestamp + (i + 1) * 1 days; // Different start times
-
-      vm.prank(alice);
-      circleIds[i] = savingCircles.create(circle);
+      ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL);
+      circleIds[i] = _createCircleWithMembers(circle, members, alicePrivateKey);
     }
 
     // Get all circles for alice
@@ -1027,29 +1030,17 @@ contract SavingCirclesUnit is Test {
     for (uint256 i = 0; i < 20; i++) {
       if (i < 10) {
         // Alice is member in first 10
-        ISavingCircles.Circle memory circle = baseCircle;
-        circle.circleStart = block.timestamp + (i + 1) * 1 days;
-        vm.prank(alice);
-        circleIds[i] = savingCircles.create(circle);
+        ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL);
+        circleIds[i] = _createCircle(circle, members, alicePrivateKey);
       } else {
         // Alice is not member in last 10
         address[] memory otherMembers = new address[](2);
         otherMembers[0] = bob;
         otherMembers[1] = carol;
 
-        ISavingCircles.Circle memory circle = ISavingCircles.Circle({
-          owner: bob,
-          members: otherMembers,
-          token: address(token),
-          depositAmount: DEPOSIT_AMOUNT,
-          depositInterval: DEPOSIT_INTERVAL,
-          circleStart: block.timestamp + (i + 1) * 1 days,
-          circleEnd: 0,
-          currentIndex: 0
-        });
+        ISavingCircles.Circle memory circle = _defaultCircle(bob, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL);
 
-        vm.prank(bob);
-        circleIds[i] = savingCircles.create(circle);
+        circleIds[i] = _createCircle(circle, otherMembers, bobPrivateKey);
       }
     }
 
@@ -1071,10 +1062,7 @@ contract SavingCirclesUnit is Test {
     // Create a second circle that alice is also a member of
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = carol;
-    vm.prank(carol);
-    uint256 secondCircleId = savingCircles.create(secondCircle);
-    vm.prank(carol);
-    savingCircles.start(secondCircleId);
+    uint256 secondCircleId = _createCircleWithMembers(secondCircle, members, carolPrivateKey);
 
     // Create array of circle IDs to check
     uint256[] memory circleIds = new uint256[](3);
