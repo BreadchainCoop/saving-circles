@@ -58,8 +58,9 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
 
     for (uint256 i = 0; i < circleIds.length; i++) {
       ISavingCircles.Circle memory circle = savingCircles.getCircle(circleIds[i]);
+      address[] memory members = savingCircles.getCircleMembers(circleIds[i]);
 
-      assertLe(circle.currentIndex, circle.members.length, 'Current index should never exceed member count');
+      assertLe(circle.currentIndex, members.length, 'Current index should never exceed member count');
     }
   }
 
@@ -68,9 +69,10 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
 
     for (uint256 i = 0; i < circleIds.length; i++) {
       ISavingCircles.Circle memory circle = savingCircles.getCircle(circleIds[i]);
+      address[] memory members = savingCircles.getCircleMembers(circleIds[i]);
 
-      for (uint256 j = 0; j < circle.members.length; j++) {
-        uint256 balance = savingCircles.balances(circleIds[i], circle.members[j]);
+      for (uint256 j = 0; j < members.length; j++) {
+        uint256 balance = savingCircles.balances(circleIds[i], members[j]);
 
         assertLe(balance, circle.depositAmount, 'Member balance should never exceed deposit amount');
       }
@@ -89,13 +91,12 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
 
     for (uint256 i = 0; i < circleIds.length; i++) {
       ISavingCircles.Circle memory circle = savingCircles.getCircle(circleIds[i]);
+      address[] memory members = savingCircles.getCircleMembers(circleIds[i]);
 
-      assertGe(circle.members.length, 2, 'Circle should always have at least 2 members');
+      assertGe(members.length, 2, 'Circle should always have at least 2 members');
 
-      for (uint256 j = 0; j < circle.members.length; j++) {
-        assertTrue(
-          savingCircles.isMember(circleIds[i], circle.members[j]), 'All circle members should be marked as members'
-        );
+      for (uint256 j = 0; j < members.length; j++) {
+        assertTrue(savingCircles.isMember(circleIds[i], members[j]), 'All circle members should be marked as members');
       }
     }
   }
@@ -114,9 +115,10 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
 
     for (uint256 i = 0; i < circleIds.length; i++) {
       ISavingCircles.Circle memory circle = savingCircles.getCircle(circleIds[i]);
+      address[] memory members = savingCircles.getCircleMembers(circleIds[i]);
 
-      for (uint256 j = 0; j < circle.members.length; j++) {
-        uint256 balance = savingCircles.balances(circleIds[i], circle.members[j]);
+      for (uint256 j = 0; j < members.length; j++) {
+        uint256 balance = savingCircles.balances(circleIds[i], members[j]);
 
         assertGe(balance, 0, 'Member balances should never be negative');
       }
@@ -128,11 +130,13 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
 
     for (uint256 i = 0; i < circleIds.length; i++) {
       ISavingCircles.Circle memory circle = savingCircles.getCircle(circleIds[i]);
+      address[] memory members = savingCircles.getCircleMembers(circleIds[i]);
 
       assertGt(circle.depositAmount, 0, 'Deposit amount should be greater than 0');
       assertGt(circle.depositInterval, 0, 'Deposit interval should be greater than 0');
-      assertGt(circle.circleStart, 0, 'Circle start time should be greater than 0');
+      assertGt(circle.effectiveCircleStartTime, 0, 'Circle start time should be greater than 0');
       assertTrue(circle.owner != address(0), 'Circle should have valid owner');
+      assertGe(members.length, 2, 'Circle should have members');
     }
   }
 
@@ -150,15 +154,16 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
       uint256 circleId = activeCircles[i];
 
       try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+        address[] memory members = savingCircles.getCircleMembers(circleId);
         uint256 totalPossibleDeposits = 0;
 
         // Calculate total deposits in the circle
-        for (uint256 j = 0; j < circle.members.length; j++) {
-          totalPossibleDeposits += savingCircles.balances(circleId, circle.members[j]);
+        for (uint256 j = 0; j < members.length; j++) {
+          totalPossibleDeposits += savingCircles.balances(circleId, members[j]);
         }
 
         // Maximum possible deposits per round
-        uint256 maxPerRound = circle.depositAmount * circle.members.length;
+        uint256 maxPerRound = circle.depositAmount * members.length;
 
         assertLe(totalPossibleDeposits, maxPerRound, 'Total deposits exceed maximum per round');
       } catch {}
@@ -174,8 +179,9 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
       uint256 circleId = activeCircles[i];
 
       try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+        address[] memory members = savingCircles.getCircleMembers(circleId);
         // currentIndex should never exceed member count
-        assertLt(circle.currentIndex, circle.members.length, 'Current index is not less than member count');
+        assertLt(circle.currentIndex, members.length, 'Current index is not less than member count');
       } catch {}
     }
   }
@@ -190,7 +196,7 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
 
       try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
         // Circle start should be in the past or future but never 0
-        assertGt(circle.circleStart, 0, 'Circle start time is zero');
+        assertGt(circle.effectiveCircleStartTime, 0, 'Circle start time is zero');
       } catch {}
     }
   }
@@ -203,12 +209,13 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
       uint256 circleId = activeCircles[i];
 
       try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+        address[] memory members = savingCircles.getCircleMembers(circleId);
         // Member count should be at least 2
-        assertGe(circle.members.length, 2, 'Member count less than minimum');
+        assertGe(members.length, 2, 'Member count less than minimum');
 
         // All members should have valid addresses
-        for (uint256 j = 0; j < circle.members.length; j++) {
-          assertNotEq(circle.members[j], address(0), 'Invalid member address');
+        for (uint256 j = 0; j < members.length; j++) {
+          assertNotEq(members[j], address(0), 'Invalid member address');
         }
       } catch {}
     }
