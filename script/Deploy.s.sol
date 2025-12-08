@@ -9,7 +9,9 @@ contract Deploy is Common {
   address constant ADMIN = 0xB11865e35A9dAaD8050AA67A6808776EC0Ad2E34;
 
   function run() public {
-    vm.startBroadcast();
+    uint256 deployerKey = vm.envUint('PRIVATE_KEY');
+
+    vm.startBroadcast(deployerKey);
 
     _deployContracts(ADMIN);
 
