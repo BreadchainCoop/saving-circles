@@ -297,14 +297,15 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
   }
 
   function _setCircleTimingData(UserCircleData memory circleData, ISavingCircles.Circle memory circle) internal view {
-    uint256 currentPeriodEnd = circle.circleStart + (circle.depositInterval * (circle.currentIndex + 1));
-    circleData.nextWithdrawTime = circle.circleStart + (circle.depositInterval * circle.currentIndex);
+    uint256 currentPeriodEnd = circle.effectiveCircleStartTime + (circle.depositInterval * (circle.currentIndex + 1));
+    circleData.nextWithdrawTime = circle.effectiveCircleStartTime + (circle.depositInterval * circle.currentIndex);
     circleData.depositWindowEnd = currentPeriodEnd;
 
     circleData.isExpired = (block.timestamp >= circle.circleEnd);
 
     circleData.completedRounds = circle.currentIndex;
-    circleData.totalRounds = circle.members.length;
+    address[] memory circleMembers = SAVING_CIRCLES.getCircleMembers(circleData.circleId);
+    circleData.totalRounds = circleMembers.length;
   }
 
   function _setDepositProgress(UserCircleData memory circleData, uint256 _circleId) internal view {

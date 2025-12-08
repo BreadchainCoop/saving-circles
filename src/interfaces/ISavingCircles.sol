@@ -15,12 +15,11 @@ interface ISavingCircles {
    */
   struct Circle {
     address owner;
-    address[] members;
     uint256 currentIndex;
     uint256 depositAmount;
     address token;
     uint256 depositInterval;
-    uint256 circleStart;
+    uint256 effectiveCircleStartTime;
     uint256 circleEnd;
   }
 
@@ -306,6 +305,12 @@ interface ISavingCircles {
    * @return balances The balances of the members of the circle
    */
   function getMemberBalances(uint256 id) external view returns (address[] memory members, uint256[] memory balances);
+  /**
+   * @notice Get the members of a circle
+   * @param id The ID of the circle
+   * @return members The members of the circle
+   */
+  function getCircleMembers(uint256 id) external view returns (address[] memory members);
 
   /**
    * @notice Check if a member is a member of a circle

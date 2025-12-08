@@ -69,16 +69,18 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     for (uint256 id = 0; id < nextId; id++) {
       // Skip if circle doesn't exist or is decommissioned
       try SAVING_CIRCLES.getCircle(id) returns (ISavingCircles.Circle memory _circle) {
+        address[] memory circleMembers = SAVING_CIRCLES.getCircleMembers(id);
         // Check if we're in a valid deposit window
-        if (block.timestamp < _circle.circleStart) continue;
+        if (block.timestamp < _circle.effectiveCircleStartTime) continue;
 
-        uint256 depositWindowEnd = _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1));
+        uint256 depositWindowEnd =
+          _circle.effectiveCircleStartTime + (_circle.depositInterval * (_circle.currentIndex + 1));
         if (block.timestamp >= depositWindowEnd) continue;
 
         if (block.timestamp >= _circle.circleEnd) continue;
 
-        for (uint256 j = 0; j < _circle.members.length; j++) {
-          address member = _circle.members[j];
+        for (uint256 j = 0; j < circleMembers.length; j++) {
+          address member = circleMembers[j];
           if (!delegatedDepositsEnabled[member]) continue; // Skip if not opted in
 
           uint256 currentBalance = SAVING_CIRCLES.balances(id, member);
@@ -104,16 +106,18 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     uint256 index = 0;
     for (uint256 id = 0; id < nextId; id++) {
       try SAVING_CIRCLES.getCircle(id) returns (ISavingCircles.Circle memory _circle) {
+        address[] memory circleMembers = SAVING_CIRCLES.getCircleMembers(id);
         // Check if we're in a valid deposit window
-        if (block.timestamp < _circle.circleStart) continue;
+        if (block.timestamp < _circle.effectiveCircleStartTime) continue;
 
-        uint256 depositWindowEnd = _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1));
+        uint256 depositWindowEnd =
+          _circle.effectiveCircleStartTime + (_circle.depositInterval * (_circle.currentIndex + 1));
         if (block.timestamp >= depositWindowEnd) continue;
 
         if (block.timestamp >= _circle.circleEnd) continue;
 
-        for (uint256 j = 0; j < _circle.members.length; j++) {
-          address member = _circle.members[j];
+        for (uint256 j = 0; j < circleMembers.length; j++) {
+          address member = circleMembers[j];
           if (!delegatedDepositsEnabled[member]) continue; // Skip if not opted in
 
           uint256 currentBalance = SAVING_CIRCLES.balances(id, member);
@@ -146,11 +150,12 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
 
     // Get circle information
     ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
+    address[] memory circleMembers = SAVING_CIRCLES.getCircleMembers(_circleId);
 
     // Check if member is part of the circle
     bool isMember = false;
-    for (uint256 i = 0; i < _circle.members.length; i++) {
-      if (_circle.members[i] == _member) {
+    for (uint256 i = 0; i < circleMembers.length; i++) {
+      if (circleMembers[i] == _member) {
         isMember = true;
         break;
       }
@@ -167,11 +172,11 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     if (allowance < requiredAmount) revert InsufficientAllowance();
 
     // Check deposit window validity
-    if (block.timestamp < _circle.circleStart) {
+    if (block.timestamp < _circle.effectiveCircleStartTime) {
       revert ISavingCircles.DepositBeforeCircleStart();
     }
     // Check if current deposit window has closed (each window lasts depositInterval)
-    if (block.timestamp >= _circle.circleStart + (_circle.depositInterval * (_circle.currentIndex + 1))) {
+    if (block.timestamp >= _circle.effectiveCircleStartTime + (_circle.depositInterval * (_circle.currentIndex + 1))) {
       revert ISavingCircles.DepositWindowClosed();
     }
     // Check if all deposit periods have passed
