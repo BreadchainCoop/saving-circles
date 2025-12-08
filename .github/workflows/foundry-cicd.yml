@@ -15,7 +15,7 @@ jobs:
       test-verbosity: 'vvv'
 
       # Deploy to testnet on PRs
-      deploy-on-pr: false 
+      deploy-on-pr: true 
 
       # Start with false for mainnet until we're ready
       deploy-on-main: false
