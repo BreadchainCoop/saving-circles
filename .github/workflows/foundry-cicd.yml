@@ -22,4 +22,4 @@ jobs:
 
     secrets: 
       inherit: true
-      ADMIN_ADDRESS: 0xB11865e35A9dAaD8050AA67A6808776EC0Ad2E34
+      ADMIN_ADDRESS: ${{ secrets.ADMIN_ADDRESS }}
