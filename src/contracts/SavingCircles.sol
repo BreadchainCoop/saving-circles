@@ -10,11 +10,12 @@ import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
 /**
  * @title Saving Circles
  * @notice Simple implementation of a rotating savings and credit association (ROSCA) for ERC20 tokens
- * @author Breadchain Collective
+ * @author Bread Cooperative
  * @author @RonTuretzky
  * @author bagelface.eth
  * @author exo404
  * @author valeriooconte
+ * @author franrolotti
  */
 contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   uint256 public constant MINIMUM_MEMBERS = 2;
