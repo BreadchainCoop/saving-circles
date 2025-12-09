@@ -127,21 +127,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   /// @inheritdoc ISavingCircles
   function decommission(uint256 _id) external override nonReentrant {
     if (!isActive[_id]) revert NotActive();
-    Circle storage _circle = circles[_id];
+    if (!_isDecommissionable(_id)) revert NotDecommissionable();
 
-    if (block.timestamp <= _circle.effectiveCircleStartTime + (_circle.depositInterval * (_circle.currentIndex + 1))) {
-      revert NotDecommissionable();
-    }
-
-    bool hasIncompleteDeposits = false;
+    address token = circles[_id].token;
     address[] memory members = circleMembers[_id];
-    for (uint256 i = 0; i < members.length; i++) {
-      if (balances[_id][members[i]] < _circle.depositAmount) {
-        hasIncompleteDeposits = true;
-        break;
-      }
-    }
-    if (!hasIncompleteDeposits) revert NotDecommissionable();
 
     // Return deposits to members
     for (uint256 i = 0; i < members.length; i++) {
@@ -150,7 +139,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
       if (_balance > 0) {
         balances[_id][_member] = 0;
-        bool success = IERC20(_circle.token).transfer(_member, _balance);
+        bool success = IERC20(token).transfer(_member, _balance);
         if (!success) revert TransferFailed();
       }
     }
@@ -249,6 +238,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   /// @inheritdoc ISavingCircles
   function isDecommissioned(Circle memory _circle) external view override returns (bool) {
     return _isDecommissioned(_circle);
+  }
+
+  function isDecommissionable(uint256 _id) external view override returns (bool) {
+    return _isDecommissionable(_id);
   }
 
   /// @inheritdoc ISavingCircles
@@ -354,6 +347,32 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
    */
   function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
     return _circle.owner == address(0);
+  }
+
+  /**
+   * @dev Return if a specified circle is decommissionable
+   *      To be considered decommissionable, the circle must have passed its deposit window
+   *      and all members must have made their deposits for the current round.
+   */
+  function _isDecommissionable(uint256 _id) internal view returns (bool) {
+    Circle memory _circle = circles[_id];
+    bool decommissionable = true;
+
+    if (block.timestamp <= _circle.effectiveCircleStartTime + (_circle.depositInterval * (_circle.currentIndex + 1))) {
+      decommissionable = false;
+    }
+
+    bool hasIncompleteDeposits = false;
+    address[] memory members = circleMembers[_id];
+    for (uint256 i = 0; i < members.length; i++) {
+      if (balances[_id][members[i]] < _circle.depositAmount) {
+        hasIncompleteDeposits = true;
+        break;
+      }
+    }
+    if (!hasIncompleteDeposits) decommissionable = false;
+
+    return decommissionable;
   }
 
   /**
