@@ -9,8 +9,9 @@ import {SavingCircles} from 'src/contracts/SavingCircles.sol';
 import {SavingCirclesViewer} from 'src/contracts/SavingCirclesViewer.sol';
 import {ISavingCircles} from 'src/interfaces/ISavingCircles.sol';
 import {MockERC20} from 'test/mocks/MockERC20.sol';
+import {SavingCirclesTestBase} from 'test/utils/SavingCirclesTestBase.t.sol';
 
-contract SavingCirclesViewerUnit is Test {
+contract SavingCirclesViewerUnit is SavingCirclesTestBase {
   uint256 public constant BASE_CURRENT_INDEX = 0;
   uint256 public constant DEPOSIT_AMOUNT = 1 ether;
   uint256 public constant DEPOSIT_INTERVAL = 1 days;
@@ -71,87 +72,11 @@ contract SavingCirclesViewerUnit is Test {
     members[2] = carol;
 
     // Setup baseCircle parameters
-    baseCircle = ISavingCircles.Circle({
-      owner: alice,
-      currentIndex: BASE_CURRENT_INDEX,
-      depositAmount: DEPOSIT_AMOUNT,
-      token: address(token),
-      depositInterval: DEPOSIT_INTERVAL,
-      effectiveCircleStartTime: 0,
-      circleEnd: 0
-    });
+    baseCircle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
     // Create an initial test circle
-    baseCircleId = _createCircleWithMembers(baseCircle, members, alicePrivateKey);
+    baseCircleId = _createCircleWithMembers(savingCircles, baseCircle, members, alicePrivateKey);
     baseCircleStart = savingCircles.getCircle(baseCircleId).effectiveCircleStartTime;
-  }
-
-  function _createCircleWithMembers(
-    ISavingCircles.Circle memory _circle,
-    address[] memory _members,
-    uint256 _ownerKey
-  ) internal returns (uint256 _id) {
-    _id = _createCircle(_circle, _members, _ownerKey);
-    vm.prank(_circle.owner);
-    savingCircles.start(_id);
-  }
-
-  function _createCircle(
-    ISavingCircles.Circle memory _circle,
-    address[] memory _members,
-    uint256 _ownerKey
-  ) internal returns (uint256 _id) {
-    vm.prank(_circle.owner);
-    _id = savingCircles.create(_circle);
-
-    _addMembers(_id, _circle.owner, _ownerKey, _members);
-  }
-
-  function _addMembers(uint256 _circleId, address _owner, uint256 _ownerKey, address[] memory _members) internal {
-    uint256 nonce = 1;
-    for (uint256 i = 0; i < _members.length; i++) {
-      address member = _members[i];
-      if (member == _owner) continue;
-
-      bytes memory signature = _signInvite(_circleId, nonce, _ownerKey);
-      vm.prank(member);
-      savingCircles.redeemInvite(_circleId, nonce, signature);
-      nonce++;
-    }
-  }
-
-  function _signInvite(uint256 _circleId, uint256 _nonce, uint256 _signerKey) internal view returns (bytes memory) {
-    bytes32 inviteTypehash = 0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3;
-    bytes32 structHash = keccak256(abi.encode(inviteTypehash, _circleId, _nonce));
-    bytes32 eip712DomainTypehash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
-    bytes32 inviteDomainNameHash = 0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
-    bytes32 inviteDomainVersionHash = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
-
-    bytes32 domainSeparator = keccak256(
-      abi.encode(
-        eip712DomainTypehash, inviteDomainNameHash, inviteDomainVersionHash, block.chainid, address(savingCircles)
-      )
-    );
-
-    bytes32 digest = keccak256(abi.encodePacked('\x19\x01', domainSeparator, structHash));
-    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_signerKey, digest);
-    return abi.encodePacked(r, s, v);
-  }
-
-  function _defaultCircle(
-    address _owner,
-    uint256 _depositAmount,
-    uint256 _depositInterval
-  ) internal view returns (ISavingCircles.Circle memory _circle) {
-    _circle = ISavingCircles.Circle({
-      owner: _owner,
-      currentIndex: BASE_CURRENT_INDEX,
-      depositAmount: _depositAmount,
-      token: address(token),
-      depositInterval: _depositInterval,
-      effectiveCircleStartTime: 0,
-      circleEnd: 0
-    });
   }
 
   /**
@@ -161,7 +86,7 @@ contract SavingCirclesViewerUnit is Test {
     // Create a second circle with the same parameters but a different owner
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = bob;
-    uint256 secondCircleId = _createCircleWithMembers(secondCircle, members, bobPrivateKey);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, bobPrivateKey);
 
     // Prepare deposits: full amount in first circle, half in second
     uint256 firstDeposit = DEPOSIT_AMOUNT;
@@ -196,7 +121,7 @@ contract SavingCirclesViewerUnit is Test {
     // Create a second circle
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = bob;
-    uint256 secondCircleId = _createCircleWithMembers(secondCircle, members, bobPrivateKey);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, bobPrivateKey);
 
     // Make deposits in both circles
     token.mint(alice, DEPOSIT_AMOUNT * 2);
@@ -322,7 +247,7 @@ contract SavingCirclesViewerUnit is Test {
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = bob;
     secondCircle.depositAmount = DEPOSIT_AMOUNT * 2;
-    uint256 secondCircleId = _createCircleWithMembers(secondCircle, members, bobPrivateKey);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, bobPrivateKey);
 
     // Make deposits
     token.mint(alice, DEPOSIT_AMOUNT * 3);
