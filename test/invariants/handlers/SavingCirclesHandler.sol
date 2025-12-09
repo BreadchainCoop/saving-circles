@@ -4,9 +4,9 @@ pragma solidity ^0.8.28;
 import {SavingCircles} from '../../../src/contracts/SavingCircles.sol';
 import {ISavingCircles} from '../../../src/interfaces/ISavingCircles.sol';
 import {MockERC20} from '../../mocks/MockERC20.sol';
-import {Test} from 'forge-std/Test.sol';
+import {SavingCirclesTestBase} from '../../utils/SavingCirclesTestBase.t.sol';
 
-contract SavingCirclesHandler is Test {
+contract SavingCirclesHandler is SavingCirclesTestBase {
   SavingCircles public savingCircles;
   MockERC20 public token;
 
@@ -73,7 +73,7 @@ contract SavingCirclesHandler is Test {
     });
 
     try savingCircles.create(circle) returns (uint256 circleId) {
-      _addMembers(circleId, msg.sender, actorKeys[msg.sender], members);
+      _addMembers(savingCircles, circleId, msg.sender, actorKeys[msg.sender], members);
       uint256 startAt = currentTime + circleStartOffset;
       if (block.timestamp < startAt) vm.warp(startAt);
       try savingCircles.start(circleId) {
@@ -245,37 +245,6 @@ contract SavingCirclesHandler is Test {
 
   function _getActor(uint256 actorIndexSeed) internal view returns (address) {
     return actors[actorIndexSeed % actors.length];
-  }
-
-  function _signInvite(uint256 _circleId, uint256 _nonce, uint256 _signerKey) internal view returns (bytes memory) {
-    bytes32 inviteTypehash = 0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3;
-    bytes32 structHash = keccak256(abi.encode(inviteTypehash, _circleId, _nonce));
-    bytes32 eip712DomainTypehash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
-    bytes32 inviteDomainNameHash = 0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
-    bytes32 inviteDomainVersionHash = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
-
-    bytes32 domainSeparator = keccak256(
-      abi.encode(
-        eip712DomainTypehash, inviteDomainNameHash, inviteDomainVersionHash, block.chainid, address(savingCircles)
-      )
-    );
-
-    bytes32 digest = keccak256(abi.encodePacked('\x19\x01', domainSeparator, structHash));
-    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_signerKey, digest);
-    return abi.encodePacked(r, s, v);
-  }
-
-  function _addMembers(uint256 _circleId, address _owner, uint256 _ownerKey, address[] memory _members) internal {
-    uint256 nonce = 1;
-    for (uint256 i = 0; i < _members.length; i++) {
-      address member = _members[i];
-      if (member == _owner) continue;
-
-      bytes memory signature = _signInvite(_circleId, nonce, _ownerKey);
-      vm.prank(member);
-      savingCircles.redeemInvite(_circleId, nonce, signature);
-      nonce++;
-    }
   }
 
   function getActiveCircles() public view returns (uint256[] memory) {
