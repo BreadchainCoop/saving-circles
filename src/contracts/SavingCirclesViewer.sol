@@ -193,18 +193,22 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     uint256 withdrawableCount = 0;
     uint256 expiredCount = 0;
     uint256 decommissionedCount = 0;
+    uint256 decommissionableCount = 0;
 
     for (uint256 i = 0; i < _circleIds.length; i++) {
       UserCircleData memory circleData = _getUserCircleData(_user, _circleIds[i]);
 
       if (circleData.isDecommissioned) {
         decommissionedCount++;
-      } else if (circleData.isExpired) {
-        expiredCount++;
       } else {
-        activeCount++;
-        if (circleData.isOwner) ownedCount++;
-        if (circleData.canWithdraw) withdrawableCount++;
+        if (circleData.isDecommissionable) decommissionableCount++;
+        if (circleData.isExpired) {
+          expiredCount++;
+        } else {
+          activeCount++;
+          if (circleData.isOwner) ownedCount++;
+          if (circleData.canWithdraw) withdrawableCount++;
+        }
       }
     }
 
@@ -213,6 +217,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     status.withdrawableCircleIds = new uint256[](withdrawableCount);
     status.expiredCircleIds = new uint256[](expiredCount);
     status.decommissionedCircleIds = new uint256[](decommissionedCount);
+    status.decommissionableCircleIds = new uint256[](decommissionableCount);
 
     status = _populateStatusArrays(status, _user, _circleIds);
   }
@@ -227,10 +232,15 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     uint256 withdrawableIndex = 0;
     uint256 expiredIndex = 0;
     uint256 decommissionedIndex = 0;
+    uint256 decommissionableIndex = 0;
 
     for (uint256 i = 0; i < _circleIds.length; i++) {
       uint256 circleId = _circleIds[i];
       UserCircleData memory circleData = _getUserCircleData(_user, circleId);
+
+      if (!circleData.isDecommissioned && circleData.isDecommissionable) {
+        status.decommissionableCircleIds[decommissionableIndex++] = circleId;
+      }
 
       if (circleData.isDecommissioned) {
         status.decommissionedCircleIds[decommissionedIndex++] = circleId;
@@ -264,6 +274,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
 
     circleData.circleInfo = circle;
     circleData.isDecommissioned = false;
+    circleData.isDecommissionable = SAVING_CIRCLES.isDecommissionable(_circleId);
 
     _setUserBalanceData(circleData, _user, _circleId);
     _setUserPermissions(circleData, _user, circle, _circleId);

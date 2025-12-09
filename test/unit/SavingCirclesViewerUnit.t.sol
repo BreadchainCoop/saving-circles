@@ -193,6 +193,7 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     assertTrue(userData.circleData[0].isOwner);
     assertTrue(userData.circleData[0].isMember);
     assertTrue(userData.circleData[0].isCurrentWithdrawer);
+    assertFalse(userData.circleData[0].isDecommissionable);
   }
 
   function test_GetComprehensiveUserDataWithWithdrawableCircle() external {
@@ -228,6 +229,7 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     assertTrue(userData.circleData[0].isCurrentWithdrawer);
     assertEq(userData.membershipStatus.withdrawableCircleIds.length, 1);
     assertEq(userData.membershipStatus.withdrawableCircleIds[0], baseCircleId);
+    assertFalse(userData.circleData[0].isDecommissionable);
   }
 
   function test_GetComprehensiveUserDataForNonMember() external {
@@ -281,5 +283,16 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     // Verify upcoming deposits count
     assertEq(summary.upcomingDeposits, 1);
     assertEq(summary.totalDeposited, DEPOSIT_AMOUNT / 2);
+  }
+
+  function test_DecommissionableCirclesIncludedInUserData() external {
+    // Warp beyond the first deposit window without all deposits completed
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL + 1);
+
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(alice);
+
+    assertTrue(userData.circleData[0].isDecommissionable);
+    assertEq(userData.membershipStatus.decommissionableCircleIds.length, 1);
+    assertEq(userData.membershipStatus.decommissionableCircleIds[0], baseCircleId);
   }
 }
