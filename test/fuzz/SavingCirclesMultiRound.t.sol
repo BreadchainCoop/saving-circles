@@ -4,10 +4,11 @@ pragma solidity ^0.8.28;
 import {SavingCircles} from '../../src/contracts/SavingCircles.sol';
 import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
 import {MockERC20} from '../mocks/MockERC20.sol';
-import {ERC1967Proxy} from '@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol';
-import {Test} from 'forge-std/Test.sol';
 
-contract SavingCirclesMultiRoundFuzzTest is Test {
+import {SavingCirclesTestBase} from '../utils/SavingCirclesTestBase.t.sol';
+import {ERC1967Proxy} from '@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol';
+
+contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
   SavingCircles public implementation;
   SavingCircles public savingCircles;
   MockERC20 public token;
@@ -37,74 +38,6 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
     savingCircles.setTokenAllowed(address(token), true);
   }
 
-  function _defaultCircle(
-    address _owner,
-    uint256 _depositAmount,
-    uint256 _depositInterval
-  ) internal view returns (ISavingCircles.Circle memory _circle) {
-    _circle = ISavingCircles.Circle({
-      owner: _owner,
-      currentIndex: 0,
-      depositAmount: _depositAmount,
-      token: address(token),
-      depositInterval: _depositInterval,
-      effectiveCircleStartTime: 0,
-      circleEnd: 0
-    });
-  }
-
-  function _createCircleWithMembers(
-    ISavingCircles.Circle memory _circle,
-    address[] memory _members,
-    uint256 _ownerKey
-  ) internal returns (uint256 _id) {
-    _id = _createCircle(_circle, _members, _ownerKey);
-    vm.prank(_circle.owner);
-    savingCircles.start(_id);
-  }
-
-  function _createCircle(
-    ISavingCircles.Circle memory _circle,
-    address[] memory _members,
-    uint256 _ownerKey
-  ) internal returns (uint256 _id) {
-    vm.prank(_circle.owner);
-    _id = savingCircles.create(_circle);
-
-    _addMembers(_id, _circle.owner, _ownerKey, _members);
-  }
-
-  function _addMembers(uint256 _circleId, address _owner, uint256 _ownerKey, address[] memory _members) internal {
-    uint256 nonce = 1;
-    for (uint256 i = 0; i < _members.length; i++) {
-      address member = _members[i];
-      if (member == _owner) continue;
-
-      bytes memory signature = _signInvite(_circleId, nonce, _ownerKey);
-      vm.prank(member);
-      savingCircles.redeemInvite(_circleId, nonce, signature);
-      nonce++;
-    }
-  }
-
-  function _signInvite(uint256 _circleId, uint256 _nonce, uint256 _signerKey) internal view returns (bytes memory) {
-    bytes32 inviteTypehash = 0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3;
-    bytes32 structHash = keccak256(abi.encode(inviteTypehash, _circleId, _nonce));
-    bytes32 eip712DomainTypehash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
-    bytes32 inviteDomainNameHash = 0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
-    bytes32 inviteDomainVersionHash = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
-
-    bytes32 domainSeparator = keccak256(
-      abi.encode(
-        eip712DomainTypehash, inviteDomainNameHash, inviteDomainVersionHash, block.chainid, address(savingCircles)
-      )
-    );
-
-    bytes32 digest = keccak256(abi.encodePacked('\x19\x01', domainSeparator, structHash));
-    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_signerKey, digest);
-    return abi.encodePacked(r, s, v);
-  }
-
   function _createCircleAt(
     address[] memory members,
     uint256 depositAmount,
@@ -114,9 +47,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
     if (members.length > 0) {
       members[0] = alice;
     }
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, depositAmount, depositInterval);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, depositAmount, depositInterval, address(token));
 
-    circleId = _createCircle(circle, members, alicePrivateKey);
+    circleId = _createCircle(savingCircles, circle, members, alicePrivateKey);
     if (block.timestamp < startTime) vm.warp(startTime);
     vm.prank(alice);
     savingCircles.start(circleId);
@@ -138,9 +71,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
     }
 
     uint256 startTime = block.timestamp + 1 days;
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval, address(token));
 
-    uint256 circleId = _createCircle(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircle(savingCircles, circle, members, alicePrivateKey);
     if (block.timestamp < startTime) vm.warp(startTime);
     vm.prank(alice);
     savingCircles.start(circleId);
@@ -218,9 +151,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
       allMembers[c] = members;
 
       startTimes[c] = block.timestamp + 1 days + (c * 1 hours); // Stagger start times
-      ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval);
+      ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval, address(token));
 
-      circleIds[c] = _createCircle(circle, members, alicePrivateKey);
+      circleIds[c] = _createCircle(savingCircles, circle, members, alicePrivateKey);
       if (block.timestamp < startTimes[c]) vm.warp(startTimes[c]);
       vm.prank(alice);
       savingCircles.start(circleIds[c]);
@@ -275,9 +208,9 @@ contract SavingCirclesMultiRoundFuzzTest is Test {
     }
 
     uint256 startTime = block.timestamp + 1 days;
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval, address(token));
 
-    uint256 circleId = _createCircle(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircle(savingCircles, circle, members, alicePrivateKey);
     if (block.timestamp < startTime) vm.warp(startTime);
     vm.prank(alice);
     savingCircles.start(circleId);

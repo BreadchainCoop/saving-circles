@@ -4,10 +4,12 @@ pragma solidity ^0.8.28;
 import {SavingCircles} from '../../src/contracts/SavingCircles.sol';
 import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
 import {MockERC20} from '../mocks/MockERC20.sol';
+
+import {SavingCirclesTestBase} from '../utils/SavingCirclesTestBase.t.sol';
 import {ERC1967Proxy} from '@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol';
 import {Test} from 'forge-std/Test.sol';
 
-contract SavingCirclesFuzzTest is Test {
+contract SavingCirclesFuzzTest is SavingCirclesTestBase {
   SavingCircles public implementation;
   SavingCircles public savingCircles;
   MockERC20 public token;
@@ -39,74 +41,6 @@ contract SavingCirclesFuzzTest is Test {
     savingCircles.setTokenAllowed(address(token), true);
   }
 
-  function _defaultCircle(
-    address _owner,
-    uint256 _depositAmount,
-    uint256 _depositInterval
-  ) internal view returns (ISavingCircles.Circle memory _circle) {
-    _circle = ISavingCircles.Circle({
-      owner: _owner,
-      currentIndex: 0,
-      depositAmount: _depositAmount,
-      token: address(token),
-      depositInterval: _depositInterval,
-      effectiveCircleStartTime: 0,
-      circleEnd: 0
-    });
-  }
-
-  function _createCircleWithMembers(
-    ISavingCircles.Circle memory _circle,
-    address[] memory _members,
-    uint256 _ownerKey
-  ) internal returns (uint256 _id) {
-    _id = _createCircle(_circle, _members, _ownerKey);
-    vm.prank(_circle.owner);
-    savingCircles.start(_id);
-  }
-
-  function _createCircle(
-    ISavingCircles.Circle memory _circle,
-    address[] memory _members,
-    uint256 _ownerKey
-  ) internal returns (uint256 _id) {
-    vm.prank(_circle.owner);
-    _id = savingCircles.create(_circle);
-
-    _addMembers(_id, _circle.owner, _ownerKey, _members);
-  }
-
-  function _addMembers(uint256 _circleId, address _owner, uint256 _ownerKey, address[] memory _members) internal {
-    uint256 nonce = 1;
-    for (uint256 i = 0; i < _members.length; i++) {
-      address member = _members[i];
-      if (member == _owner) continue;
-
-      bytes memory signature = _signInvite(_circleId, nonce, _ownerKey);
-      vm.prank(member);
-      savingCircles.redeemInvite(_circleId, nonce, signature);
-      nonce++;
-    }
-  }
-
-  function _signInvite(uint256 _circleId, uint256 _nonce, uint256 _signerKey) internal view returns (bytes memory) {
-    bytes32 inviteTypehash = 0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3;
-    bytes32 structHash = keccak256(abi.encode(inviteTypehash, _circleId, _nonce));
-    bytes32 eip712DomainTypehash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
-    bytes32 inviteDomainNameHash = 0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
-    bytes32 inviteDomainVersionHash = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
-
-    bytes32 domainSeparator = keccak256(
-      abi.encode(
-        eip712DomainTypehash, inviteDomainNameHash, inviteDomainVersionHash, block.chainid, address(savingCircles)
-      )
-    );
-
-    bytes32 digest = keccak256(abi.encodePacked('\x19\x01', domainSeparator, structHash));
-    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_signerKey, digest);
-    return abi.encodePacked(r, s, v);
-  }
-
   function testFuzz_CreateCircle_ValidParameters(
     uint256 _depositAmount,
     uint256 _depositInterval,
@@ -122,9 +56,9 @@ contract SavingCirclesFuzzTest is Test {
       members[i] = makeAddr(string(abi.encodePacked('member', i)));
     }
 
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval, address(token));
 
-    uint256 circleId = _createCircleWithMembers(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircleWithMembers(savingCircles, circle, members, alicePrivateKey);
 
     ISavingCircles.Circle memory retrievedCircle = savingCircles.getCircle(circleId);
     assertEq(retrievedCircle.owner, alice);
@@ -142,9 +76,9 @@ contract SavingCirclesFuzzTest is Test {
     members[0] = alice;
     members[1] = bob;
 
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, _totalDeposit, 1 days);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, _totalDeposit, 1 days, address(token));
 
-    uint256 circleId = _createCircleWithMembers(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircleWithMembers(savingCircles, circle, members, alicePrivateKey);
 
     token.mint(alice, _totalDeposit);
     vm.startPrank(alice);
@@ -183,9 +117,9 @@ contract SavingCirclesFuzzTest is Test {
       members[i] = makeAddr(string(abi.encodePacked('member', i)));
     }
 
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, 1 days);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, 1 days, address(token));
 
-    uint256 circleId = _createCircleWithMembers(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircleWithMembers(savingCircles, circle, members, alicePrivateKey);
 
     for (uint256 i = 0; i < _memberCount; i++) {
       token.mint(members[i], _depositAmount);
@@ -230,9 +164,9 @@ contract SavingCirclesFuzzTest is Test {
       members[i] = makeAddr(string(abi.encodePacked('member', i)));
     }
 
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, 1 days);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, 1 days, address(token));
 
-    uint256 circleId = _createCircleWithMembers(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircleWithMembers(savingCircles, circle, members, alicePrivateKey);
 
     for (uint256 i = 0; i < _completeMembers; i++) {
       token.mint(members[i], _depositAmount);
@@ -274,7 +208,7 @@ contract SavingCirclesFuzzTest is Test {
     members[0] = alice;
     members[1] = bob;
 
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval, address(token));
 
     if (_depositAmount == 0) {
       vm.prank(alice);
@@ -290,7 +224,7 @@ contract SavingCirclesFuzzTest is Test {
       return;
     }
 
-    uint256 circleId = _createCircle(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircle(savingCircles, circle, members, alicePrivateKey);
     vm.prank(alice);
     savingCircles.start(circleId);
   }
@@ -304,9 +238,9 @@ contract SavingCirclesFuzzTest is Test {
     members[1] = bob;
 
     uint256 depositAmount = 1000;
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, depositAmount, _depositInterval);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, depositAmount, _depositInterval, address(token));
 
-    uint256 circleId = _createCircleWithMembers(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircleWithMembers(savingCircles, circle, members, alicePrivateKey);
 
     token.mint(alice, depositAmount);
     vm.startPrank(alice);
@@ -351,9 +285,9 @@ contract SavingCirclesFuzzTest is Test {
       members[i] = makeAddr(string(abi.encodePacked('member', i)));
     }
 
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, 1 days);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, 1 days, address(token));
 
-    uint256 circleId = _createCircleWithMembers(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircleWithMembers(savingCircles, circle, members, alicePrivateKey);
 
     // Depositor deposits for target member
     address depositor = members[_depositorIndex];
@@ -388,9 +322,9 @@ contract SavingCirclesFuzzTest is Test {
     uint256 depositInterval = 1 days;
     uint256 startTime = block.timestamp;
 
-    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, depositInterval);
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, depositInterval, address(token));
 
-    uint256 circleId = _createCircleWithMembers(circle, members, alicePrivateKey);
+    uint256 circleId = _createCircleWithMembers(savingCircles, circle, members, alicePrivateKey);
 
     // Warp to near the end of deposit window
     uint256 nearWindowClose = startTime + depositInterval - _timeDelta - 1 hours;
