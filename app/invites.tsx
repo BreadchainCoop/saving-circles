@@ -18,7 +18,7 @@ const savingCirclesAbi = [
   'function redeemInvite(uint256 id, uint256 nonce, bytes signature)',
   'function isMember(uint256 id, address member) view returns (bool)',
   'function owner() view returns (address)',
-  'function getCircle(uint256 id) view returns (address owner, address[] members, uint256 currentIndex, uint256 depositAmount, address token, uint256 depositInterval, uint256 circleStart, uint256 circleEnd)'
+  'function getCircle(uint256 id) view returns (address owner, uint256 currentIndex, uint256 depositAmount, address token, uint256 depositInterval, uint256 effectiveCircleStartTime, uint256 circleEnd)'
 ] as const;
 
 type InviteTypes = { Invite: TypedDataField[] };
