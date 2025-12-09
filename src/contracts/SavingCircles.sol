@@ -176,6 +176,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     if (_signer != _circle.owner) revert InvalidSigner();
 
     usedNonces[_id][_nonce] = true;
+
+    // No max count validation, the owner issues a finite amount of invites
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
     circleMembers[_id].push(msg.sender);
