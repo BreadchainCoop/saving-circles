@@ -36,6 +36,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     _;
   }
 
+  modifier onlyActive(uint256 _id) {
+    if (!isActive[_id]) revert NotActive();
+    _;
+  }
+
   /// @dev Requires address is a member by checking the mapping
   modifier onlyMember(uint256 _id, address _member) {
     if (!isMember[_id][_member]) revert NotMember();
@@ -101,32 +106,27 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function deposit(uint256 _id, uint256 _value) external override nonReentrant {
-    if (!isActive[_id]) revert NotActive();
+  function deposit(uint256 _id, uint256 _value) external override nonReentrant onlyActive(_id) {
     _deposit(_id, _value, msg.sender);
   }
 
   /// @inheritdoc ISavingCircles
-  function depositFor(uint256 _id, uint256 _value, address _member) external override nonReentrant {
-    if (!isActive[_id]) revert NotActive();
+  function depositFor(uint256 _id, uint256 _value, address _member) external override nonReentrant onlyActive(_id) {
     _deposit(_id, _value, _member);
   }
 
   /// @inheritdoc ISavingCircles
-  function withdraw(uint256 _id) external override nonReentrant onlyMember(_id, msg.sender) {
-    if (!isActive[_id]) revert NotActive();
+  function withdraw(uint256 _id) external override nonReentrant onlyMember(_id, msg.sender) onlyActive(_id) {
     _withdraw(_id, msg.sender);
   }
 
   /// @inheritdoc ISavingCircles
-  function withdrawFor(uint256 _id, address _member) external override nonReentrant {
-    if (!isActive[_id]) revert NotActive();
+  function withdrawFor(uint256 _id, address _member) external override nonReentrant onlyActive(_id) {
     _withdraw(_id, _member);
   }
 
   /// @inheritdoc ISavingCircles
-  function decommission(uint256 _id) external override nonReentrant {
-    if (!isActive[_id]) revert NotActive();
+  function decommission(uint256 _id) external override nonReentrant onlyActive(_id) {
     if (!_isDecommissionable(_id)) revert NotDecommissionable();
 
     address token = circles[_id].token;
@@ -214,10 +214,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     external
     view
     override
+    onlyActive(_id)
     returns (address[] memory _members, uint256[] memory _balances)
   {
-    if (!isActive[_id]) revert NotActive();
-
     Circle memory _circle = circles[_id];
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
@@ -236,7 +235,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
   }
 
   /// @inheritdoc ISavingCircles
-  function isDecommissioned(Circle memory _circle) external view override returns (bool) {
+  function isDecommissioned(Circle memory _circle) external pure override returns (bool) {
     return _isDecommissioned(_circle);
   }
 
@@ -246,13 +245,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
   /// @inheritdoc ISavingCircles
   function isWithdrawable(uint256 _id) public view override returns (bool) {
-    if (!isActive[_id]) revert NotActive();
+    if (!isActive[_id]) return false;
     return _withdrawable(_id);
   }
 
   /// @inheritdoc ISavingCircles
   function withdrawableBy(uint256 _id) public view override onlyCommissioned(_id) returns (address) {
-    if (!isActive[_id]) revert NotActive();
+    if (!isActive[_id]) return address(0);
     Circle memory _circle = circles[_id];
 
     return circleMembers[_id][_circle.currentIndex];

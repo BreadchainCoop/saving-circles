@@ -187,9 +187,8 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     uint256 nonExistentCircleId = uint256(keccak256(abi.encodePacked('Non Existent Circle')));
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotActive.selector));
-    savingCircles.isWithdrawable(nonExistentCircleId);
-
+    bool result = savingCircles.isWithdrawable(nonExistentCircleId);
+    assertFalse(result);
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
     savingCircles.withdraw(nonExistentCircleId);
