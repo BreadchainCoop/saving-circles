@@ -131,6 +131,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
     address token = circles[_id].token;
     address[] memory members = circleMembers[_id];
+    isActive[_id] = false;
 
     // Return deposits to members
     for (uint256 i = 0; i < members.length; i++) {
@@ -145,8 +146,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
     }
 
     delete circles[_id];
-    isActive[_id] = false;
-
     emit CircleDecommissioned(_id);
   }
 
