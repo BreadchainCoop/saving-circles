@@ -90,7 +90,6 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
     uint256[] memory circleIds = handler.getActiveCircles();
 
     for (uint256 i = 0; i < circleIds.length; i++) {
-      ISavingCircles.Circle memory circle = savingCircles.getCircle(circleIds[i]);
       address[] memory members = savingCircles.getCircleMembers(circleIds[i]);
 
       assertGe(members.length, 2, 'Circle should always have at least 2 members');
@@ -114,7 +113,6 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
     uint256[] memory circleIds = handler.getActiveCircles();
 
     for (uint256 i = 0; i < circleIds.length; i++) {
-      ISavingCircles.Circle memory circle = savingCircles.getCircle(circleIds[i]);
       address[] memory members = savingCircles.getCircleMembers(circleIds[i]);
 
       for (uint256 j = 0; j < members.length; j++) {
