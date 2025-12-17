@@ -27,10 +27,10 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
   address public bob;
   address public carol;
   address public immutable STRANGER = makeAddr('stranger');
-  uint256 internal ownerPrivateKey;
-  uint256 internal alicePrivateKey;
-  uint256 internal bobPrivateKey;
-  uint256 internal carolPrivateKey;
+  uint256 internal _ownerPrivateKey;
+  uint256 internal _alicePrivateKey;
+  uint256 internal _bobPrivateKey;
+  uint256 internal _carolPrivateKey;
 
   // Test data
   uint256 public baseCircleId;
@@ -40,10 +40,10 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
 
   function setUp() external {
     // Setup test addresses
-    (owner, ownerPrivateKey) = makeAddrAndKey('owner');
-    (alice, alicePrivateKey) = makeAddrAndKey('alice');
-    (bob, bobPrivateKey) = makeAddrAndKey('bob');
-    (carol, carolPrivateKey) = makeAddrAndKey('carol');
+    (owner, _ownerPrivateKey) = makeAddrAndKey('owner');
+    (alice, _alicePrivateKey) = makeAddrAndKey('alice');
+    (bob, _bobPrivateKey) = makeAddrAndKey('bob');
+    (carol, _carolPrivateKey) = makeAddrAndKey('carol');
 
     // Deploy and initialize the SavingCircles contract
     vm.startPrank(owner);
@@ -74,7 +74,7 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     baseCircle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
     // Create an initial test circle
-    baseCircleId = _createCircleWithMembers(savingCircles, baseCircle, members, alicePrivateKey);
+    baseCircleId = _createCircleWithMembers(savingCircles, baseCircle, members, _alicePrivateKey);
     baseCircleStart = savingCircles.getCircle(baseCircleId).effectiveCircleStartTime;
   }
 
@@ -85,7 +85,7 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     // Create a second circle with the same parameters but a different owner
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = bob;
-    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, bobPrivateKey);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, _bobPrivateKey);
 
     // Prepare deposits: full amount in first circle, half in second
     uint256 firstDeposit = DEPOSIT_AMOUNT;
@@ -120,7 +120,7 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     // Create a second circle
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = bob;
-    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, bobPrivateKey);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, _bobPrivateKey);
 
     // Make deposits in both circles
     token.mint(alice, DEPOSIT_AMOUNT * 2);
@@ -248,7 +248,7 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = bob;
     secondCircle.depositAmount = DEPOSIT_AMOUNT * 2;
-    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, bobPrivateKey);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, _bobPrivateKey);
 
     // Make deposits
     token.mint(alice, DEPOSIT_AMOUNT * 3);

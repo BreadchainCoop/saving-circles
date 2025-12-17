@@ -19,10 +19,10 @@ contract IntegrationBase is Common, SavingCirclesTestBase {
   address public bob = makeAddr('bob');
   address public carol = makeAddr('carol');
   address public owner = makeAddr('owner');
-  uint256 internal alicePrivateKey;
-  uint256 internal bobPrivateKey;
-  uint256 internal carolPrivateKey;
-  uint256 internal ownerPrivateKey;
+  uint256 internal _alicePrivateKey;
+  uint256 internal _bobPrivateKey;
+  uint256 internal _carolPrivateKey;
+  uint256 internal _ownerPrivateKey;
   address[] public members;
 
   ISavingCircles.Circle public baseCircle;
@@ -37,10 +37,10 @@ contract IntegrationBase is Common, SavingCirclesTestBase {
   function setUp() public virtual override {
     super.setUp();
 
-    (owner, ownerPrivateKey) = makeAddrAndKey('owner');
-    (alice, alicePrivateKey) = makeAddrAndKey('alice');
-    (bob, bobPrivateKey) = makeAddrAndKey('bob');
-    (carol, carolPrivateKey) = makeAddrAndKey('carol');
+    (owner, _ownerPrivateKey) = makeAddrAndKey('owner');
+    (alice, _alicePrivateKey) = makeAddrAndKey('alice');
+    (bob, _bobPrivateKey) = makeAddrAndKey('bob');
+    (carol, _carolPrivateKey) = makeAddrAndKey('carol');
 
     vm.startPrank(owner);
     circle = SavingCircles(address(_deployContracts(owner)));
@@ -56,7 +56,7 @@ contract IntegrationBase is Common, SavingCirclesTestBase {
     vm.prank(owner);
     circle.setTokenAllowed(address(token), true);
 
-    baseCircleId = _createCircleWithMembers(circle, baseCircle, members, alicePrivateKey);
+    baseCircleId = _createCircleWithMembers(circle, baseCircle, members, _alicePrivateKey);
     baseCircleStart = circle.getCircle(baseCircleId).effectiveCircleStartTime;
   }
 

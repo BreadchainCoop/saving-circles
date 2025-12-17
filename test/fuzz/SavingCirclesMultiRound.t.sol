@@ -14,8 +14,8 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
   MockERC20 public token;
 
   address public owner = makeAddr('owner');
-  uint256 internal ownerPrivateKey;
-  uint256 internal alicePrivateKey;
+  uint256 internal _ownerPrivateKey;
+  uint256 internal _alicePrivateKey;
   address public alice = makeAddr('alice');
 
   uint256 private constant _MAX_REASONABLE_DEPOSIT = 1e20;
@@ -23,8 +23,8 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
   uint256 private constant _MIN_DEPOSIT_INTERVAL = 1 hours;
 
   function setUp() public {
-    (owner, ownerPrivateKey) = makeAddrAndKey('owner');
-    (alice, alicePrivateKey) = makeAddrAndKey('alice');
+    (owner, _ownerPrivateKey) = makeAddrAndKey('owner');
+    (alice, _alicePrivateKey) = makeAddrAndKey('alice');
 
     implementation = new SavingCircles();
 
@@ -49,7 +49,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
     }
     ISavingCircles.Circle memory circle = _defaultCircle(alice, depositAmount, depositInterval, address(token));
 
-    circleId = _createCircle(savingCircles, circle, members, alicePrivateKey);
+    circleId = _createCircle(savingCircles, circle, members, _alicePrivateKey);
     if (block.timestamp < startTime) vm.warp(startTime);
     vm.prank(alice);
     savingCircles.start(circleId);
@@ -73,7 +73,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
     uint256 startTime = block.timestamp + 1 days;
     ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval, address(token));
 
-    uint256 circleId = _createCircle(savingCircles, circle, members, alicePrivateKey);
+    uint256 circleId = _createCircle(savingCircles, circle, members, _alicePrivateKey);
     if (block.timestamp < startTime) vm.warp(startTime);
     vm.prank(alice);
     savingCircles.start(circleId);
@@ -153,7 +153,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
       startTimes[c] = block.timestamp + 1 days + (c * 1 hours); // Stagger start times
       ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval, address(token));
 
-      circleIds[c] = _createCircle(savingCircles, circle, members, alicePrivateKey);
+      circleIds[c] = _createCircle(savingCircles, circle, members, _alicePrivateKey);
       if (block.timestamp < startTimes[c]) vm.warp(startTimes[c]);
       vm.prank(alice);
       savingCircles.start(circleIds[c]);
@@ -210,7 +210,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
     uint256 startTime = block.timestamp + 1 days;
     ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval, address(token));
 
-    uint256 circleId = _createCircle(savingCircles, circle, members, alicePrivateKey);
+    uint256 circleId = _createCircle(savingCircles, circle, members, _alicePrivateKey);
     if (block.timestamp < startTime) vm.warp(startTime);
     vm.prank(alice);
     savingCircles.start(circleId);

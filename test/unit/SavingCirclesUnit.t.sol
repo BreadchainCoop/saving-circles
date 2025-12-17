@@ -27,13 +27,13 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   address public bob;
   address public carol;
   address public immutable STRANGER = makeAddr('stranger');
-  address internal ownerWithKey;
-  address internal nonOwnerSigner;
-  uint256 internal ownerPrivateKey;
-  uint256 internal alicePrivateKey;
-  uint256 internal bobPrivateKey;
-  uint256 internal carolPrivateKey;
-  uint256 internal nonOwnerPrivateKey;
+  address internal _ownerWithKey;
+  address internal _nonOwnerSigner;
+  uint256 internal _ownerPrivateKey;
+  uint256 internal _alicePrivateKey;
+  uint256 internal _bobPrivateKey;
+  uint256 internal _carolPrivateKey;
+  uint256 internal _nonOwnerPrivateKey;
 
   // Test data
   uint256 public baseCircleId;
@@ -43,12 +43,12 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
   function setUp() external {
     // Setup test addresses
-    (owner, ownerPrivateKey) = makeAddrAndKey('owner');
-    ownerWithKey = owner;
-    (alice, alicePrivateKey) = makeAddrAndKey('alice');
-    (bob, bobPrivateKey) = makeAddrAndKey('bob');
-    (carol, carolPrivateKey) = makeAddrAndKey('carol');
-    (nonOwnerSigner, nonOwnerPrivateKey) = makeAddrAndKey('nonOwnerSigner');
+    (owner, _ownerPrivateKey) = makeAddrAndKey('owner');
+    _ownerWithKey = owner;
+    (alice, _alicePrivateKey) = makeAddrAndKey('alice');
+    (bob, _bobPrivateKey) = makeAddrAndKey('bob');
+    (carol, _carolPrivateKey) = makeAddrAndKey('carol');
+    (_nonOwnerSigner, _nonOwnerPrivateKey) = makeAddrAndKey('nonOwnerSigner');
 
     // Deploy and initialize the contract
     vm.startPrank(owner);
@@ -76,25 +76,26 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     baseCircle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
     // Create an initial test circle
-    baseCircleId = _createCircleWithMembers(savingCircles, baseCircle, members, alicePrivateKey);
+    baseCircleId = _createCircleWithMembers(savingCircles, baseCircle, members, _alicePrivateKey);
     baseCircleStart = savingCircles.getCircle(baseCircleId).effectiveCircleStartTime;
   }
 
   function _createBaseCircle() internal returns (uint256) {
-    return _createCircleWithMembers(savingCircles, baseCircle, members, alicePrivateKey);
+    return _createCircleWithMembers(savingCircles, baseCircle, members, _alicePrivateKey);
   }
 
   function _createUnstartedCircle() internal returns (uint256) {
-    return _createCircle(savingCircles, baseCircle, members, alicePrivateKey);
+    return _createCircle(savingCircles, baseCircle, members, _alicePrivateKey);
   }
 
   function _createInviteCircle() internal returns (uint256) {
     address[] memory inviteMembers = new address[](1);
-    inviteMembers[0] = ownerWithKey;
+    inviteMembers[0] = _ownerWithKey;
 
-    ISavingCircles.Circle memory circle = _defaultCircle(ownerWithKey, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
+    ISavingCircles.Circle memory circle =
+      _defaultCircle(_ownerWithKey, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
-    return _createCircle(savingCircles, circle, inviteMembers, ownerPrivateKey);
+    return _createCircle(savingCircles, circle, inviteMembers, _ownerPrivateKey);
   }
 
   function test_SetTokenAllowedWhenCallerIsNotOwner() external {
@@ -472,7 +473,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
     ISavingCircles.Circle memory circle = _defaultCircle(owner, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
-    uint256 circleId = _createCircleWithMembers(savingCircles, circle, circleMembers, ownerPrivateKey);
+    uint256 circleId = _createCircleWithMembers(savingCircles, circle, circleMembers, _ownerPrivateKey);
 
     address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
     assertEq(storedMembers.length, circleMembers.length);
@@ -488,7 +489,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
     ISavingCircles.Circle memory circle = _defaultCircle(owner, DEPOSIT_AMOUNT, overflowingInterval, address(token));
 
-    uint256 circleId = _createCircle(savingCircles, circle, twoMembers, ownerPrivateKey);
+    uint256 circleId = _createCircle(savingCircles, circle, twoMembers, _ownerPrivateKey);
 
     vm.warp(startTime);
     vm.prank(owner);
@@ -503,7 +504,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     circleMembers[1] = bob;
     circleMembers[2] = carol;
 
-    uint256 circleId = _createCircle(savingCircles, circle, circleMembers, alicePrivateKey);
+    uint256 circleId = _createCircle(savingCircles, circle, circleMembers, _alicePrivateKey);
 
     uint256 expectedStart = block.timestamp + 5 hours;
     vm.warp(expectedStart);
@@ -521,7 +522,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
     address invitee = STRANGER;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, ownerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey);
 
     vm.prank(invitee);
     vm.expectEmit(true, true, true, true);
@@ -542,7 +543,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     uint256 circleId = _createInviteCircle();
     uint256 otherCircleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signatureForOtherCircle = _signInvite(address(savingCircles), otherCircleId, nonce, ownerPrivateKey);
+    bytes memory signatureForOtherCircle = _signInvite(address(savingCircles), otherCircleId, nonce, _ownerPrivateKey);
 
     vm.prank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidSigner.selector));
@@ -552,7 +553,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   function test_RedeemInvitePreventsNonceReplay() external {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, ownerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey);
 
     vm.prank(STRANGER);
     savingCircles.redeemInvite(circleId, nonce, signature);
@@ -566,7 +567,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   function test_RedeemInviteRejectsExistingMember() external {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, ownerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey);
 
     vm.prank(alice);
     savingCircles.redeemInvite(circleId, nonce, signature);
@@ -574,7 +575,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyMember.selector));
     savingCircles.redeemInvite(
-      circleId, nonce + 1, _signInvite(address(savingCircles), circleId, nonce + 1, ownerPrivateKey)
+      circleId, nonce + 1, _signInvite(address(savingCircles), circleId, nonce + 1, _ownerPrivateKey)
     );
   }
 
@@ -586,25 +587,25 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   function test_RedeemInviteRejectsActiveCircle() external {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, ownerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey);
 
     vm.prank(alice);
     savingCircles.redeemInvite(circleId, nonce, signature);
 
-    vm.prank(ownerWithKey);
+    vm.prank(_ownerWithKey);
     savingCircles.start(circleId);
 
     vm.prank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyActive.selector));
     savingCircles.redeemInvite(
-      circleId, nonce + 1, _signInvite(address(savingCircles), circleId, nonce + 1, ownerPrivateKey)
+      circleId, nonce + 1, _signInvite(address(savingCircles), circleId, nonce + 1, _ownerPrivateKey)
     );
   }
 
   function test_RedeemInviteRejectsNonOwnerSignature() external {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, nonOwnerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _nonOwnerPrivateKey);
 
     vm.prank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidSigner.selector));
@@ -618,7 +619,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     ISavingCircles.Circle memory _invalidCircle =
       _defaultCircle(owner, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
-    uint256 invalidCircleId = _createCircle(savingCircles, _invalidCircle, _oneMember, ownerPrivateKey);
+    uint256 invalidCircleId = _createCircle(savingCircles, _invalidCircle, _oneMember, _ownerPrivateKey);
 
     vm.prank(owner);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidMemberCount.selector));
@@ -629,7 +630,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     // Create a second circle
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = carol;
-    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, carolPrivateKey);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, _carolPrivateKey);
 
     // Create array of circle IDs to fetch
     uint256[] memory circleIds = new uint256[](2);
@@ -681,7 +682,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
     ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, 1 hours, address(token));
 
-    uint256 circleId = _createCircle(savingCircles, circle, circleMembers, alicePrivateKey);
+    uint256 circleId = _createCircle(savingCircles, circle, circleMembers, _alicePrivateKey);
 
     uint256 startTime = block.timestamp + 1 hours;
     vm.warp(startTime);
@@ -707,7 +708,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     // Create a second circle that alice is also a member of
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = carol;
-    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, carolPrivateKey);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, _carolPrivateKey);
 
     // Get alice's circles
     uint256[] memory aliceCircles = savingCircles.getMemberCircles(alice);
@@ -872,7 +873,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
     ISavingCircles.Circle memory circle = _defaultCircle(alice, maxAmount, DEPOSIT_INTERVAL, address(token));
 
-    uint256 circleId = _createCircle(savingCircles, circle, twoMembers, alicePrivateKey);
+    uint256 circleId = _createCircle(savingCircles, circle, twoMembers, _alicePrivateKey);
 
     // Verify circle was created with large values
     ISavingCircles.Circle memory created = savingCircles.getCircle(circleId);
@@ -932,7 +933,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
     for (uint256 i = 0; i < 10; i++) {
       ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
-      circleIds[i] = _createCircleWithMembers(savingCircles, circle, members, alicePrivateKey);
+      circleIds[i] = _createCircleWithMembers(savingCircles, circle, members, _alicePrivateKey);
     }
 
     // Get all circles for alice
@@ -951,7 +952,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
       if (i < 10) {
         // Alice is member in first 10
         ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
-        circleIds[i] = _createCircle(savingCircles, circle, members, alicePrivateKey);
+        circleIds[i] = _createCircle(savingCircles, circle, members, _alicePrivateKey);
       } else {
         // Alice is not member in last 10
         address[] memory otherMembers = new address[](2);
@@ -960,7 +961,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
         ISavingCircles.Circle memory circle = _defaultCircle(bob, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
-        circleIds[i] = _createCircle(savingCircles, circle, otherMembers, bobPrivateKey);
+        circleIds[i] = _createCircle(savingCircles, circle, otherMembers, _bobPrivateKey);
       }
     }
 
@@ -982,7 +983,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     // Create a second circle that alice is also a member of
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = carol;
-    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, carolPrivateKey);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, _carolPrivateKey);
 
     // Create array of circle IDs to check
     uint256[] memory circleIds = new uint256[](3);

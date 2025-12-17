@@ -329,8 +329,8 @@ contract SavingCirclesIntegration is IntegrationBase {
     ISavingCircles.Circle memory circle1 = _defaultCircle(alice, 1 ether, 1 days, address(token));
     ISavingCircles.Circle memory circle2 = _defaultCircle(bob, 2 ether, 2 days, address(token));
 
-    uint256 circleId1 = _createCircle(circle, circle1, sharedMembers, alicePrivateKey);
-    uint256 circleId2 = _createCircle(circle, circle2, mixedMembers, bobPrivateKey);
+    uint256 circleId1 = _createCircle(circle, circle1, sharedMembers, _alicePrivateKey);
+    uint256 circleId2 = _createCircle(circle, circle2, mixedMembers, _bobPrivateKey);
 
     vm.warp(startTime1);
     vm.prank(circle1.owner);

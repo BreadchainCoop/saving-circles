@@ -240,13 +240,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
     return circleMembers[_id];
   }
 
+  function isDecommissionable(uint256 _id) external view override returns (bool) {
+    return _isDecommissionable(_id);
+  }
+
   /// @inheritdoc ISavingCircles
   function isDecommissioned(Circle calldata _circle) external pure override returns (bool) {
     return _isDecommissioned(_circle);
-  }
-
-  function isDecommissionable(uint256 _id) external view override returns (bool) {
-    return _isDecommissionable(_id);
   }
 
   /// @inheritdoc ISavingCircles

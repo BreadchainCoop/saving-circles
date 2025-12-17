@@ -21,10 +21,10 @@ contract DelegatedSavingCirclesUnit is SavingCirclesTestBase {
   address public alice = makeAddr('alice');
   address public bob = makeAddr('bob');
   address public carol = makeAddr('carol');
-  uint256 internal ownerPrivateKey;
-  uint256 internal alicePrivateKey;
-  uint256 internal bobPrivateKey;
-  uint256 internal carolPrivateKey;
+  uint256 internal _ownerPrivateKey;
+  uint256 internal _alicePrivateKey;
+  uint256 internal _bobPrivateKey;
+  uint256 internal _carolPrivateKey;
 
   uint256 public constant DEPOSIT_AMOUNT = 1 ether;
   uint256 public constant DEPOSIT_INTERVAL = 1 weeks;
@@ -38,10 +38,10 @@ contract DelegatedSavingCirclesUnit is SavingCirclesTestBase {
     // Deploy token
     token = new MockERC20('Test Token', 'TEST');
 
-    (owner, ownerPrivateKey) = makeAddrAndKey('owner');
-    (alice, alicePrivateKey) = makeAddrAndKey('alice');
-    (bob, bobPrivateKey) = makeAddrAndKey('bob');
-    (carol, carolPrivateKey) = makeAddrAndKey('carol');
+    (owner, _ownerPrivateKey) = makeAddrAndKey('owner');
+    (alice, _alicePrivateKey) = makeAddrAndKey('alice');
+    (bob, _bobPrivateKey) = makeAddrAndKey('bob');
+    (carol, _carolPrivateKey) = makeAddrAndKey('carol');
 
     // Deploy main SavingCircles contract
     proxyAdmin = new ProxyAdmin(owner);
@@ -67,7 +67,7 @@ contract DelegatedSavingCirclesUnit is SavingCirclesTestBase {
     // Create base circle
     baseCircle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
-    baseCircleId = _createCircleWithMembers(savingCircles, baseCircle, members, alicePrivateKey);
+    baseCircleId = _createCircleWithMembers(savingCircles, baseCircle, members, _alicePrivateKey);
   }
 
   function test_SetDelegatedDepositsEnabled() external {
