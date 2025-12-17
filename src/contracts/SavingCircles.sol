@@ -40,6 +40,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
     _;
   }
 
+  /// @dev Requires circle is active by checking the mapping
   modifier onlyActive(uint256 _id) {
     if (!isActive[_id]) revert NotActive();
     _;
@@ -70,7 +71,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
   }
 
   /// @inheritdoc ISavingCircles
-  function create(Circle memory _circle) external override returns (uint256 _id) {
+  function create(Circle calldata _circle) external override returns (uint256 _id) {
     _id = nextId++;
 
     if (circles[_id].owner != address(0)) revert AlreadyExists();
@@ -92,6 +93,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
     return _id;
   }
 
+  /// @inheritdoc ISavingCircles
   function start(uint256 _id) external override nonReentrant onlyCommissioned(_id) {
     Circle storage _circle = circles[_id];
     if (isActive[_id]) revert AlreadyActive();
@@ -239,7 +241,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
   }
 
   /// @inheritdoc ISavingCircles
-  function isDecommissioned(Circle memory _circle) external pure override returns (bool) {
+  function isDecommissioned(Circle calldata _circle) external pure override returns (bool) {
     return _isDecommissioned(_circle);
   }
 
