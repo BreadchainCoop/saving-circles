@@ -8,8 +8,8 @@ import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
 import {MockERC20} from '../mocks/MockERC20.sol';
 
 import {SavingCirclesTestBase} from '../utils/SavingCirclesTestBase.t.sol';
-import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
-import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
+import {ProxyAdmin} from '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol';
+import {TransparentUpgradeableProxy} from '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Test} from 'forge-std/Test.sol';
 
 contract DelegatedSavingCirclesUnit is SavingCirclesTestBase {

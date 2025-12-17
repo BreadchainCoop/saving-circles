@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {OwnableUpgradeable} from '@openzeppelin-upgradeable/access/OwnableUpgradeable.sol';
-import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
-import {ReentrancyGuard} from '@openzeppelin/utils/ReentrancyGuard.sol';
-import {ECDSA} from '@openzeppelin/utils/cryptography/ECDSA.sol';
+import {OwnableUpgradeable} from '@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol';
+import {EIP712Upgradeable} from '@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol';
+import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
 
 import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
 
@@ -17,8 +18,11 @@ import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
  * @author exo404
  * @author valeriooconte
  */
-contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
+contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, EIP712Upgradeable {
   uint256 public constant MINIMUM_MEMBERS = 2;
+  string private constant EIP712_NAME = 'StacksInvite';
+  string private constant EIP712_VERSION = '1';
+  bytes32 private constant INVITE_TYPEHASH = keccak256('Invite(uint256 id,uint256 nonce)');
 
   uint256 public nextId;
   mapping(uint256 id => Circle circle) public circles;
@@ -54,6 +58,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
   /// @inheritdoc ISavingCircles
   function initialize(address _owner) external override initializer {
+    __EIP712_init(EIP712_NAME, EIP712_VERSION);
     __Ownable_init_unchained(_owner);
   }
 
@@ -375,21 +380,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable {
 
   /**
    * @dev Computes the EIP-712 hash for an invite
-   * @notice _inviteTypehash is keccak256('Invite(uint256 id,uint256 nonce)')
-   * @notice _eip712DomainTypehash is keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')
-   * @notice Domain name is 'StacksInvite' and version is '1'
+   * @notice INVITE_TYPEHASH is keccak256('Invite(uint256 id,uint256 nonce)')
    */
   function _hashInvite(uint256 _id, uint256 _nonce) private view returns (bytes32) {
-    bytes32 _inviteTypehash = 0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3;
-    bytes32 _structHash = keccak256(abi.encode(_inviteTypehash, _id, _nonce));
-    bytes32 _eip712DomainTypehash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
-    bytes32 _inviteDomainNameHash = 0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
-    bytes32 _inviteDomainVersionHash = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
-
-    bytes32 _domainSeparator = keccak256(
-      abi.encode(_eip712DomainTypehash, _inviteDomainNameHash, _inviteDomainVersionHash, block.chainid, address(this))
-    );
-
-    return keccak256(abi.encodePacked('\x19\x01', _domainSeparator, _structHash));
+    bytes32 _structHash = keccak256(abi.encode(INVITE_TYPEHASH, _id, _nonce));
+    return _hashTypedDataV4(_structHash);
   }
 }

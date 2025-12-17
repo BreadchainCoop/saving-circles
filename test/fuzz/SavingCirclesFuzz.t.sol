@@ -6,7 +6,7 @@ import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
 import {MockERC20} from '../mocks/MockERC20.sol';
 
 import {SavingCirclesTestBase} from '../utils/SavingCirclesTestBase.t.sol';
-import {ERC1967Proxy} from '@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol';
+import {ERC1967Proxy} from '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
 import {Test} from 'forge-std/Test.sol';
 
 contract SavingCirclesFuzzTest is SavingCirclesTestBase {

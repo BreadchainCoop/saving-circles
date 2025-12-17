@@ -3,8 +3,8 @@ pragma solidity 0.8.28;
 
 import {IDelegatedSavingCircles} from '../interfaces/IDelegatedSavingCircles.sol';
 import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
-import {IERC20} from '@openzeppelin/token/ERC20/IERC20.sol';
-import {ReentrancyGuard} from '@openzeppelin/utils/ReentrancyGuard.sol';
+import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 /**
  * @title DelegatedSavingCircles

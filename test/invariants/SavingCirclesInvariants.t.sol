@@ -6,7 +6,7 @@ import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
 import {MockERC20} from '../mocks/MockERC20.sol';
 
 import {SavingCirclesHandler} from './handlers/SavingCirclesHandler.sol';
-import {ERC1967Proxy} from '@openzeppelin/proxy/ERC1967/ERC1967Proxy.sol';
+import {ERC1967Proxy} from '@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol';
 import {StdInvariant} from 'forge-std/StdInvariant.sol';
 import {Test} from 'forge-std/Test.sol';
 
