@@ -16,11 +16,13 @@
     "deploy:gnosis": "bash -c 'source .env && forge script Deploy --rpc-url $GNOSIS_RPC --private-key $GNOSIS_PK --broadcast --verify --chain gnosis -vvvvv'",
     "deploy:optimism": "bash -c 'source .env && forge script Deploy --rpc-url $OPTIMISM_RPC --private-key $OPTIMISM_PK --broadcast --verify --chain optimism -vvvvv'",
     "deploy:sepolia": "bash -c 'source .env && forge script Deploy --rpc-url $SEPOLIA_RPC --private-key $SEPOLIA_PK --broadcast --verify --chain sepolia -vvvvv'",
+    "dev:frontend": "vite --open",
     "lint:check": "yarn lint:sol && forge fmt --check",
     "lint:fix": "sort-package-json && forge fmt && yarn lint:sol --fix",
     "lint:sol": "solhint 'src/**/*.sol' 'script/**/*.sol' 'test/**/*.sol'",
     "prepare": "husky",
     "test": "forge test -vvv",
+    "test:frontend": "vitest run",
     "test:integration": "forge test --match-contract Integration -vvv",
     "test:symbolic": "halmos",
     "test:unit": "forge test --match-contract Unit -vvv",
@@ -38,11 +40,17 @@
   "devDependencies": {
     "@commitlint/cli": "19.3.0",
     "@commitlint/config-conventional": "19.2.2",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.3.0",
+    "@testing-library/user-event": "^14.6.0",
     "forge-std": "github:foundry-rs/forge-std#1.9.2",
     "halmos-cheatcodes": "github:a16z/halmos-cheatcodes#c0d8655",
     "husky": ">=9",
+    "jsdom": "^24.1.0",
     "lint-staged": ">=10",
     "solhint-community": "4.0.0",
-    "sort-package-json": "2.10.0"
+    "sort-package-json": "2.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }

@@ -15,6 +15,7 @@ interface ISavingCirclesViewer {
    * @param canWithdraw Whether the user can currently withdraw
    * @param isExpired Whether the circle has expired
    * @param isDecommissioned Whether the circle has been decommissioned
+   * @param isDecommissionable Whether the circle can be decommissioned
    * @param nextWithdrawTime When the next withdrawal can occur
    * @param depositWindowEnd When the current deposit window ends
    * @param totalPoolBalance Total balance of all members in the circle
@@ -32,6 +33,7 @@ interface ISavingCirclesViewer {
     bool canWithdraw;
     bool isExpired;
     bool isDecommissioned;
+    bool isDecommissionable;
     uint256 nextWithdrawTime;
     uint256 depositWindowEnd;
     uint256 totalPoolBalance;
@@ -70,6 +72,7 @@ interface ISavingCirclesViewer {
    * @param withdrawableCircleIds Circle IDs where user can withdraw
    * @param expiredCircleIds Circle IDs that have expired
    * @param decommissionedCircleIds Circle IDs that have been decommissioned
+   * @param decommissionableCircleIds Circle IDs that can be decommissioned
    */
   struct UserMembershipStatus {
     uint256[] allCircleIds;
@@ -78,6 +81,7 @@ interface ISavingCirclesViewer {
     uint256[] withdrawableCircleIds;
     uint256[] expiredCircleIds;
     uint256[] decommissionedCircleIds;
+    uint256[] decommissionableCircleIds;
   }
 
   /**

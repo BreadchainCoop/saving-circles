@@ -4,9 +4,9 @@ pragma solidity ^0.8.28;
 import {SavingCircles} from '../../../src/contracts/SavingCircles.sol';
 import {ISavingCircles} from '../../../src/interfaces/ISavingCircles.sol';
 import {MockERC20} from '../../mocks/MockERC20.sol';
-import {Test} from 'forge-std/Test.sol';
+import {SavingCirclesTestBase} from '../../utils/SavingCirclesTestBase.t.sol';
 
-contract SavingCirclesHandler is Test {
+contract SavingCirclesHandler is SavingCirclesTestBase {
   SavingCircles public savingCircles;
   MockERC20 public token;
 
@@ -20,6 +20,7 @@ contract SavingCirclesHandler is Test {
   uint256 public expectedWithdrawals;
 
   address[] public actors;
+  mapping(address actor => uint256 key) public actorKeys;
   mapping(address actor => bool isActorBool) public isActor;
 
   uint256 public currentTime;
@@ -37,9 +38,10 @@ contract SavingCirclesHandler is Test {
     currentTime = block.timestamp;
 
     for (uint256 i = 0; i < 10; i++) {
-      address actor = makeAddr(string(abi.encodePacked('actor', i)));
+      (address actor, uint256 key) = makeAddrAndKey(string(abi.encodePacked('actor', i)));
       actors.push(actor);
       isActor[actor] = true;
+      actorKeys[actor] = key;
     }
   }
 
@@ -47,14 +49,12 @@ contract SavingCirclesHandler is Test {
     uint256 memberCountSeed,
     uint256 depositAmount,
     uint256 depositInterval,
-    uint256 maxDeposits,
     uint256 circleStartOffset,
     uint256 _actorSeed // solhint-disable-line no-unused-vars
   ) public useActor(_actorSeed) {
     uint256 memberCount = bound(memberCountSeed, 2, 5);
     depositAmount = bound(depositAmount, 100, 1e18);
     depositInterval = bound(depositInterval, 1 hours, 7 days);
-    maxDeposits = bound(maxDeposits, memberCount, memberCount * 2);
     circleStartOffset = bound(circleStartOffset, 1, 30 days);
 
     address[] memory members = new address[](memberCount);
@@ -64,18 +64,22 @@ contract SavingCirclesHandler is Test {
 
     ISavingCircles.Circle memory circle = ISavingCircles.Circle({
       owner: msg.sender,
-      members: members,
-      token: address(token),
+      currentIndex: 0,
       depositAmount: depositAmount,
+      token: address(token),
       depositInterval: depositInterval,
-      maxDeposits: maxDeposits,
-      circleStart: currentTime + circleStartOffset,
-      currentIndex: 0
+      effectiveCircleStartTime: 0,
+      circleEnd: 0
     });
 
     try savingCircles.create(circle) returns (uint256 circleId) {
-      activeCircles.push(circleId);
-      isActive[circleId] = true;
+      _addMembers(savingCircles, circleId, msg.sender, actorKeys[msg.sender], members);
+      uint256 startAt = currentTime + circleStartOffset;
+      if (block.timestamp < startAt) vm.warp(startAt);
+      try savingCircles.start(circleId) {
+        activeCircles.push(circleId);
+        isActive[circleId] = true;
+      } catch {}
     } catch {}
   }
 
@@ -120,10 +124,11 @@ contract SavingCirclesHandler is Test {
     if (!isActive[circleId]) return;
 
     try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
-      if (circle.members.length == 0) return;
+      address[] memory members = savingCircles.getCircleMembers(circleId);
+      if (members.length == 0) return;
 
-      uint256 memberIndex = memberIndexSeed % circle.members.length;
-      address member = circle.members[memberIndex];
+      uint256 memberIndex = memberIndexSeed % members.length;
+      address member = members[memberIndex];
 
       uint256 currentBalance = savingCircles.balances(circleId, member);
       uint256 maxDeposit = circle.depositAmount > currentBalance ? circle.depositAmount - currentBalance : 0;
@@ -150,6 +155,7 @@ contract SavingCirclesHandler is Test {
     if (!isActive[circleId]) return;
 
     try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+      address[] memory members = savingCircles.getCircleMembers(circleId);
       if (!savingCircles.isMember(circleId, msg.sender)) return;
 
       uint256 balanceBefore = token.balanceOf(msg.sender);
@@ -157,7 +163,7 @@ contract SavingCirclesHandler is Test {
       try savingCircles.withdraw(circleId) {
         uint256 balanceAfter = token.balanceOf(msg.sender);
         uint256 withdrawnAmount = balanceAfter - balanceBefore;
-        uint256 expectedWithdrawal = circle.depositAmount * circle.members.length;
+        uint256 expectedWithdrawal = circle.depositAmount * members.length;
         totalWithdrawn += withdrawnAmount;
         totalDeposits -= withdrawnAmount;
         expectedWithdrawals += expectedWithdrawal;
@@ -178,11 +184,12 @@ contract SavingCirclesHandler is Test {
     if (!isActive[circleId]) return;
 
     try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+      address[] memory members = savingCircles.getCircleMembers(circleId);
       if (!savingCircles.isMember(circleId, msg.sender)) return;
-      if (circle.members.length == 0) return;
+      if (members.length == 0) return;
 
-      uint256 memberIndex = memberIndexSeed % circle.members.length;
-      address member = circle.members[memberIndex];
+      uint256 memberIndex = memberIndexSeed % members.length;
+      address member = members[memberIndex];
 
       uint256 balanceBefore = token.balanceOf(member);
 
@@ -206,9 +213,10 @@ contract SavingCirclesHandler is Test {
     if (!isActive[circleId]) return;
 
     try savingCircles.getCircle(circleId) returns (ISavingCircles.Circle memory circle) {
+      address[] memory members = savingCircles.getCircleMembers(circleId);
       uint256 totalRefunded = 0;
-      for (uint256 i = 0; i < circle.members.length; i++) {
-        totalRefunded += savingCircles.balances(circleId, circle.members[i]);
+      for (uint256 i = 0; i < members.length; i++) {
+        totalRefunded += savingCircles.balances(circleId, members[i]);
       }
 
       try savingCircles.decommission(circleId) {

@@ -11,17 +11,16 @@ interface ISavingCircles {
    * @param token The token of the circle
    * @param depositInterval The deposit interval of the circle
    * @param circleStart The start time of the circle
-   * @param maxDeposits The maximum number of deposits for the circle
+   * @param circleEnd The end time of the circle
    */
   struct Circle {
     address owner;
-    address[] members;
     uint256 currentIndex;
     uint256 depositAmount;
     address token;
     uint256 depositInterval;
-    uint256 circleStart;
-    uint256 maxDeposits;
+    uint256 effectiveCircleStartTime;
+    uint256 circleEnd;
   }
 
   // =======================
@@ -31,14 +30,11 @@ interface ISavingCircles {
   /**
    * @notice Emitted when a circle is created
    * @param id The ID of the circle
-   * @param members The members of the circle
    * @param token The token of the circle
    * @param depositAmount The deposit amount of the circle
    * @param depositInterval The deposit interval of the circle
    */
-  event CircleCreated(
-    uint256 indexed id, address[] members, address token, uint256 depositAmount, uint256 depositInterval
-  );
+  event CircleCreated(uint256 indexed id, address token, uint256 depositAmount, uint256 depositInterval);
 
   /**
    * @notice Emitted when a circle is decommissioned
@@ -68,6 +64,18 @@ interface ISavingCircles {
    * @param allowed Whether the token is allowed
    */
   event TokenAllowed(address indexed token, bool indexed allowed);
+
+  /**
+   * @notice Emitted when an invite is successfully redeemed
+   * @param id The ID of the circle
+   * @param redeemer The address of the redeemer
+   */
+  event InviteRedeemed(uint256 indexed id, address indexed redeemer);
+  /**
+   * @notice Emitted when a saving circle is started
+   * @param id The ID of the circle
+   */
+  event CircleStarted(uint256 indexed id);
 
   /**
    * @notice Thrown when a member attempts to redundantly deposit funds into a circle
@@ -150,11 +158,6 @@ interface ISavingCircles {
   error InvalidDepositAmount();
 
   /**
-   * @notice Thrown when a max deposits is invalid
-   */
-  error InvalidMaxDeposits();
-
-  /**
    * @notice Thrown when a circle start time is invalid
    */
   error InvalidCircleStartTime();
@@ -180,6 +183,33 @@ interface ISavingCircles {
   error InvalidMemberAddress();
 
   /**
+   * @notice Thrown when the signer of an invite is invalid
+   */
+  error InvalidSigner();
+
+  /**
+   * @notice Thrown when the caller is already a member of the Circle
+   */
+  error AlreadyMember();
+
+  /**
+   * @notice Thrown when an invite nonce has already been used
+   */
+  error InviteAlreadyUsed();
+  /**
+   * @notice Thrown when the caller is not the owner of the Circle
+   */
+  error NotOwner();
+  /**
+   * @notice Thrown when the circle is already active
+   */
+  error AlreadyActive();
+  /**
+   * @notice Thrown when the circle is not active
+   */
+  error NotActive();
+
+  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -198,6 +228,12 @@ interface ISavingCircles {
    * @return id The ID of the circle
    */
   function create(Circle memory circle) external returns (uint256);
+
+  /**
+   * @notice Start a circle
+   * @param id The ID of the circle
+   */
+  function start(uint256 id) external;
 
   /**
    * @notice Deposit funds into a circle
@@ -234,6 +270,14 @@ interface ISavingCircles {
   function decommission(uint256 id) external;
 
   /**
+   * @notice Redeems an invite signed by the Circle owner
+   * @param id The ID of the Circle
+   * @param nonce Unique nonce for the invite
+   * @param signature The owner's EIP-712 signature
+   */
+  function redeemInvite(uint256 id, uint256 nonce, bytes calldata signature) external;
+
+  /**
    * @notice Get a single circle
    * @param id The ID of the circle
    * @return circle The circle
@@ -261,6 +305,12 @@ interface ISavingCircles {
    * @return balances The balances of the members of the circle
    */
   function getMemberBalances(uint256 id) external view returns (address[] memory members, uint256[] memory balances);
+  /**
+   * @notice Get the members of a circle
+   * @param id The ID of the circle
+   * @return members The members of the circle
+   */
+  function getCircleMembers(uint256 id) external view returns (address[] memory members);
 
   /**
    * @notice Check if a member is a member of a circle
@@ -283,6 +333,13 @@ interface ISavingCircles {
    * @return decommissioned Whether the circle is decommissioned
    */
   function isDecommissioned(Circle memory circle) external view returns (bool decommissioned);
+
+  /**
+   * @notice Check if a circle is decommissionable
+   * @param id The ID of the circle
+   * @return decommissionable Whether the circle is decommissionable
+   */
+  function isDecommissionable(uint256 id) external view returns (bool decommissionable);
 
   /**
    * @notice Check if a circle is withdrawable

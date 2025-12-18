@@ -6,11 +6,12 @@ import {SavingCircles} from '../../src/contracts/SavingCircles.sol';
 import {IDelegatedSavingCircles} from '../../src/interfaces/IDelegatedSavingCircles.sol';
 import {ISavingCircles} from '../../src/interfaces/ISavingCircles.sol';
 import {MockERC20} from '../mocks/MockERC20.sol';
-import {ProxyAdmin} from '@openzeppelin/proxy/transparent/ProxyAdmin.sol';
-import {TransparentUpgradeableProxy} from '@openzeppelin/proxy/transparent/TransparentUpgradeableProxy.sol';
-import {Test} from 'forge-std/Test.sol';
 
-contract DelegatedSavingCirclesUnit is Test {
+import {SavingCirclesTestBase} from '../utils/SavingCirclesTestBase.t.sol';
+import {ProxyAdmin} from '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol';
+import {TransparentUpgradeableProxy} from '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol';
+
+contract DelegatedSavingCirclesUnit is SavingCirclesTestBase {
   SavingCircles public savingCircles;
   DelegatedSavingCircles public delegatedSavingCircles;
   MockERC20 public token;
@@ -20,6 +21,10 @@ contract DelegatedSavingCirclesUnit is Test {
   address public alice = makeAddr('alice');
   address public bob = makeAddr('bob');
   address public carol = makeAddr('carol');
+  uint256 internal _ownerPrivateKey;
+  uint256 internal _alicePrivateKey;
+  uint256 internal _bobPrivateKey;
+  uint256 internal _carolPrivateKey;
 
   uint256 public constant DEPOSIT_AMOUNT = 1 ether;
   uint256 public constant DEPOSIT_INTERVAL = 1 weeks;
@@ -32,6 +37,11 @@ contract DelegatedSavingCirclesUnit is Test {
   function setUp() external {
     // Deploy token
     token = new MockERC20('Test Token', 'TEST');
+
+    (owner, _ownerPrivateKey) = makeAddrAndKey('owner');
+    (alice, _alicePrivateKey) = makeAddrAndKey('alice');
+    (bob, _bobPrivateKey) = makeAddrAndKey('bob');
+    (carol, _carolPrivateKey) = makeAddrAndKey('carol');
 
     // Deploy main SavingCircles contract
     proxyAdmin = new ProxyAdmin(owner);
@@ -55,19 +65,9 @@ contract DelegatedSavingCirclesUnit is Test {
     savingCircles.setTokenAllowed(address(token), true);
 
     // Create base circle
-    baseCircle = ISavingCircles.Circle({
-      owner: owner,
-      members: members,
-      currentIndex: 0,
-      circleStart: block.timestamp,
-      token: address(token),
-      depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL,
-      maxDeposits: MAX_DEPOSITS
-    });
+    baseCircle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
-    vm.prank(owner);
-    baseCircleId = savingCircles.create(baseCircle);
+    baseCircleId = _createCircleWithMembers(savingCircles, baseCircle, members, _alicePrivateKey);
   }
 
   function test_SetDelegatedDepositsEnabled() external {
