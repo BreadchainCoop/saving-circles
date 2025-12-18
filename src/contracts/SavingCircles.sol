@@ -60,7 +60,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
   /// @inheritdoc ISavingCircles
   function initialize(address _owner) external override initializer {
     __EIP712_init(_EIP712_NAME, _EIP712_VERSION);
-    __Ownable_init_unchained(_owner);
+    __Ownable_init(_owner);
   }
 
   /// @inheritdoc ISavingCircles
