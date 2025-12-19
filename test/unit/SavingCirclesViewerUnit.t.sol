@@ -3,14 +3,14 @@ pragma solidity 0.8.28;
 
 import {ProxyAdmin} from '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol';
 import {TransparentUpgradeableProxy} from '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol';
-import {Test} from 'forge-std/Test.sol';
 
 import {SavingCircles} from 'src/contracts/SavingCircles.sol';
 import {SavingCirclesViewer} from 'src/contracts/SavingCirclesViewer.sol';
 import {ISavingCircles} from 'src/interfaces/ISavingCircles.sol';
 import {MockERC20} from 'test/mocks/MockERC20.sol';
+import {SavingCirclesTestBase} from 'test/utils/SavingCirclesTestBase.t.sol';
 
-contract SavingCirclesViewerUnit is Test {
+contract SavingCirclesViewerUnit is SavingCirclesTestBase {
   uint256 public constant BASE_CURRENT_INDEX = 0;
   uint256 public constant DEPOSIT_AMOUNT = 1 ether;
   uint256 public constant DEPOSIT_INTERVAL = 1 days;
@@ -27,18 +27,23 @@ contract SavingCirclesViewerUnit is Test {
   address public bob;
   address public carol;
   address public immutable STRANGER = makeAddr('stranger');
+  uint256 internal _ownerPrivateKey;
+  uint256 internal _alicePrivateKey;
+  uint256 internal _bobPrivateKey;
+  uint256 internal _carolPrivateKey;
 
   // Test data
   uint256 public baseCircleId;
+  uint256 public baseCircleStart;
   address[] public members;
   ISavingCircles.Circle public baseCircle;
 
   function setUp() external {
     // Setup test addresses
-    owner = makeAddr('owner');
-    alice = makeAddr('alice');
-    bob = makeAddr('bob');
-    carol = makeAddr('carol');
+    (owner, _ownerPrivateKey) = makeAddrAndKey('owner');
+    (alice, _alicePrivateKey) = makeAddrAndKey('alice');
+    (bob, _bobPrivateKey) = makeAddrAndKey('bob');
+    (carol, _carolPrivateKey) = makeAddrAndKey('carol');
 
     // Deploy and initialize the SavingCircles contract
     vm.startPrank(owner);
@@ -66,20 +71,11 @@ contract SavingCirclesViewerUnit is Test {
     members[2] = carol;
 
     // Setup baseCircle parameters
-    baseCircle = ISavingCircles.Circle({
-      owner: owner,
-      members: members,
-      currentIndex: BASE_CURRENT_INDEX,
-      circleStart: block.timestamp,
-      token: address(token),
-      depositAmount: DEPOSIT_AMOUNT,
-      depositInterval: DEPOSIT_INTERVAL,
-      maxDeposits: MAX_DEPOSITS
-    });
+    baseCircle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
 
     // Create an initial test circle
-    vm.prank(alice);
-    baseCircleId = savingCircles.create(baseCircle);
+    baseCircleId = _createCircleWithMembers(savingCircles, baseCircle, members, _alicePrivateKey);
+    baseCircleStart = savingCircles.getCircle(baseCircleId).effectiveCircleStartTime;
   }
 
   /**
@@ -89,8 +85,7 @@ contract SavingCirclesViewerUnit is Test {
     // Create a second circle with the same parameters but a different owner
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = bob;
-    vm.prank(bob);
-    uint256 secondCircleId = savingCircles.create(secondCircle);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, _bobPrivateKey);
 
     // Prepare deposits: full amount in first circle, half in second
     uint256 firstDeposit = DEPOSIT_AMOUNT;
@@ -125,8 +120,7 @@ contract SavingCirclesViewerUnit is Test {
     // Create a second circle
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = bob;
-    vm.prank(bob);
-    uint256 secondCircleId = savingCircles.create(secondCircle);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, _bobPrivateKey);
 
     // Make deposits in both circles
     token.mint(alice, DEPOSIT_AMOUNT * 2);
@@ -148,7 +142,7 @@ contract SavingCirclesViewerUnit is Test {
     assertEq(userData.financialSummary.totalBalance, DEPOSIT_AMOUNT + DEPOSIT_AMOUNT / 2);
     assertEq(userData.financialSummary.totalDeposited, DEPOSIT_AMOUNT + DEPOSIT_AMOUNT / 2);
     assertEq(userData.financialSummary.activeCirclesCount, 2);
-    assertEq(userData.financialSummary.ownedCirclesCount, 0);
+    assertEq(userData.financialSummary.ownedCirclesCount, 1);
     assertEq(userData.financialSummary.pendingWithdrawals, 0);
     assertEq(userData.financialSummary.upcomingDeposits, 1);
 
@@ -157,7 +151,8 @@ contract SavingCirclesViewerUnit is Test {
     assertEq(userData.membershipStatus.allCircleIds[0], baseCircleId);
     assertEq(userData.membershipStatus.allCircleIds[1], secondCircleId);
     assertEq(userData.membershipStatus.activeCircleIds.length, 2);
-    assertEq(userData.membershipStatus.ownedCircleIds.length, 0);
+    assertEq(userData.membershipStatus.ownedCircleIds.length, 1);
+    assertEq(userData.membershipStatus.ownedCircleIds[0], baseCircleId);
 
     // Verify circle data
     assertEq(userData.circleData.length, 2);
@@ -166,24 +161,24 @@ contract SavingCirclesViewerUnit is Test {
     assertEq(userData.circleData[0].circleId, baseCircleId);
     assertEq(userData.circleData[0].userBalance, DEPOSIT_AMOUNT);
     assertTrue(userData.circleData[0].isMember);
-    assertFalse(userData.circleData[0].isOwner);
+    assertTrue(userData.circleData[0].isOwner);
     assertTrue(userData.circleData[0].isCurrentWithdrawer);
     assertFalse(userData.circleData[0].canWithdraw);
     assertEq(userData.circleData[0].completedRounds, 0);
-    assertEq(userData.circleData[0].totalRounds, MAX_DEPOSITS);
+    assertEq(userData.circleData[0].totalRounds, members.length);
 
     // Second circle data
     assertEq(userData.circleData[1].circleId, secondCircleId);
     assertEq(userData.circleData[1].userBalance, DEPOSIT_AMOUNT / 2);
     assertTrue(userData.circleData[1].isMember);
     assertFalse(userData.circleData[1].isOwner);
-    assertTrue(userData.circleData[1].isCurrentWithdrawer);
+    assertFalse(userData.circleData[1].isCurrentWithdrawer);
     assertFalse(userData.circleData[1].canWithdraw);
   }
 
   function test_GetComprehensiveUserDataForCircleOwner() external {
     // Get comprehensive data for the circle owner
-    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(owner);
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(alice);
 
     // Verify financial summary shows ownership
     assertEq(userData.financialSummary.ownedCirclesCount, 1);
@@ -195,8 +190,9 @@ contract SavingCirclesViewerUnit is Test {
 
     // Verify circle data shows ownership
     assertTrue(userData.circleData[0].isOwner);
-    assertFalse(userData.circleData[0].isMember);
-    assertFalse(userData.circleData[0].isCurrentWithdrawer);
+    assertTrue(userData.circleData[0].isMember);
+    assertTrue(userData.circleData[0].isCurrentWithdrawer);
+    assertFalse(userData.circleData[0].isDecommissionable);
   }
 
   function test_GetComprehensiveUserDataWithWithdrawableCircle() external {
@@ -232,6 +228,7 @@ contract SavingCirclesViewerUnit is Test {
     assertTrue(userData.circleData[0].isCurrentWithdrawer);
     assertEq(userData.membershipStatus.withdrawableCircleIds.length, 1);
     assertEq(userData.membershipStatus.withdrawableCircleIds[0], baseCircleId);
+    assertFalse(userData.circleData[0].isDecommissionable);
   }
 
   function test_GetComprehensiveUserDataForNonMember() external {
@@ -251,8 +248,7 @@ contract SavingCirclesViewerUnit is Test {
     ISavingCircles.Circle memory secondCircle = baseCircle;
     secondCircle.owner = bob;
     secondCircle.depositAmount = DEPOSIT_AMOUNT * 2;
-    vm.prank(bob);
-    uint256 secondCircleId = savingCircles.create(secondCircle);
+    uint256 secondCircleId = _createCircleWithMembers(savingCircles, secondCircle, members, _bobPrivateKey);
 
     // Make deposits
     token.mint(alice, DEPOSIT_AMOUNT * 3);
@@ -286,5 +282,16 @@ contract SavingCirclesViewerUnit is Test {
     // Verify upcoming deposits count
     assertEq(summary.upcomingDeposits, 1);
     assertEq(summary.totalDeposited, DEPOSIT_AMOUNT / 2);
+  }
+
+  function test_DecommissionableCirclesIncludedInUserData() external {
+    // Warp beyond the first deposit window without all deposits completed
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL + 1);
+
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(alice);
+
+    assertTrue(userData.circleData[0].isDecommissionable);
+    assertEq(userData.membershipStatus.decommissionableCircleIds.length, 1);
+    assertEq(userData.membershipStatus.decommissionableCircleIds[0], baseCircleId);
   }
 }
