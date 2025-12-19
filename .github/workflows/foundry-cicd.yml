@@ -8,7 +8,7 @@ on:
 
 jobs:
   foundry-cicd:
-    uses: BreadchainCoop/etherform/.github/workflows/_foundry-cicd.yml@main
+    uses: BreadchainCoop/etherform/.github/workflows/_foundry-cicd.yml@implement-cicd-spec
     with:
       # --- CI options ---
       check-formatting: true
