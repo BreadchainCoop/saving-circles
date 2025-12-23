@@ -220,7 +220,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
     external
     view
     override
-    onlyActive(_id)
     returns (address[] memory _members, uint256[] memory _balances)
   {
     Circle memory _circle = circles[_id];
