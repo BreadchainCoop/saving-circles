@@ -41,7 +41,7 @@ contract Common is Script {
       abi.encodeWithSelector(SavingCircles.initialize.selector, _admin)
     );
 
-    // Deploy helpers
+    // Deploy auxiliary contracts that reference the SavingCircles proxy
     new DelegatedSavingCircles(address(proxy));
     new SavingCirclesViewer(address(proxy));
 
