@@ -35,11 +35,10 @@ contract Common is Script {
   }
 
   function _deployContracts(address _admin) internal returns (TransparentUpgradeableProxy) {
-    SavingCircles impl = _deploySavingCircles();
-    ProxyAdmin proxyAdmin = _deployProxyAdmin(_admin);
-
     TransparentUpgradeableProxy proxy = _deployTransparentProxy(
-      address(impl), address(proxyAdmin), abi.encodeWithSelector(SavingCircles.initialize.selector, _admin)
+      address(_deploySavingCircles()),
+      address(_deployProxyAdmin(_admin)),
+      abi.encodeWithSelector(SavingCircles.initialize.selector, _admin)
     );
 
     // Deploy helpers
