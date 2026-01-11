@@ -5,11 +5,13 @@ import {ProxyAdmin} from '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {TransparentUpgradeableProxy} from '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Script} from 'forge-std/Script.sol';
 
+import {DelegatedSavingCircles} from '../src/contracts/DelegatedSavingCircles.sol';
 import {SavingCircles} from '../src/contracts/SavingCircles.sol';
+import {SavingCirclesViewer} from '../src/contracts/SavingCirclesViewer.sol';
 
 /**
  * @title Common Contract
- * @author Breadchain
+ * @author Bread Cooperative
  * @notice This contract is used to deploy an upgradeable Saving Circles contract
  * @dev This contract is intended for use in Scripts and Integration Tests
  */
@@ -33,10 +35,16 @@ contract Common is Script {
   }
 
   function _deployContracts(address _admin) internal returns (TransparentUpgradeableProxy) {
-    return _deployTransparentProxy(
+    TransparentUpgradeableProxy proxy = _deployTransparentProxy(
       address(_deploySavingCircles()),
       address(_deployProxyAdmin(_admin)),
       abi.encodeWithSelector(SavingCircles.initialize.selector, _admin)
     );
+
+    // Deploy auxiliary contracts that reference the SavingCircles proxy
+    new DelegatedSavingCircles(address(proxy));
+    new SavingCirclesViewer(address(proxy));
+
+    return proxy;
   }
 }

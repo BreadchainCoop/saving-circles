@@ -347,13 +347,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
   }
 
   /**
-   * @dev Return if a specified circle is decommissioned by checking if an owner is set
-   */
-  function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
-    return _circle.owner == address(0);
-  }
-
-  /**
    * @dev Return if a specified circle is decommissionable
    *      To be considered decommissionable, the circle must have passed its deposit window
    *      and all members must have made their deposits for the current round.
@@ -377,6 +370,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
     if (!hasIncompleteDeposits) decommissionable = false;
 
     return decommissionable;
+  }
+
+  /**
+   * @dev Return if a specified circle is decommissioned by checking if an owner is set
+   */
+  function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
+    return _circle.owner == address(0);
   }
 
   /**
