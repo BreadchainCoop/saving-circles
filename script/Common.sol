@@ -11,7 +11,7 @@ import {SavingCirclesViewer} from '../src/contracts/SavingCirclesViewer.sol';
 
 /**
  * @title Common Contract
- * @author Bread
+ * @author Bread Cooperative
  * @notice This contract is used to deploy an upgradeable Saving Circles contract
  * @dev This contract is intended for use in Scripts and Integration Tests
  */
