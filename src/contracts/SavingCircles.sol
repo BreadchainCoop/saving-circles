@@ -147,11 +147,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
 
       if (_balance > 0) {
         balances[_id][_member] = 0;
+        isMember[_id][_member] = false;
         bool success = IERC20(token).transfer(_member, _balance);
         if (!success) revert TransferFailed();
       }
     }
 
+    delete circleMembers[_id];
     delete circles[_id];
     emit CircleDecommissioned(_id);
   }
