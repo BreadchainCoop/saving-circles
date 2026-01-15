@@ -118,11 +118,6 @@ interface ISavingCircles {
   error NotWithdrawable();
 
   /**
-   * @notice Thrown when a transfer fails
-   */
-  error TransferFailed();
-
-  /**
    * @notice Thrown when a deposit window is closed
    */
   error DepositWindowClosed();

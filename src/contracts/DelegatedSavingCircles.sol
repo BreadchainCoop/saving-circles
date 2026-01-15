@@ -3,14 +3,18 @@ pragma solidity 0.8.28;
 
 import {IDelegatedSavingCircles} from '../interfaces/IDelegatedSavingCircles.sol';
 import {ISavingCircles} from '../interfaces/ISavingCircles.sol';
+
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
+using SafeERC20 for IERC20;
 /**
  * @title DelegatedSavingCircles
  * @notice Extension contract for delegated deposits in SavingCircles
  * @dev This contract enables delegated ERC20 allowance-based deposits and batch operations
  */
+
 contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
   /// @notice The main SavingCircles contract
   ISavingCircles public immutable SAVING_CIRCLES;
@@ -185,11 +189,10 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     }
 
     // Transfer tokens from member to this contract
-    bool transferSuccess = IERC20(_circle.token).transferFrom(_member, address(this), requiredAmount);
-    if (!transferSuccess) revert ISavingCircles.TransferFailed();
+    IERC20(_circle.token).safeTransferFrom(_member, address(this), requiredAmount);
 
     // Approve the main contract to spend the tokens
-    IERC20(_circle.token).approve(address(SAVING_CIRCLES), requiredAmount);
+    IERC20(_circle.token).forceApprove(address(SAVING_CIRCLES), requiredAmount);
 
     // Call depositFor on the main contract
     SAVING_CIRCLES.depositFor(_circleId, requiredAmount, _member);
