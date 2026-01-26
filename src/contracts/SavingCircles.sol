@@ -34,7 +34,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => mapping(uint256 nonce => bool used)) public usedNonces;
   mapping(uint256 id => bool active) public isActive;
   mapping(uint256 id => address[] members) public circleMembers;
-  uint256[30] private __gap;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
