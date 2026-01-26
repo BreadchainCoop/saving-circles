@@ -12,6 +12,7 @@ interface ISavingCirclesViewer {
    * @param isMember Whether the user is a member of the circle
    * @param isOwner Whether the user owns the circle
    * @param isCurrentWithdrawer Whether the user is the current withdrawer
+   * @param currentWithdrawer The address of the current withdrawer
    * @param canWithdraw Whether the user can currently withdraw
    * @param isExpired Whether the circle has expired
    * @param isDecommissioned Whether the circle has been decommissioned
@@ -30,6 +31,7 @@ interface ISavingCirclesViewer {
     bool isMember;
     bool isOwner;
     bool isCurrentWithdrawer;
+    address currentWithdrawer;
     bool canWithdraw;
     bool isExpired;
     bool isDecommissioned;
