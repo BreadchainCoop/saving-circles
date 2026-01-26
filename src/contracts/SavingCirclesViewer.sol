@@ -118,7 +118,8 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     uint256[] memory memberCircleIds = SAVING_CIRCLES.getMemberCircles(_user);
     uint256[] memory ownedOnlyCircleIds = _getOwnedOnlyCircleIds(_user, memberCircleIds);
 
-    return _combineCircleIdArrays(memberCircleIds, ownedOnlyCircleIds);
+    uint256[] memory combinedCircleIds = _combineCircleIdArrays(memberCircleIds, ownedOnlyCircleIds);
+    return _filterActiveCircleIds(combinedCircleIds);
   }
 
   function _getOwnedOnlyCircleIds(
@@ -356,5 +357,27 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     }
 
     return combined;
+  }
+
+  function _filterActiveCircleIds(uint256[] memory _circleIds) internal view returns (uint256[] memory) {
+    uint256 activeCount = 0;
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      ISavingCircles.Circle memory circle = SAVING_CIRCLES.getCircle(_circleIds[i]);
+      if (!SAVING_CIRCLES.isDecommissioned(circle)) {
+        activeCount++;
+      }
+    }
+
+    uint256[] memory activeCircleIds = new uint256[](activeCount);
+    uint256 currentIndex = 0;
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      uint256 circleId = _circleIds[i];
+      ISavingCircles.Circle memory circle = SAVING_CIRCLES.getCircle(circleId);
+      if (!SAVING_CIRCLES.isDecommissioned(circle)) {
+        activeCircleIds[currentIndex++] = circleId;
+      }
+    }
+
+    return activeCircleIds;
   }
 }
