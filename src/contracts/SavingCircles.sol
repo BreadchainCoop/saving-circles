@@ -209,7 +209,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
     _statuses = new bool[](_ids.length);
 
     for (uint256 i = 0; i < _ids.length; i++) {
-      _statuses[i] = isMember[_ids[i]][_member];
+      if (_isDecommissioned(circles[_ids[i]])) {
+        _statuses[i] = false;
+      } else {
+        _statuses[i] = isMember[_ids[i]][_member];
+      }
     }
 
     return _statuses;
@@ -236,6 +240,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
 
   /// @inheritdoc ISavingCircles
   function getCircleMembers(uint256 _id) external view override returns (address[] memory members) {
+    if (_isDecommissioned(circles[_id])) {
+      return new address[](0);
+    }
     return circleMembers[_id];
   }
 
