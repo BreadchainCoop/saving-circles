@@ -89,6 +89,9 @@ contract SavingCirclesIntegration is IntegrationBase {
     vm.prank(carol);
     circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
+    // Move into last day of round 0
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL - 1 days);
+
     // First member withdraws
     uint256 balanceBefore = token.balanceOf(alice);
     vm.prank(alice);
@@ -103,14 +106,17 @@ contract SavingCirclesIntegration is IntegrationBase {
     vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
     circle.withdraw(baseCircleId);
 
-    // Wait for interval (need to wait for index 1's interval)
-    vm.warp(block.timestamp + DEPOSIT_INTERVAL);
+    // Move to start of round 1 window
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
     vm.prank(alice);
     circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.prank(bob);
     circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.prank(carol);
     circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+
+    // Move into last day of round 1
+    vm.warp(baseCircleStart + (2 * DEPOSIT_INTERVAL) - 1 days);
 
     // Bob should be able to withdraw
     vm.prank(bob);
@@ -130,6 +136,9 @@ contract SavingCirclesIntegration is IntegrationBase {
     vm.prank(carol);
     circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
 
+    // Move into last day of round 0
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL - 1 days);
+
     // Bob tries to withdraw for Alice (who is first in line)
     uint256 balanceBefore = token.balanceOf(alice);
     vm.prank(bob);
@@ -144,8 +153,8 @@ contract SavingCirclesIntegration is IntegrationBase {
     vm.expectRevert(ISavingCircles.NotWithdrawable.selector);
     circle.withdrawFor(baseCircleId, bob);
 
-    // Wait for interval (need to wait for index 1's interval)
-    vm.warp(block.timestamp + DEPOSIT_INTERVAL);
+    // Move to start of round 1 window
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
 
     // New round of deposits
     vm.prank(alice);
@@ -154,6 +163,9 @@ contract SavingCirclesIntegration is IntegrationBase {
     circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.prank(carol);
     circle.deposit(baseCircleId, DEPOSIT_AMOUNT);
+
+    // Move into last day of round 1
+    vm.warp(baseCircleStart + (2 * DEPOSIT_INTERVAL) - 1 days);
 
     // Alice withdraws for Bob (who is now next in line)
     balanceBefore = token.balanceOf(bob);

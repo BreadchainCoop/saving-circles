@@ -98,6 +98,31 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     return _createCircle(savingCircles, circle, inviteMembers, _ownerPrivateKey);
   }
 
+  function _createCircleWithInterval(uint256 _depositInterval) internal returns (uint256) {
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, _depositInterval, address(token));
+    return _createCircleWithMembers(savingCircles, circle, members, _alicePrivateKey);
+  }
+
+  function _depositFullRound(uint256 _circleId) internal {
+    vm.startPrank(alice);
+    token.mint(alice, DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(_circleId, DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    vm.startPrank(bob);
+    token.mint(bob, DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(_circleId, DEPOSIT_AMOUNT);
+    vm.stopPrank();
+
+    vm.startPrank(carol);
+    token.mint(carol, DEPOSIT_AMOUNT);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.deposit(_circleId, DEPOSIT_AMOUNT);
+    vm.stopPrank();
+  }
+
   function test_SetTokenAllowedWhenCallerIsNotOwner() external {
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
@@ -242,23 +267,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
   function test_WithdrawWhenParametersAreValid() external {
     // Complete deposits from all members
-    vm.startPrank(alice);
-    token.mint(alice, DEPOSIT_AMOUNT);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
-    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    vm.startPrank(bob);
-    token.mint(bob, DEPOSIT_AMOUNT);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
-    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    vm.startPrank(carol);
-    token.mint(carol, DEPOSIT_AMOUNT);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
-    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
-    vm.stopPrank();
+    _depositFullRound(baseCircleId);
 
     // Move time past first round
     vm.warp(block.timestamp + DEPOSIT_INTERVAL);
@@ -288,23 +297,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
   function test_WithdrawForWhenParametersAreValid() external {
     // Complete deposits from all members
-    vm.startPrank(alice);
-    token.mint(alice, DEPOSIT_AMOUNT);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
-    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    vm.startPrank(bob);
-    token.mint(bob, DEPOSIT_AMOUNT);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
-    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    vm.startPrank(carol);
-    token.mint(carol, DEPOSIT_AMOUNT);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
-    savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
-    vm.stopPrank();
+    _depositFullRound(baseCircleId);
 
     // Move time past first round
     vm.warp(block.timestamp + DEPOSIT_INTERVAL);
@@ -516,6 +509,54 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     assertEq(started.effectiveCircleStartTime, expectedStart);
     address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
     assertEq(started.circleEnd, expectedStart + (started.depositInterval * storedMembers.length));
+  }
+
+  function test_WithdrawableDuringLastDayOfCurrentRound() external {
+    uint256 interval = 7 days;
+    uint256 circleId = _createCircleWithInterval(interval);
+    uint256 startTime = savingCircles.getCircle(circleId).effectiveCircleStartTime;
+
+    _depositFullRound(circleId);
+
+    // 1 second before last day begins
+    vm.warp(startTime + interval - 1 days - 1);
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector));
+    savingCircles.withdraw(circleId);
+
+    // At last day start (last 24 hours of window)
+    vm.warp(startTime + interval - 1 days);
+    vm.prank(alice);
+    savingCircles.withdraw(circleId);
+  }
+
+  function test_WithdrawableDayAfterWindowEnds() external {
+    uint256 interval = 7 days;
+    uint256 circleId = _createCircleWithInterval(interval);
+    uint256 startTime = savingCircles.getCircle(circleId).effectiveCircleStartTime;
+
+    _depositFullRound(circleId);
+
+    // Day after window ends
+    vm.warp(startTime + interval + 1 days);
+    vm.prank(alice);
+    savingCircles.withdraw(circleId);
+  }
+
+  function test_LateClaimInNextRoundAllowsNextRoundDeposits() external {
+    uint256 interval = 7 days;
+    uint256 circleId = _createCircleWithInterval(interval);
+    uint256 startTime = savingCircles.getCircle(circleId).effectiveCircleStartTime;
+
+    _depositFullRound(circleId);
+
+    // Warp into round x+1 window (after round x ends)
+    vm.warp(startTime + interval + 1 days);
+    vm.prank(alice);
+    savingCircles.withdraw(circleId);
+
+    // After late claim, deposits for next round should still be allowed
+    _depositFullRound(circleId);
   }
 
   function test_RedeemInviteWhenSignatureIsValid() external {

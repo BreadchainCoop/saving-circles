@@ -326,13 +326,16 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
 
   /**
    * @dev Return if a specified circle is withdrawable
-   *      To be considered withdrawable, enough time must have passed since the deposit interval started
-   *      and all members must have made a deposit.
+   *      To be considered withdrawable, the current deposit window must be within its final day
+   *      (last 24 hours of the current round) and all members must have made a deposit.
    */
   function _withdrawable(uint256 _id) internal view onlyCommissioned(_id) returns (bool) {
     Circle memory _circle = circles[_id];
 
-    if (block.timestamp < _circle.effectiveCircleStartTime + (_circle.depositInterval * _circle.currentIndex)) {
+    uint256 windowEnd = _circle.effectiveCircleStartTime + (_circle.depositInterval * (_circle.currentIndex + 1));
+    uint256 lastDayStart = windowEnd - 1 days;
+
+    if (block.timestamp < lastDayStart) {
       return false;
     }
     address[] memory members = circleMembers[_id];
