@@ -36,6 +36,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => mapping(uint256 nonce => bool used)) public usedNonces;
   mapping(uint256 id => bool active) public isActive;
   mapping(uint256 id => address[] members) public circleMembers;
+  mapping(uint256 id => mapping(address member => bool claimed)) public hasClaimed;
+  mapping(uint256 id => mapping(address member => uint256 round)) private lastDepositRound;
+  mapping(uint256 id => mapping(uint256 round => mapping(address member => uint256 amount))) public roundDeposits;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -186,6 +189,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   /// @inheritdoc ISavingCircles
   function getCircle(uint256 _id) external view override onlyCommissioned(_id) returns (Circle memory _circle) {
     _circle = circles[_id];
+    _circle.currentIndex = _currentRoundIndex(_circle);
   }
 
   /// @inheritdoc ISavingCircles
@@ -194,6 +198,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     for (uint256 i = 0; i < _ids.length; i++) {
       _circles[i] = circles[_ids[i]];
+      _circles[i].currentIndex = _currentRoundIndex(_circles[i]);
     }
   }
 
@@ -229,9 +234,15 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     if (_isDecommissioned(_circle)) revert NotCommissioned();
 
+    uint256 currentRound = _currentRoundIndex(_circle);
     _balances = new uint256[](circleMembers[_id].length);
     for (uint256 i = 0; i < circleMembers[_id].length; i++) {
-      _balances[i] = balances[_id][circleMembers[_id][i]];
+      address member = circleMembers[_id][i];
+      if (lastDepositRound[_id][member] == currentRound) {
+        _balances[i] = balances[_id][member];
+      } else {
+        _balances[i] = 0;
+      }
     }
 
     return (circleMembers[_id], _balances);
@@ -254,7 +265,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   /// @inheritdoc ISavingCircles
   function isWithdrawable(uint256 _id) public view override returns (bool) {
     if (!isActive[_id]) return false;
-    return _withdrawable(_id);
+    Circle memory _circle = circles[_id];
+    uint256 currentRound = _currentRoundIndex(_circle);
+    if (currentRound >= circleMembers[_id].length) return false;
+    address member = circleMembers[_id][currentRound];
+    return _claimable(_id, member);
   }
 
   /// @inheritdoc ISavingCircles
@@ -262,7 +277,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     if (!isActive[_id]) return address(0);
     Circle memory _circle = circles[_id];
 
-    return circleMembers[_id][_circle.currentIndex];
+    uint256 currentRound = _currentRoundIndex(_circle);
+    if (currentRound >= circleMembers[_id].length) return address(0);
+    return circleMembers[_id][currentRound];
   }
 
   /**
@@ -273,20 +290,19 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   function _withdraw(uint256 _id, address _member) internal onlyMember(_id, msg.sender) {
     Circle storage _circle = circles[_id];
 
-    if (!_withdrawable(_id)) revert NotWithdrawable();
-    if (circleMembers[_id][_circle.currentIndex] != _member) revert NotWithdrawable();
-    if (_circle.currentIndex >= circleMembers[_id].length) revert NotWithdrawable();
+    if (!_claimable(_id, _member)) revert NotWithdrawable();
 
     uint256 _withdrawAmount = _circle.depositAmount * (circleMembers[_id].length);
 
-    for (uint256 i = 0; i < circleMembers[_id].length; i++) {
-      balances[_id][circleMembers[_id][i]] = 0;
-    }
+    hasClaimed[_id][_member] = true;
 
-    _circle.currentIndex = (_circle.currentIndex + 1) % circleMembers[_id].length;
     IERC20(_circle.token).safeTransfer(_member, _withdrawAmount);
 
     emit FundsWithdrawn(_id, _member, _withdrawAmount);
+
+    if (_allMembersClaimed(_id) && IERC20(_circle.token).balanceOf(address(this)) == 0) {
+      isActive[_id] = false;
+    }
   }
 
   /**
@@ -304,22 +320,29 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     if (block.timestamp < circles[_id].effectiveCircleStartTime) {
       revert DepositBeforeCircleStart();
     }
-    // Check if the entire circle has expired (all rounds completed)
-    if (block.timestamp >= _circle.circleEnd) {
+    uint256 currentRound = _currentRoundIndex(_circle);
+    if (currentRound >= circleMembers[_id].length) {
       revert CircleExpired();
     }
-    // Check if current deposit window is closed
-    if (
-      block.timestamp
-        >= circles[_id].effectiveCircleStartTime + (circles[_id].depositInterval * (circles[_id].currentIndex + 1))
-    ) {
-      revert DepositWindowClosed();
-    }
-    if (balances[_id][_member] + _value > circles[_id].depositAmount) {
-      revert ExceedsDepositAmount();
+
+    if (currentRound > 0) {
+      uint256 prev = currentRound - 1;
+      if (
+        block.timestamp > _roundEndTime(_circle, prev)
+          && !_allMembersDepositedForRound(_id, prev, _circle.depositAmount)
+      ) {
+        revert CircleStuck();
+      }
     }
 
-    balances[_id][_member] = balances[_id][_member] + _value;
+    uint256 depositedSoFar = roundDeposits[_id][currentRound][_member];
+    if (depositedSoFar + _value > _circle.depositAmount) revert ExceedsDepositAmount();
+
+    uint256 newTotal = depositedSoFar + _value;
+    roundDeposits[_id][currentRound][_member] = newTotal;
+
+    lastDepositRound[_id][_member] = currentRound;
+    balances[_id][_member] = newTotal;
 
     IERC20(_circle.token).safeTransferFrom(msg.sender, address(this), _value);
 
@@ -327,21 +350,19 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /**
-   * @dev Return if a specified circle is withdrawable
-   *      To be considered withdrawable, enough time must have passed since the deposit interval started
-   *      and all members must have made a deposit.
+   * @dev Return if a specified member can claim from a circle
+   *      Claim eligibility is determined by the time-based round index.
    */
-  function _withdrawable(uint256 _id) internal view onlyCommissioned(_id) returns (bool) {
+  function _claimable(uint256 _id, address _member) internal view onlyCommissioned(_id) returns (bool) {
     Circle memory _circle = circles[_id];
+    if (hasClaimed[_id][_member]) return false;
 
-    if (block.timestamp < _circle.effectiveCircleStartTime + (_circle.depositInterval * _circle.currentIndex)) {
-      return false;
-    }
-    address[] memory members = circleMembers[_id];
-    for (uint256 i = 0; i < members.length; i++) {
-      if (balances[_id][members[i]] < _circle.depositAmount) {
-        return false;
-      }
+    uint256 currentRound = _currentRoundIndex(_circle);
+    (uint256 memberIndex, bool found) = _memberIndex(_id, _member);
+    if (!found || currentRound < memberIndex) return false;
+
+    if (currentRound == memberIndex) {
+      return _allMembersDepositedForRound(_id, currentRound, _circle.depositAmount);
     }
 
     return true;
@@ -357,27 +378,72 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   /**
    * @dev Return if a specified circle is decommissionable
    *      To be considered decommissionable, the circle must have passed its deposit window
-   *      and all members must have made their deposits for the current round.
+   *      and some members must have incomplete deposits for the current round.
    */
   function _isDecommissionable(uint256 _id) internal view returns (bool) {
     Circle memory _circle = circles[_id];
-    bool decommissionable = true;
+    uint256 len = circleMembers[_id].length;
+    if (len == 0) return false;
 
-    if (block.timestamp <= _circle.effectiveCircleStartTime + (_circle.depositInterval * (_circle.currentIndex + 1))) {
-      decommissionable = false;
+    uint256 currentRound = _currentRoundIndex(_circle);
+
+    if (currentRound == 0) return false;
+
+    uint256 checkRound = currentRound - 1;
+
+    if (checkRound >= len) checkRound = len - 1;
+    if (block.timestamp <= _roundEndTime(_circle, checkRound)) return false;
+    return !_allMembersDepositedForRound(_id, checkRound, _circle.depositAmount);
+  }
+
+  function _roundEndTime(Circle memory _circle, uint256 round) internal pure returns (uint256) {
+    return _circle.effectiveCircleStartTime + (_circle.depositInterval * (round + 1));
+  }
+
+  function _currentRoundIndex(Circle memory _circle) internal view returns (uint256) {
+    if (
+      _circle.depositInterval == 0 || _circle.effectiveCircleStartTime == 0
+        || block.timestamp < _circle.effectiveCircleStartTime
+    ) {
+      return 0;
     }
 
-    bool hasIncompleteDeposits = false;
+    return (block.timestamp - _circle.effectiveCircleStartTime) / _circle.depositInterval;
+  }
+
+  function _allMembersDepositedForRound(
+    uint256 _id,
+    uint256 _round,
+    uint256 _depositAmount
+  ) internal view returns (bool) {
     address[] memory members = circleMembers[_id];
     for (uint256 i = 0; i < members.length; i++) {
-      if (balances[_id][members[i]] < _circle.depositAmount) {
-        hasIncompleteDeposits = true;
-        break;
+      address member = members[i];
+      if (roundDeposits[_id][_round][member] < _depositAmount) {
+        return false;
       }
     }
-    if (!hasIncompleteDeposits) decommissionable = false;
+    return true;
+  }
 
-    return decommissionable;
+  function _memberIndex(uint256 _id, address _member) internal view returns (uint256, bool) {
+    address[] memory members = circleMembers[_id];
+    for (uint256 i = 0; i < members.length; i++) {
+      if (members[i] == _member) {
+        return (i, true);
+      }
+    }
+    return (0, false);
+  }
+
+  function _allMembersClaimed(uint256 _id) internal view returns (bool) {
+    address[] memory members = circleMembers[_id];
+    for (uint256 i = 0; i < members.length; i++) {
+      if (!hasClaimed[_id][members[i]]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

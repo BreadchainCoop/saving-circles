@@ -203,6 +203,10 @@ interface ISavingCircles {
    * @notice Thrown when the circle is not active
    */
   error NotActive();
+  /**
+   * @notice Thrown when a deposit is missed
+   */
+  error CircleStuck();
 
   /**
    * @notice Initialize the contract
