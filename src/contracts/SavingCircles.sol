@@ -364,16 +364,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   function _claimable(uint256 _id, address _member) internal view onlyCommissioned(_id) returns (bool) {
     Circle memory _circle = circles[_id];
     if (hasClaimed[_id][_member]) return false;
+    if (_isDecommissionable(_id)) return false;
 
     uint256 currentRound = _currentRoundIndex(_circle);
     (uint256 memberIndex, bool found) = _memberIndex(_id, _member);
     if (!found || currentRound < memberIndex) return false;
 
-    if (currentRound == memberIndex) {
-      return _allMembersDepositedForRound(_id, currentRound, _circle.depositAmount);
-    }
-
-    return true;
+    return _allMembersDepositedForRound(_id, memberIndex, _circle.depositAmount);
   }
 
   /**
