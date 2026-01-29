@@ -179,7 +179,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
 
     vm.prank(alice);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.DepositWindowClosed.selector));
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.CircleStuck.selector));
     savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
   }
 
