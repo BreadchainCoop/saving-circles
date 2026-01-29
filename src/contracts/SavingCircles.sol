@@ -143,18 +143,26 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   function decommission(uint256 _id) external override nonReentrant onlyActive(_id) {
     if (!_isDecommissionable(_id)) revert NotDecommissionable();
 
+    Circle memory circle = circles[_id];
     address token = circles[_id].token;
     address[] memory members = circleMembers[_id];
+    uint256 len = members.length;
+
     isActive[_id] = false;
 
-    // Return deposits to members
-    for (uint256 i = 0; i < members.length; i++) {
-      address _member = members[i];
-      uint256 _balance = balances[_id][_member];
+    // Refund all deposits in rounds whose payout hasn't happened yet (recipient not claimed)
+    for (uint256 r = 0; r < len; r++) {
+      address recipient = members[r];
+      if (hasClaimed[_id][recipient]) continue; // round already paid out
 
-      if (_balance > 0) {
-        balances[_id][_member] = 0;
-        IERC20(token).safeTransfer(_member, _balance);
+      for (uint256 i = 0; i < len; i++) {
+        address member = members[i];
+        uint256 amount = roundDeposits[_id][r][member];
+        if (amount == 0) continue;
+
+        roundDeposits[_id][r][member] = 0;
+
+        IERC20(token).safeTransfer(member, amount);
       }
     }
 
