@@ -39,6 +39,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => mapping(address member => bool claimed)) public hasClaimed;
   mapping(uint256 id => mapping(address member => uint256 round)) private lastDepositRound;
   mapping(uint256 id => mapping(uint256 round => mapping(address member => uint256 amount))) public roundDeposits;
+  mapping(uint256 id => mapping(address member => uint256 indexPlusOne)) private memberIndexPlusOne;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -93,6 +94,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][owner] = true;
     memberCircles[owner].push(_id);
     circleMembers[_id].push(owner);
+    memberIndexPlusOne[_id][owner] = circleMembers[_id].length;
 
     circles[_id] = _circle;
     emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
@@ -190,6 +192,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
     circleMembers[_id].push(msg.sender);
+    memberIndexPlusOne[_id][msg.sender] = circleMembers[_id].length;
 
     emit InviteRedeemed(_id, msg.sender);
   }
@@ -432,13 +435,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   function _memberIndex(uint256 _id, address _member) internal view returns (uint256, bool) {
-    address[] memory members = circleMembers[_id];
-    for (uint256 i = 0; i < members.length; i++) {
-      if (members[i] == _member) {
-        return (i, true);
-      }
-    }
-    return (0, false);
+    uint256 indexPlusOne = memberIndexPlusOne[_id][_member];
+    if (indexPlusOne == 0) return (0, false);
+    return (indexPlusOne - 1, true);
   }
 
   function _allMembersClaimed(uint256 _id) internal view returns (bool) {
