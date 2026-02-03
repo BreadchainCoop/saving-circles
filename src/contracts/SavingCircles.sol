@@ -432,7 +432,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     return true;
   }
 
-  function _memberIndex(uint256 _id, address _member) internal view returns (uint256, bool) {
+  function _memberIndex(uint256 _id, address _member) internal view returns (uint256, bool found) {
     uint256 indexPlusOne = _memberIndexPlusOne[_id][_member];
     if (indexPlusOne == 0) return (0, false);
     return (indexPlusOne - 1, true);

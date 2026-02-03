@@ -490,7 +490,6 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
       }
 
       // Check who should withdraw
-      ISavingCircles.Circle memory currentCircle = savingCircles.getCircle(circleId);
       address expectedWithdrawer = savingCircles.withdrawableBy(circleId);
 
       // Verify it's the correct member based on currentIndex
