@@ -336,7 +336,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     if (currentRound > 0) {
       uint256 prev = currentRound - 1;
       if (
-        block.timestamp > _roundEndTime(_circle, prev)
+        block.timestamp >= _roundEndTime(_circle, prev)
           && !_allMembersDepositedForRound(_id, prev, _circle.depositAmount)
       ) {
         revert CircleStuck();
@@ -397,7 +397,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     uint256 checkRound = currentRound - 1;
 
     if (checkRound >= len) checkRound = len - 1;
-    if (block.timestamp <= _roundEndTime(_circle, checkRound)) return false;
+    if (block.timestamp < _roundEndTime(_circle, checkRound)) return false;
     return !_allMembersDepositedForRound(_id, checkRound, _circle.depositAmount);
   }
 
