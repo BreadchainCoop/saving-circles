@@ -308,7 +308,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     emit FundsWithdrawn(_id, _member, _withdrawAmount);
 
-    if (_allMembersClaimed(_id) && IERC20(_circle.token).balanceOf(address(this)) == 0) {
+    if (_allMembersClaimed(_id)) {
       isActive[_id] = false;
     }
   }
