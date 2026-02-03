@@ -37,9 +37,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => bool active) public isActive;
   mapping(uint256 id => address[] members) public circleMembers;
   mapping(uint256 id => mapping(address member => bool claimed)) public hasClaimed;
-  mapping(uint256 id => mapping(address member => uint256 round)) private lastDepositRound;
+  mapping(uint256 id => mapping(address member => uint256 round)) private _lastDepositRound;
   mapping(uint256 id => mapping(uint256 round => mapping(address member => uint256 amount))) public roundDeposits;
-  mapping(uint256 id => mapping(address member => uint256 indexPlusOne)) private memberIndexPlusOne;
+  mapping(uint256 id => mapping(address member => uint256 indexPlusOne)) private _memberIndexPlusOne;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -94,7 +94,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][owner] = true;
     memberCircles[owner].push(_id);
     circleMembers[_id].push(owner);
-    memberIndexPlusOne[_id][owner] = circleMembers[_id].length;
+    _memberIndexPlusOne[_id][owner] = circleMembers[_id].length;
 
     circles[_id] = _circle;
     emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
@@ -145,7 +145,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   function decommission(uint256 _id) external override nonReentrant onlyActive(_id) {
     if (!_isDecommissionable(_id)) revert NotDecommissionable();
 
-    Circle memory circle = circles[_id];
     address token = circles[_id].token;
     address[] memory members = circleMembers[_id];
     uint256 len = members.length;
@@ -192,7 +191,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
     circleMembers[_id].push(msg.sender);
-    memberIndexPlusOne[_id][msg.sender] = circleMembers[_id].length;
+    _memberIndexPlusOne[_id][msg.sender] = circleMembers[_id].length;
 
     emit InviteRedeemed(_id, msg.sender);
   }
@@ -249,7 +248,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     _balances = new uint256[](circleMembers[_id].length);
     for (uint256 i = 0; i < circleMembers[_id].length; i++) {
       address member = circleMembers[_id][i];
-      if (lastDepositRound[_id][member] == currentRound) {
+      if (_lastDepositRound[_id][member] == currentRound) {
         _balances[i] = balances[_id][member];
       } else {
         _balances[i] = 0;
@@ -352,7 +351,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     uint256 newTotal = depositedSoFar + _value;
     roundDeposits[_id][currentRound][_member] = newTotal;
 
-    lastDepositRound[_id][_member] = currentRound;
+    _lastDepositRound[_id][_member] = currentRound;
     balances[_id][_member] = newTotal;
 
     IERC20(_circle.token).safeTransferFrom(msg.sender, address(this), _value);
@@ -407,7 +406,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   function _roundEndTime(Circle memory _circle, uint256 round) internal pure returns (uint256) {
     return _circle.effectiveCircleStartTime + (_circle.depositInterval * (round + 1));
   }
-
   function _currentRoundIndex(Circle memory _circle) internal view returns (uint256) {
     if (
       _circle.depositInterval == 0 || _circle.effectiveCircleStartTime == 0
@@ -435,7 +433,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   function _memberIndex(uint256 _id, address _member) internal view returns (uint256, bool) {
-    uint256 indexPlusOne = memberIndexPlusOne[_id][_member];
+    uint256 indexPlusOne = _memberIndexPlusOne[_id][_member];
     if (indexPlusOne == 0) return (0, false);
     return (indexPlusOne - 1, true);
   }
