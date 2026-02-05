@@ -39,7 +39,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => mapping(address member => bool claimed)) public hasClaimed;
   mapping(uint256 id => mapping(address member => uint256 round)) private _lastDepositRound;
   mapping(uint256 id => mapping(uint256 round => mapping(address member => uint256 amount))) public roundDeposits;
-  mapping(uint256 id => mapping(address member => uint256 indexPlusOne)) private _memberIndexPlusOne;
+  // 1-based index so 0 can represent "not found"
+  mapping(uint256 id => mapping(address member => uint256 memberIndex)) private _memberIndex;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -94,7 +95,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][owner] = true;
     memberCircles[owner].push(_id);
     circleMembers[_id].push(owner);
-    _memberIndexPlusOne[_id][owner] = circleMembers[_id].length;
+    _memberIndex[_id][owner] = circleMembers[_id].length;
 
     circles[_id] = _circle;
     emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
@@ -191,7 +192,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
     circleMembers[_id].push(msg.sender);
-    _memberIndexPlusOne[_id][msg.sender] = circleMembers[_id].length;
+    _memberIndex[_id][msg.sender] = circleMembers[_id].length;
 
     emit InviteRedeemed(_id, msg.sender);
   }
@@ -369,7 +370,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     if (_isDecommissionable(_id)) return false;
 
     uint256 currentRound = _currentRoundIndex(_circle);
-    (uint256 memberIndex, bool found) = _memberIndex(_id, _member);
+    (uint256 memberIndex, bool found) = _getMemberIndex(_id, _member);
     if (!found || currentRound < memberIndex) return false;
 
     return _allMembersDepositedForRound(_id, memberIndex, _circle.depositAmount);
@@ -432,8 +433,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     return true;
   }
 
-  function _memberIndex(uint256 _id, address _member) internal view returns (uint256 index, bool found) {
-    uint256 indexPlusOne = _memberIndexPlusOne[_id][_member];
+  function _getMemberIndex(uint256 _id, address _member) internal view returns (uint256 index, bool found) {
+    uint256 indexPlusOne = _memberIndex[_id][_member];
     if (indexPlusOne == 0) return (0, false);
     return (indexPlusOne - 1, true);
   }
