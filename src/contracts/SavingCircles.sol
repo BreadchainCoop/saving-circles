@@ -152,7 +152,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     isActive[_id] = false;
 
-    // Refund all deposits in rounds whose payout hasn't happened yet (recipient not claimed)
+    // Return all funds still held by the contract to the members who deposited them.
     for (uint256 r = 0; r < len; r++) {
       address recipient = members[r];
       if (hasClaimed[_id][recipient]) continue; // round already paid out
