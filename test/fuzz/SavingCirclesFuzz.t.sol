@@ -209,6 +209,13 @@ contract SavingCirclesFuzzTest is SavingCirclesTestBase {
 
     ISavingCircles.Circle memory circle = _defaultCircle(alice, _depositAmount, _depositInterval, address(token));
 
+    if (_depositAmount == 0 && _depositInterval == 0) {
+      vm.prank(alice);
+      vm.expectRevert(ISavingCircles.InvalidDepositInterval.selector);
+      savingCircles.create(circle);
+      return;
+    }
+
     if (_depositAmount == 0) {
       vm.prank(alice);
       vm.expectRevert(ISavingCircles.InvalidDepositAmount.selector);
