@@ -35,6 +35,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
   mapping(uint256 id => mapping(uint256 nonce => bool used)) public usedNonces;
   mapping(uint256 id => bool active) public isActive;
   mapping(uint256 id => address[] members) public circleMembers;
+  mapping(uint256 id => address owner) public circleOwners;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -88,6 +89,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
     isMember[_id][owner] = true;
     memberCircles[owner].push(_id);
     circleMembers[_id].push(owner);
+    circleOwners[_id] = owner;
 
     circles[_id] = _circle;
     emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
@@ -153,7 +155,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuard, OwnableUpgradeable, E
       }
     }
 
-    delete circles[_id];
+    circles[_id].owner = address(0);
     emit CircleDecommissioned(_id);
   }
 

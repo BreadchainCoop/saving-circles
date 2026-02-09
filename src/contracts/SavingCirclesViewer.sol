@@ -130,7 +130,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
 
     uint256 currentIndex = 0;
     for (uint256 i = 0; i < SAVING_CIRCLES.nextId(); i++) {
-      if (SAVING_CIRCLES.getCircle(i).owner == _user && !_isInArray(i, memberCircleIds)) {
+      if (_getCircleOwner(i) == _user && !_isInArray(i, memberCircleIds)) {
         ownedOnlyIds[currentIndex] = i;
         currentIndex++;
       }
@@ -144,7 +144,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     uint256[] memory memberCircleIds
   ) internal view returns (uint256 count) {
     for (uint256 i = 0; i < SAVING_CIRCLES.nextId(); i++) {
-      if (SAVING_CIRCLES.getCircle(i).owner == _user && !_isInArray(i, memberCircleIds)) {
+      if (_getCircleOwner(i) == _user && !_isInArray(i, memberCircleIds)) {
         count++;
       }
     }
@@ -265,14 +265,19 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
   ) internal view returns (UserCircleData memory circleData) {
     circleData.circleId = _circleId;
 
-    ISavingCircles.Circle memory circle = SAVING_CIRCLES.getCircle(_circleId);
+    ISavingCircles.Circle memory circle = _getCircle(_circleId);
+    bool isDecommissioned = SAVING_CIRCLES.isDecommissioned(circle);
 
-    if (SAVING_CIRCLES.isDecommissioned(circle)) {
+    if (circle.owner == address(0)) {
+      circle.owner = SAVING_CIRCLES.circleOwners(_circleId);
+    }
+    circleData.circleInfo = circle;
+
+    if (isDecommissioned) {
       circleData.isDecommissioned = true;
       return circleData;
     }
 
-    circleData.circleInfo = circle;
     circleData.isDecommissioned = false;
     circleData.isDecommissionable = SAVING_CIRCLES.isDecommissionable(_circleId);
 
@@ -321,7 +326,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
 
   function _setDepositProgress(UserCircleData memory circleData, uint256 _circleId) internal view {
     (, uint256[] memory memberBalances) = SAVING_CIRCLES.getMemberBalances(_circleId);
-    ISavingCircles.Circle memory circle = SAVING_CIRCLES.getCircle(_circleId);
+    ISavingCircles.Circle memory circle = _getCircle(_circleId);
 
     uint256 membersWithFullDeposits = 0;
     for (uint256 i = 0; i < memberBalances.length; i++) {
@@ -330,6 +335,36 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
       }
     }
     circleData.remainingDepositsNeeded = memberBalances.length - membersWithFullDeposits;
+  }
+
+  function _getCircleOwner(uint256 _circleId) internal view returns (address owner) {
+    ISavingCircles.Circle memory circle = _getCircle(_circleId);
+    owner = circle.owner;
+    if (owner == address(0)) {
+      owner = SAVING_CIRCLES.circleOwners(_circleId);
+    }
+  }
+
+  function _getCircle(uint256 _circleId) internal view returns (ISavingCircles.Circle memory circle) {
+    (
+      address owner,
+      uint256 currentIndex,
+      uint256 depositAmount,
+      address token,
+      uint256 depositInterval,
+      uint256 effectiveCircleStartTime,
+      uint256 circleEnd
+    ) = SAVING_CIRCLES.circles(_circleId);
+
+    circle = ISavingCircles.Circle({
+      owner: owner,
+      currentIndex: currentIndex,
+      depositAmount: depositAmount,
+      token: token,
+      depositInterval: depositInterval,
+      effectiveCircleStartTime: effectiveCircleStartTime,
+      circleEnd: circleEnd
+    });
   }
 
   function _isInArray(uint256 value, uint256[] memory array) internal pure returns (bool) {
