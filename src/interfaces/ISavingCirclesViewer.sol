@@ -22,6 +22,7 @@ interface ISavingCirclesViewer {
    * @param remainingDepositsNeeded Number of members who still need to complete deposits
    * @param completedRounds Number of withdrawal rounds completed
    * @param totalRounds Total number of withdrawal rounds
+   * @param currentWithdrawer The address of the current withdrawer
    */
   struct UserCircleData {
     uint256 circleId;
@@ -40,6 +41,7 @@ interface ISavingCirclesViewer {
     uint256 remainingDepositsNeeded;
     uint256 completedRounds;
     uint256 totalRounds;
+    address currentWithdrawer;
   }
 
   /**
