@@ -37,10 +37,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => bool active) public isActive;
   mapping(uint256 id => address[] members) public circleMembers;
   mapping(uint256 id => mapping(address member => bool claimed)) public hasClaimed;
-  mapping(uint256 id => mapping(address member => uint256 round)) private _lastDepositRound;
+  mapping(uint256 id => mapping(address member => uint256 round)) public lastDepositRound;
   mapping(uint256 id => mapping(uint256 round => mapping(address member => uint256 amount))) public roundDeposits;
   // 1-based index so 0 can represent "not found"
-  mapping(uint256 id => mapping(address member => uint256 memberIndex)) private _memberIndex;
+  mapping(uint256 id => mapping(address member => uint256 memberIndex)) public memberIndex;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -95,7 +95,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][owner] = true;
     memberCircles[owner].push(_id);
     circleMembers[_id].push(owner);
-    _memberIndex[_id][owner] = circleMembers[_id].length;
+    memberIndex[_id][owner] = circleMembers[_id].length;
 
     circles[_id] = _circle;
     emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
@@ -192,7 +192,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
     circleMembers[_id].push(msg.sender);
-    _memberIndex[_id][msg.sender] = circleMembers[_id].length;
+    memberIndex[_id][msg.sender] = circleMembers[_id].length;
 
     emit InviteRedeemed(_id, msg.sender);
   }
@@ -249,7 +249,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     _balances = new uint256[](circleMembers[_id].length);
     for (uint256 i = 0; i < circleMembers[_id].length; i++) {
       address member = circleMembers[_id][i];
-      if (_lastDepositRound[_id][member] == currentRound) {
+      if (lastDepositRound[_id][member] == currentRound) {
         _balances[i] = balances[_id][member];
       } else {
         _balances[i] = 0;
@@ -352,7 +352,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     uint256 newTotal = depositedSoFar + _value;
     roundDeposits[_id][currentRound][_member] = newTotal;
 
-    _lastDepositRound[_id][_member] = currentRound;
+    lastDepositRound[_id][_member] = currentRound;
     balances[_id][_member] = newTotal;
 
     IERC20(_circle.token).safeTransferFrom(msg.sender, address(this), _value);
@@ -434,7 +434,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   function _getMemberIndex(uint256 _id, address _member) internal view returns (uint256 index, bool found) {
-    uint256 indexPlusOne = _memberIndex[_id][_member];
+    uint256 indexPlusOne = memberIndex[_id][_member];
     if (indexPlusOne == 0) return (0, false);
     return (indexPlusOne - 1, true);
   }
