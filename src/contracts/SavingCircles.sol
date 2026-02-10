@@ -148,16 +148,16 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     address token = circles[_id].token;
     address[] memory members = circleMembers[_id];
-    uint256 len = members.length;
+    uint256 membersLength = members.length;
 
     isActive[_id] = false;
 
     // Return all funds still held by the contract to the members who deposited them.
-    for (uint256 r = 0; r < len; r++) {
+    for (uint256 r = 0; r < membersLength; r++) {
       address recipient = members[r];
       if (hasClaimed[_id][recipient]) continue; // round already paid out
 
-      for (uint256 i = 0; i < len; i++) {
+      for (uint256 i = 0; i < membersLength; i++) {
         address member = members[i];
         uint256 amount = roundDeposits[_id][r][member];
         if (amount == 0) continue;
