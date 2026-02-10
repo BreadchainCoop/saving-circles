@@ -443,7 +443,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
       token.approve(address(savingCircles), 1000);
 
       // Should revert as deposit window is closed and circle is stuck
-      vm.expectRevert(ISavingCircles.CircleStuck.selector);
+      vm.expectRevert(ISavingCircles.CircleTimedOut.selector);
       savingCircles.deposit(circleId, 1000);
       vm.stopPrank();
     }

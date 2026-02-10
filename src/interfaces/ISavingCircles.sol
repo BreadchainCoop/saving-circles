@@ -206,7 +206,7 @@ interface ISavingCircles {
   /**
    * @notice Thrown when a deposit is missed
    */
-  error CircleStuck();
+  error CircleTimedOut();
 
   /**
    * @notice Initialize the contract

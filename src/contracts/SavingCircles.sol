@@ -342,7 +342,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
         block.timestamp >= _roundEndTime(_circle, prev)
           && !_allMembersDepositedForRound(_id, prev, _circle.depositAmount)
       ) {
-        revert CircleStuck();
+        revert CircleTimedOut();
       }
     }
 
