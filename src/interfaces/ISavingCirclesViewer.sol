@@ -12,7 +12,6 @@ interface ISavingCirclesViewer {
    * @param isMember Whether the user is a member of the circle
    * @param isOwner Whether the user owns the circle
    * @param isCurrentWithdrawer Whether the user is the current withdrawer
-   * @param currentWithdrawer The address of the current withdrawer
    * @param canWithdraw Whether the user can currently withdraw
    * @param isExpired Whether the circle has expired
    * @param isDecommissioned Whether the circle has been decommissioned
@@ -23,6 +22,7 @@ interface ISavingCirclesViewer {
    * @param remainingDepositsNeeded Number of members who still need to complete deposits
    * @param completedRounds Number of withdrawal rounds completed
    * @param totalRounds Total number of withdrawal rounds
+   * @param currentWithdrawer The address of the current withdrawer
    */
   struct UserCircleData {
     uint256 circleId;
@@ -31,7 +31,6 @@ interface ISavingCirclesViewer {
     bool isMember;
     bool isOwner;
     bool isCurrentWithdrawer;
-    address currentWithdrawer;
     bool canWithdraw;
     bool isExpired;
     bool isDecommissioned;
@@ -42,6 +41,7 @@ interface ISavingCirclesViewer {
     uint256 remainingDepositsNeeded;
     uint256 completedRounds;
     uint256 totalRounds;
+    address currentWithdrawer;
   }
 
   /**
