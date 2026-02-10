@@ -2,13 +2,14 @@
 pragma solidity ^0.8.28;
 
 import {OwnableUpgradeable} from '@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol';
-
 import {ReentrancyGuardUpgradeable} from '@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol';
 import {EIP712Upgradeable} from '@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ECDSA} from '@openzeppelin/contracts/utils/cryptography/ECDSA.sol';
-
 import {ISavingCircles} from 'interfaces/ISavingCircles.sol';
+
+using SafeERC20 for IERC20;
 
 /**
  * @title Saving Circles
@@ -149,8 +150,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
       if (_balance > 0) {
         balances[_id][_member] = 0;
-        bool success = IERC20(token).transfer(_member, _balance);
-        if (!success) revert TransferFailed();
+        IERC20(token).safeTransfer(_member, _balance);
       }
     }
 
@@ -283,8 +283,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     }
 
     _circle.currentIndex = (_circle.currentIndex + 1) % circleMembers[_id].length;
-    bool success = IERC20(_circle.token).transfer(_member, _withdrawAmount);
-    if (!success) revert TransferFailed();
+    IERC20(_circle.token).safeTransfer(_member, _withdrawAmount);
 
     emit FundsWithdrawn(_id, _member, _withdrawAmount);
   }
@@ -321,8 +320,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     balances[_id][_member] = balances[_id][_member] + _value;
 
-    bool success = IERC20(_circle.token).transferFrom(msg.sender, address(this), _value);
-    if (!success) revert TransferFailed();
+    IERC20(_circle.token).safeTransferFrom(msg.sender, address(this), _value);
 
     emit FundsDeposited(_id, _member, _value);
   }
