@@ -376,13 +376,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /**
-   * @dev Return if a specified circle is decommissioned by checking if an owner is set
-   */
-  function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
-    return _circle.owner == address(0);
-  }
-
-  /**
    * @dev Return if a specified circle is decommissionable
    *      To be considered decommissionable, the circle must have passed its deposit window
    *      and some members must have incomplete deposits for the current round.
@@ -403,9 +396,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     return !_allMembersDepositedForRound(_id, checkRound, _circle.depositAmount);
   }
 
-  function _roundEndTime(Circle memory _circle, uint256 round) internal pure returns (uint256) {
-    return _circle.effectiveCircleStartTime + (_circle.depositInterval * (round + 1));
-  }
   function _currentRoundIndex(Circle memory _circle) internal view returns (uint256) {
     if (
       _circle.depositInterval == 0 || _circle.effectiveCircleStartTime == 0
@@ -445,6 +435,17 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
       }
     }
     return true;
+  }
+
+  /**
+   * @dev Return if a specified circle is decommissioned by checking if an owner is set
+   */
+  function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
+    return _circle.owner == address(0);
+  }
+
+  function _roundEndTime(Circle memory _circle, uint256 round) internal pure returns (uint256) {
+    return _circle.effectiveCircleStartTime + (_circle.depositInterval * (round + 1));
   }
 
   /**
