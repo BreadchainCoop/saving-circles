@@ -212,11 +212,23 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     // At circle start, current round is 0 (alice's round). Bob's round is later.
     ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
     assertEq(circle.currentIndex, 0);
-    assertEq(savingCircles.memberIndex(baseCircleId, bob), 2); // 1-based index
+    assertEq(savingCircles.memberIndex(baseCircleId, bob), 1); // 0-based index
 
     vm.prank(bob);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector));
     savingCircles.withdraw(baseCircleId);
+  }
+
+  function test_MemberIndexIsZeroBasedAndOwnerFirst() external view {
+    address[] memory storedMembers = savingCircles.getCircleMembers(baseCircleId);
+
+    assertEq(storedMembers[0], alice);
+    assertEq(storedMembers[1], bob);
+    assertEq(storedMembers[2], carol);
+
+    assertEq(savingCircles.memberIndex(baseCircleId, alice), 0);
+    assertEq(savingCircles.memberIndex(baseCircleId, bob), 1);
+    assertEq(savingCircles.memberIndex(baseCircleId, carol), 2);
   }
 
   function test_WithdrawPastRoundClaimsSucceedSameBlock() external {
