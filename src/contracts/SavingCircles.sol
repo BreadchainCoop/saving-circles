@@ -393,8 +393,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
   /**
    * @dev Return if a specified circle is decommissionable
-   *      To be considered decommissionable, the circle must have passed its deposit window
-   *      and some members must have incomplete deposits for the current round.
+   *      To be considered decommissionable, the previous round's deposit window must have ended
+   *      and that round must have incomplete deposits.
    */
   function _isDecommissionable(uint256 _id) internal view returns (bool) {
     Circle memory _circle = circles[_id];
