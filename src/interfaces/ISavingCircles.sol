@@ -204,7 +204,7 @@ interface ISavingCircles {
    */
   error NotActive();
   /**
-   * @notice Thrown when a deposit is missed
+   * @notice Thrown when a previous round ended with incomplete deposits, blocking deposits and withdrawals until decommission
    */
   error CircleTimedOut();
 
