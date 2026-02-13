@@ -22,6 +22,12 @@ using SafeERC20 for IERC20;
  * @author valeriooconte
  */
 contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpgradeable, EIP712Upgradeable {
+  struct MemberState {
+    bool hasClaimed;
+    uint256 lastDepositRound;
+    uint256 memberIndex;
+  }
+
   uint256 public constant MINIMUM_MEMBERS = 2;
   string private constant _EIP712_NAME = 'StacksInvite';
   string private constant _EIP712_VERSION = '1';
@@ -36,10 +42,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => mapping(uint256 nonce => bool used)) public usedNonces;
   mapping(uint256 id => bool active) public isActive;
   mapping(uint256 id => address[] members) public circleMembers;
-  mapping(uint256 id => mapping(address member => bool claimed)) public hasClaimed;
-  mapping(uint256 id => mapping(address member => uint256 round)) public lastDepositRound;
+  mapping(uint256 id => mapping(address member => MemberState state)) internal _memberStates;
   mapping(uint256 id => mapping(uint256 round => mapping(address member => uint256 amount))) public roundDeposits;
-  mapping(uint256 id => mapping(address member => uint256 memberIndex)) public memberIndex;
 
   /// @dev Requires circle is commissioned by checking if an owner is set
   modifier onlyCommissioned(uint256 _id) {
@@ -94,7 +98,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][owner] = true;
     memberCircles[owner].push(_id);
     circleMembers[_id].push(owner);
-    memberIndex[_id][owner] = 0;
+    _memberStates[_id][owner].memberIndex = 0;
 
     circles[_id] = _circle;
     emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
@@ -154,7 +158,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     // Return all funds still held by the contract to the members who deposited them.
     for (uint256 r = 0; r < membersLength; r++) {
       address recipient = members[r];
-      if (hasClaimed[_id][recipient]) continue; // round already paid out
+      if (_memberStates[_id][recipient].hasClaimed) continue; // round already paid out
 
       for (uint256 i = 0; i < membersLength; i++) {
         address member = members[i];
@@ -191,7 +195,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
     circleMembers[_id].push(msg.sender);
-    memberIndex[_id][msg.sender] = circleMembers[_id].length - 1;
+    _memberStates[_id][msg.sender].memberIndex = circleMembers[_id].length - 1;
 
     emit InviteRedeemed(_id, msg.sender);
   }
@@ -248,7 +252,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     _balances = new uint256[](circleMembers[_id].length);
     for (uint256 i = 0; i < circleMembers[_id].length; i++) {
       address member = circleMembers[_id][i];
-      if (lastDepositRound[_id][member] == currentRound) {
+      if (_memberStates[_id][member].lastDepositRound == currentRound) {
         _balances[i] = balances[_id][member];
       } else {
         _balances[i] = 0;
@@ -265,6 +269,18 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
   function isDecommissionable(uint256 _id) external view override returns (bool) {
     return _isDecommissionable(_id);
+  }
+
+  function hasClaimed(uint256 _id, address _member) external view returns (bool claimed) {
+    return _memberStates[_id][_member].hasClaimed;
+  }
+
+  function lastDepositRound(uint256 _id, address _member) external view returns (uint256 round) {
+    return _memberStates[_id][_member].lastDepositRound;
+  }
+
+  function memberIndex(uint256 _id, address _member) external view returns (uint256 index) {
+    return _memberStates[_id][_member].memberIndex;
   }
 
   /// @inheritdoc ISavingCircles
@@ -304,7 +320,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     uint256 _withdrawAmount = _circle.depositAmount * (circleMembers[_id].length);
 
-    hasClaimed[_id][_member] = true;
+    _memberStates[_id][_member].hasClaimed = true;
 
     IERC20(_circle.token).safeTransfer(_member, _withdrawAmount);
 
@@ -351,7 +367,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     uint256 newTotal = depositedSoFar + _value;
     roundDeposits[_id][currentRound][_member] = newTotal;
 
-    lastDepositRound[_id][_member] = currentRound;
+    _memberStates[_id][_member].lastDepositRound = currentRound;
     balances[_id][_member] = newTotal;
 
     IERC20(_circle.token).safeTransferFrom(msg.sender, address(this), _value);
@@ -365,14 +381,14 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
    */
   function _claimable(uint256 _id, address _member) internal view onlyCommissioned(_id) returns (bool) {
     Circle memory _circle = circles[_id];
-    if (hasClaimed[_id][_member]) return false;
+    if (_memberStates[_id][_member].hasClaimed) return false;
     if (_isDecommissionable(_id)) return false;
 
     uint256 currentRound = _currentRoundIndex(_circle);
-    (uint256 memberIndex, bool found) = _getMemberIndex(_id, _member);
-    if (!found || currentRound < memberIndex) return false;
+    (uint256 memberIdx, bool found) = _getMemberIndex(_id, _member);
+    if (!found || currentRound < memberIdx) return false;
 
-    return _allMembersDepositedForRound(_id, memberIndex, _circle.depositAmount);
+    return _allMembersDepositedForRound(_id, memberIdx, _circle.depositAmount);
   }
 
   /**
@@ -424,13 +440,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
   function _getMemberIndex(uint256 _id, address _member) internal view returns (uint256 index, bool found) {
     if (!isMember[_id][_member]) return (0, false);
-    return (memberIndex[_id][_member], true);
+    return (_memberStates[_id][_member].memberIndex, true);
   }
 
   function _allMembersClaimed(uint256 _id) internal view returns (bool) {
     address[] memory members = circleMembers[_id];
     for (uint256 i = 0; i < members.length; i++) {
-      if (!hasClaimed[_id][members[i]]) {
+      if (!_memberStates[_id][members[i]].hasClaimed) {
         return false;
       }
     }
