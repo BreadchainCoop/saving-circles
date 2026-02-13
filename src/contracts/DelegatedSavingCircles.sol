@@ -150,11 +150,11 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     // Check if delegated deposits are enabled for this member
     if (!delegatedDepositsEnabled[_member]) revert DelegatedDepositsNotEnabled();
 
+    if (SAVING_CIRCLES.isDecommissionable(_circleId)) revert ISavingCircles.NotActive();
+
     // Get circle information
     ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
     address[] memory circleMembers = SAVING_CIRCLES.getCircleMembers(_circleId);
-
-    if (SAVING_CIRCLES.isDecommissionable(_circleId)) revert ISavingCircles.NotActive();
 
     // Check if member is part of the circle
     bool isMember = false;
