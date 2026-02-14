@@ -299,7 +299,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function withdrawableBy(uint256 _id) public view override onlyCommissioned(_id) returns (address) {
+  function currentRoundWithdrawer(uint256 _id) public view override onlyCommissioned(_id) returns (address) {
     if (!isActive[_id]) return address(0);
     Circle memory _circle = circles[_id];
 

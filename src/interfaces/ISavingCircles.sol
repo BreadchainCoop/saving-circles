@@ -350,9 +350,9 @@ interface ISavingCircles {
   /**
    * @notice Get the address of the withdrawable by
    * @param id The ID of the circle
-   * @return withdrawableBy The address of the withdrawable by
+   * @return currentRoundWithdrawer The address of the current round withdrawer
    */
-  function withdrawableBy(uint256 id) external view returns (address withdrawableBy);
+  function currentRoundWithdrawer(uint256 id) external view returns (address currentRoundWithdrawer);
 
   /**
    * @notice Get the next ID that will be assigned to a new circle

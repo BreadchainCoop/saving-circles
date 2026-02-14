@@ -254,7 +254,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     uint256 withdrawAmount = DEPOSIT_AMOUNT * members.length;
 
     // Current-round withdrawable member is carol, but prior-round members should still be claimable.
-    assertEq(savingCircles.withdrawableBy(baseCircleId), carol);
+    assertEq(savingCircles.currentRoundWithdrawer(baseCircleId), carol);
 
     vm.prank(alice);
     savingCircles.withdraw(baseCircleId);
@@ -282,7 +282,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
     // Move to round N = 1 (bob's round). Carol is a future-round member (round 2).
     vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
-    assertEq(savingCircles.withdrawableBy(baseCircleId), bob);
+    assertEq(savingCircles.currentRoundWithdrawer(baseCircleId), bob);
 
     vm.prank(carol);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector));

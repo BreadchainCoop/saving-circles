@@ -302,7 +302,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
   ) internal view {
     circleData.isOwner = (circle.owner == _user);
 
-    address currentWithdrawer = SAVING_CIRCLES.withdrawableBy(_circleId);
+    address currentWithdrawer = SAVING_CIRCLES.currentRoundWithdrawer(_circleId);
     circleData.currentWithdrawer = currentWithdrawer;
     circleData.isCurrentWithdrawer = (currentWithdrawer == _user);
     circleData.canWithdraw = circleData.isCurrentWithdrawer && SAVING_CIRCLES.isWithdrawable(_circleId);

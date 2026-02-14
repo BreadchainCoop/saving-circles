@@ -490,7 +490,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
       }
 
       // Check who should withdraw
-      address expectedWithdrawer = savingCircles.withdrawableBy(circleId);
+      address expectedWithdrawer = savingCircles.currentRoundWithdrawer(circleId);
 
       // Verify it's the correct member based on currentIndex
       assertEq(expectedWithdrawer, members[round], 'Wrong withdrawal order');
