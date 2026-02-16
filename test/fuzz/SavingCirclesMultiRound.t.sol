@@ -86,6 +86,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
 
     // Complete the full circle (each member gets one withdrawal)
     for (uint256 round = 0; round < _memberCount; round++) {
+      vm.warp(startTime + (_depositInterval * round));
       // All members deposit for this round
       for (uint256 i = 0; i < _memberCount; i++) {
         token.mint(members[i], _depositAmount);
@@ -95,17 +96,12 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
         vm.stopPrank();
       }
 
-      // Wait for current deposit interval to complete (withdrawal time)
-      vm.warp(startTime + (_depositInterval * (round + 1)));
-
       // Verify withdrawability
       assertTrue(savingCircles.isWithdrawable(circleId));
 
       // Get current recipient before withdrawal
-      ISavingCircles.Circle memory currentCircle = savingCircles.getCircle(circleId);
-      address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
-      address expectedRecipient = storedMembers[currentCircle.currentIndex];
-      uint256 recipientIndex = currentCircle.currentIndex;
+      address expectedRecipient = members[round];
+      uint256 recipientIndex = round;
 
       // Withdraw for current round
       uint256 balanceBefore = token.balanceOf(expectedRecipient);
@@ -176,8 +172,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
 
     // Wait and withdraw from all circles
     for (uint256 c = 0; c < _numCircles; c++) {
-      vm.warp(startTimes[c] + _depositInterval);
-
+      vm.warp(startTimes[c] + _depositInterval - 1);
       assertTrue(savingCircles.isWithdrawable(circleIds[c]));
 
       address withdrawer = allMembers[c][0];
@@ -218,6 +213,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
 
     // Complete some rounds
     for (uint256 round = 0; round < _roundsBeforeDecommission; round++) {
+      vm.warp(startTime + (_depositInterval * round));
       for (uint256 i = 0; i < _memberCount; i++) {
         token.mint(members[i], _depositAmount);
         vm.startPrank(members[i]);
@@ -226,11 +222,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
         vm.stopPrank();
       }
 
-      vm.warp(startTime + (_depositInterval * (round + 1)));
-
-      ISavingCircles.Circle memory currentCircle = savingCircles.getCircle(circleId);
-      address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
-      address recipient = storedMembers[currentCircle.currentIndex];
+      address recipient = members[round];
       vm.prank(recipient);
       savingCircles.withdraw(circleId);
     }
@@ -318,18 +310,19 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
           vm.stopPrank();
         }
 
-        vm.warp(liveCircle.effectiveCircleStartTime + (liveCircle.depositInterval * (round + 1)));
+        vm.warp(liveCircle.effectiveCircleStartTime + (liveCircle.depositInterval * round) + 1);
 
-        ISavingCircles.Circle memory currentCircle = savingCircles.getCircle(circleId);
-        address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
-        address recipient = storedMembers[currentCircle.currentIndex];
+        address recipient = members[round];
         uint256 balanceBefore = token.balanceOf(recipient);
 
+        assertTrue(savingCircles.isWithdrawable(circleId));
         vm.prank(recipient);
         savingCircles.withdraw(circleId);
 
-        uint256 balanceAfter = token.balanceOf(recipient);
-        payouts[currentCircle.currentIndex] = balanceAfter - balanceBefore;
+        uint256 expectedPayout = circleDepositAmount * _memberCount;
+        assertEq(token.balanceOf(recipient), balanceBefore + expectedPayout);
+
+        payouts[round] = expectedPayout;
       }
 
       // Verify everyone received their payout in this circle
@@ -365,15 +358,11 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
         vm.stopPrank();
       }
 
-      // Wait for withdrawal window
-      vm.warp(startTime + (1 days * (round + 1)));
-
-      ISavingCircles.Circle memory currentCircle = savingCircles.getCircle(circleId);
-      address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
-      address withdrawer = storedMembers[currentCircle.currentIndex];
+      address withdrawer = members[round];
 
       vm.prank(withdrawer);
       savingCircles.withdraw(circleId);
+      vm.warp(startTime + (1 days * (round + 1)));
     }
 
     // Verify circle completed successfully
@@ -453,8 +442,8 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
       vm.startPrank(members[i]);
       token.approve(address(savingCircles), 1000);
 
-      // Should revert as deposit window is closed
-      vm.expectRevert(ISavingCircles.DepositWindowClosed.selector);
+      // Should revert as deposit window is closed and circle is stuck
+      vm.expectRevert(ISavingCircles.CircleTimedOut.selector);
       savingCircles.deposit(circleId, 1000);
       vm.stopPrank();
     }
@@ -490,6 +479,7 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
     address[] memory withdrawalOrder = new address[](_rounds);
 
     for (uint256 round = 0; round < _rounds; round++) {
+      vm.warp(startTime + (depositInterval * round) + 1);
       // All members deposit
       for (uint256 i = 0; i < _memberCount; i++) {
         token.mint(members[i], 1000);
@@ -499,15 +489,11 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
         vm.stopPrank();
       }
 
-      // Move to withdrawal time
-      vm.warp(startTime + (depositInterval * (round + 1)));
-
       // Check who should withdraw
-      ISavingCircles.Circle memory currentCircle = savingCircles.getCircle(circleId);
-      address expectedWithdrawer = savingCircles.withdrawableBy(circleId);
+      address expectedWithdrawer = savingCircles.currentRoundWithdrawer(circleId);
 
       // Verify it's the correct member based on currentIndex
-      assertEq(expectedWithdrawer, members[currentCircle.currentIndex], 'Wrong withdrawal order');
+      assertEq(expectedWithdrawer, members[round], 'Wrong withdrawal order');
 
       // Perform withdrawal
       vm.prank(expectedWithdrawer);

@@ -108,7 +108,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     uint256[] memory _ids = SAVING_CIRCLES.getMemberCircles(_member);
 
     for (uint256 i = 0; i < _ids.length; i++) {
-      _totalBalance += SAVING_CIRCLES.balances(_ids[i], _member);
+      _totalBalance += _memberBalance(_ids[i], _member);
     }
 
     return _totalBalance;
@@ -302,7 +302,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
   ) internal view {
     circleData.isOwner = (circle.owner == _user);
 
-    address currentWithdrawer = SAVING_CIRCLES.withdrawableBy(_circleId);
+    address currentWithdrawer = SAVING_CIRCLES.currentRoundWithdrawer(_circleId);
     circleData.currentWithdrawer = currentWithdrawer;
     circleData.isCurrentWithdrawer = (currentWithdrawer == _user);
     circleData.canWithdraw = circleData.isCurrentWithdrawer && SAVING_CIRCLES.isWithdrawable(_circleId);
@@ -331,6 +331,16 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
       }
     }
     circleData.remainingDepositsNeeded = memberBalances.length - membersWithFullDeposits;
+  }
+
+  function _memberBalance(uint256 _circleId, address _member) internal view returns (uint256) {
+    (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
+    for (uint256 i = 0; i < members.length; i++) {
+      if (members[i] == _member) {
+        return balances[i];
+      }
+    }
+    return 0;
   }
 
   function _isInArray(uint256 value, uint256[] memory array) internal pure returns (bool) {

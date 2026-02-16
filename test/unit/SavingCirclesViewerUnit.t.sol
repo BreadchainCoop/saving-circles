@@ -216,9 +216,6 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
-    // Move time past first round to enable withdrawal
-    vm.warp(block.timestamp + DEPOSIT_INTERVAL);
-
     // Get comprehensive user data for alice (first withdrawer)
     SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(alice);
 
