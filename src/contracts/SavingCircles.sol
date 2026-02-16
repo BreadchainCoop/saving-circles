@@ -194,8 +194,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     // No max count validation, the owner issues a finite amount of invites
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
-    circleMembers[_id].push(msg.sender);
-    _memberStates[_id][msg.sender].memberIndex = circleMembers[_id].length - 1;
+    address[] storage _circleMembers = circleMembers[_id];
+    _circleMembers.push(msg.sender);
+    _memberStates[_id][msg.sender].memberIndex = _circleMembers.length - 1;
 
     emit InviteRedeemed(_id, msg.sender);
   }
