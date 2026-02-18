@@ -10,6 +10,7 @@ sort_imports = true
 
 [profile.default]
 via_ir = true
+optimizer = true
 solc_version = '0.8.28'
 libs = ['node_modules', 'lib']
 remappings = [
