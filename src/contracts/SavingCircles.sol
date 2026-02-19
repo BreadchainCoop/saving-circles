@@ -296,7 +296,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     uint256 currentRound = _currentRoundIndex(_circle);
     if (currentRound >= circleMembers[_id].length) return false;
     address member = circleMembers[_id][currentRound];
-    return _claimable(_id, member);
+    return isMemberWithdrawable(_id, member);
+  }
+
+  /// @inheritdoc ISavingCircles
+  function isMemberWithdrawable(uint256 _id, address _member) public view override returns (bool) {
+    if (!isActive[_id]) return false;
+    return _claimable(_id, _member);
   }
 
   /// @inheritdoc ISavingCircles

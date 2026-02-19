@@ -348,6 +348,14 @@ interface ISavingCircles {
   function isWithdrawable(uint256 id) external view returns (bool withdrawable);
 
   /**
+   * @notice Check if a specific member can withdraw for a circle
+   * @param id The ID of the circle
+   * @param member The member to check
+   * @return withdrawable Whether the member is withdrawable
+   */
+  function isMemberWithdrawable(uint256 id, address member) external view returns (bool withdrawable);
+
+  /**
    * @notice Get the address of the withdrawable by
    * @param id The ID of the circle
    * @return currentRoundWithdrawer The address of the current round withdrawer
