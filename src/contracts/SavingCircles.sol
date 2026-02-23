@@ -292,11 +292,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   /// @inheritdoc ISavingCircles
   function isWithdrawable(uint256 _id) public view override returns (bool) {
     if (!isActive[_id]) return false;
-    Circle memory _circle = circles[_id];
-    uint256 currentRound = _currentRoundIndex(_circle);
-    if (currentRound >= circleMembers[_id].length) return false;
-    address member = circleMembers[_id][currentRound];
-    return isMemberWithdrawable(_id, member);
+
+    address[] memory members = circleMembers[_id];
+    for (uint256 i = 0; i < members.length; i++) {
+      if (_claimable(_id, members[i])) return true;
+    }
+
+    return false;
   }
 
   /// @inheritdoc ISavingCircles
