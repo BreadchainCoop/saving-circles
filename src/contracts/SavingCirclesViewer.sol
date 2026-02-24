@@ -104,6 +104,17 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     return _getTotalBalance(_member);
   }
 
+  /// @inheritdoc ISavingCirclesViewer
+  function getCirclesState(uint256[] calldata _circleIds) external view override returns (CircleState[] memory states) {
+    states = new CircleState[](_circleIds.length);
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      states[i].circleId = _circleIds[i];
+      states[i].circleState = SAVING_CIRCLES.circleState(_circleIds[i]);
+      states[i].roundState = SAVING_CIRCLES.roundState(_circleIds[i]);
+    }
+    return states;
+  }
+
   function _getTotalBalance(address _member) internal view returns (uint256 _totalBalance) {
     uint256[] memory _ids = SAVING_CIRCLES.getMemberCircles(_member);
 

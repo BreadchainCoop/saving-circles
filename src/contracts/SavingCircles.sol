@@ -309,6 +309,50 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     return circleMembers[_id][currentRound];
   }
 
+  /// @inheritdoc ISavingCircles
+  function circleState(uint256 _id) public view override returns (uint8 state) {
+    Circle memory _circle = circles[_id];
+    if (isActive[_id]) {
+      state = 1;
+      uint256 currentRound = _currentRoundIndex(_circle);
+      if (currentRound >= circleMembers[_id].length) {
+        state = 4;
+      }
+      if (currentRound > 0) {
+        uint256 prev = currentRound - 1;
+        if (
+          block.timestamp >= _roundEndTime(_circle, prev)
+            && !_allMembersDepositedForRound(_id, prev, _circle.depositAmount)
+        ) {
+          state = 6;
+        } else if (!_allMembersDepositedForRound(_id, currentRound, _circle.depositAmount)) {
+          state = 2;
+        } else {
+          state = 3;
+        }
+      }
+    } else if (_isDecommissioned(_circle)) {
+      state = 5;
+    } else {
+      state = 0;
+    }
+  }
+
+  /// @inheritdoc ISavingCircles
+  function roundState(uint256 _id) public view override returns (uint8 state) {
+    Circle memory _circle = circles[_id];
+    uint256 currentRound = _currentRoundIndex(_circle);
+    if (block.timestamp <= _circle.effectiveCircleStartTime + (currentRound * _circle.depositInterval)) {
+      state = 0;
+    } else if (_allMembersDepositedForRound(_id, currentRound, _circle.depositAmount)) {
+      state = 2;
+    } else if (_claimable(_id, circleMembers[_id][currentRound])) {
+      state = 3;
+    } else {
+      state = 1;
+    }
+  }
+
   /**
    * @dev Make a withdrawal from a specified circle
    *      Permissionless: anyone can trigger the payout for the member whose turn it is to withdraw

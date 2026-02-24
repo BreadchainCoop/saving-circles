@@ -355,6 +355,22 @@ interface ISavingCircles {
   function currentRoundWithdrawer(uint256 id) external view returns (address currentRoundWithdrawer);
 
   /**
+   * @notice Get the current state of a circle
+   * @param id The ID of the circle
+   * @dev 0 = Not started, 1 = Active, 2 = Deposit in progress, 3 = Deposit complete, 4 = Expired, 5 = Decommissioned, 6 = Missed deposit(s) in current round
+   * @return state The current state of the circle
+   */
+  function circleState(uint256 id) external view returns (uint8 state);
+
+  /**
+   * @notice Get the current round of a circle
+   * @param id The ID of the circle
+   * @return state The current round's state of the circle
+   * @dev 0 = Not started, 1 = Deposit in progress, 2 = Deposit complete, 3 = Claimed
+   */
+  function roundState(uint256 id) external view returns (uint8 state);
+
+  /**
    * @notice Get the next ID that will be assigned to a new circle
    * @return nextId The next ID
    */

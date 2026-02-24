@@ -104,6 +104,12 @@ interface ISavingCirclesViewer {
     uint256 blockNumber;
   }
 
+  struct CircleState {
+    uint256 circleId;
+    uint8 circleState;
+    uint8 roundState;
+  }
+
   /**
    * @notice Check if a token is allowed
    * @param _token The token address
@@ -158,5 +164,18 @@ interface ISavingCirclesViewer {
     address _user,
     uint256[] calldata _circleIds
   ) external view returns (UserCircleData[] memory circleDataArray);
+
+  /**
+   * @notice Get total balance across all circles for a user
+   * @param _member The member address
+   * @return _totalBalance The total balance across all circles
+   */
   function getTotalBalance(address _member) external view returns (uint256 _totalBalance);
+
+  /**
+   * @notice Get the current state of a circle
+   * @param _circleIds The circle IDs
+   * @return states An array of CircleState structs containing the state of each circle
+   */
+  function getCirclesState(uint256[] calldata _circleIds) external view returns (CircleState[] memory states);
 }
