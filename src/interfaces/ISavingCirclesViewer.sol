@@ -106,8 +106,8 @@ interface ISavingCirclesViewer {
 
   struct CircleState {
     uint256 circleId;
-    uint8 circleState;
-    uint8 roundState;
+    ISavingCircles.CircleState circleState;
+    ISavingCircles.RoundState roundState;
   }
 
   /**
