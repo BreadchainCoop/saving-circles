@@ -292,10 +292,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   /// @inheritdoc ISavingCircles
   function isWithdrawable(uint256 _id) public view override returns (bool) {
     if (!isActive[_id]) return false;
+    if (_isDecommissionable(_id)) return false;
 
     address[] memory members = circleMembers[_id];
     for (uint256 i = 0; i < members.length; i++) {
-      if (_claimable(_id, members[i])) return true;
+      if (_claimableWithoutDecommissionCheck(_id, members[i])) return true;
     }
 
     return false;
@@ -389,9 +390,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
    *      Claim eligibility is determined by the time-based round index.
    */
   function _claimable(uint256 _id, address _member) internal view onlyCommissioned(_id) returns (bool) {
+    if (_isDecommissionable(_id)) return false;
+    return _claimableWithoutDecommissionCheck(_id, _member);
+  }
+
+  function _claimableWithoutDecommissionCheck(uint256 _id, address _member) internal view returns (bool) {
     Circle memory _circle = circles[_id];
     if (_memberStates[_id][_member].hasClaimed) return false;
-    if (_isDecommissionable(_id)) return false;
 
     uint256 currentRound = _currentRoundIndex(_circle);
     (uint256 memberIdx, bool found) = _getMemberIndex(_id, _member);
