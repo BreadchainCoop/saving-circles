@@ -194,6 +194,89 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     savingCircles.withdraw(nonExistentCircleId);
   }
 
+  function test_IsMemberWithdrawableReturnsFalseForNonExistentCircle() external view {
+    uint256 nonExistentCircleId = uint256(keccak256(abi.encodePacked('Non Existent Circle')));
+    assertFalse(savingCircles.isMemberWithdrawable(nonExistentCircleId, alice));
+  }
+
+  function test_IsMemberWithdrawableReturnsFalseForInactiveCircle() external {
+    uint256 unstartedCircleId = _createUnstartedCircle();
+    assertFalse(savingCircles.isMemberWithdrawable(unstartedCircleId, alice));
+  }
+
+  function test_IsMemberWithdrawableReturnsFalseForNonMemberWithoutRevert() external view {
+    assertFalse(savingCircles.isMemberWithdrawable(baseCircleId, STRANGER));
+  }
+
+  function test_IsMemberWithdrawableReturnsFalseForFutureRoundMember() external {
+    // Fund round 0 so non-withdrawable status is due to turn ordering, not decommissionability.
+    for (uint256 i = 0; i < members.length; i++) {
+      token.mint(members[i], DEPOSIT_AMOUNT);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+      savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
+      vm.stopPrank();
+    }
+
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL); // round 1
+    assertFalse(savingCircles.isMemberWithdrawable(baseCircleId, carol)); // member index 2
+  }
+
+  function test_IsMemberWithdrawableReturnsFalseAfterMemberAlreadyClaimed() external {
+    // Complete round 0 deposits so alice can claim.
+    for (uint256 i = 0; i < members.length; i++) {
+      token.mint(members[i], DEPOSIT_AMOUNT);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+      savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
+      vm.stopPrank();
+    }
+
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
+    assertTrue(savingCircles.isMemberWithdrawable(baseCircleId, alice));
+
+    vm.prank(alice);
+    savingCircles.withdraw(baseCircleId);
+
+    assertFalse(savingCircles.isMemberWithdrawable(baseCircleId, alice));
+  }
+
+  function test_IsMemberWithdrawableReturnsTrueForLateClaimableMember() external {
+    // Complete rounds 0 and 1 so alice remains claimable in a later round.
+    for (uint256 i = 0; i < members.length; i++) {
+      token.mint(members[i], DEPOSIT_AMOUNT * 2);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), DEPOSIT_AMOUNT * 2);
+      savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT); // round 0
+      vm.stopPrank();
+    }
+
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
+    for (uint256 i = 0; i < members.length; i++) {
+      vm.startPrank(members[i]);
+      savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT); // round 1
+      vm.stopPrank();
+    }
+
+    vm.warp(baseCircleStart + (DEPOSIT_INTERVAL * 2)); // round 2
+    assertTrue(savingCircles.isMemberWithdrawable(baseCircleId, alice));
+  }
+
+  function test_IsMemberWithdrawableReturnsFalseWhenDecommissionable() external {
+    // Complete only round 0 then skip round 1 deposits.
+    for (uint256 i = 0; i < members.length; i++) {
+      token.mint(members[i], DEPOSIT_AMOUNT);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+      savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
+      vm.stopPrank();
+    }
+
+    vm.warp(baseCircleStart + (DEPOSIT_INTERVAL * 2)); // decommissionable due to missed round 1
+    assertTrue(savingCircles.isDecommissionable(baseCircleId));
+    assertFalse(savingCircles.isMemberWithdrawable(baseCircleId, alice));
+  }
+
   function test_WithdrawWhenUserIsNotACircleMember() external {
     address nonMember = makeAddr('nonMember');
 
