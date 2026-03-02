@@ -1124,12 +1124,12 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
 
   function test_CircleStateWhenCircleNotStarted() external {
     uint256 circleId = _createUnstartedCircle();
-    assertEq(savingCircles.circleState(circleId), 0);
+    assertEq(uint256(savingCircles.circleState(circleId)), uint256(ISavingCircles.CircleState.NotStarted));
   }
 
   function test_CircleStateWhenCircleIsActiveInFirstRound() external {
     vm.warp(baseCircleStart);
-    assertEq(savingCircles.circleState(baseCircleId), 1);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.Active));
   }
 
   function test_CircleStateWhenCurrentRoundDepositsAreInProgress() external {
@@ -1137,18 +1137,18 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     _depositRoundForAllMembers(baseCircleId, 1);
 
     vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
-    assertEq(savingCircles.circleState(baseCircleId), 2);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.DepositInProgress));
   }
 
   function test_CircleStateWhenCurrentRoundDepositsAreComplete() external {
     vm.warp(baseCircleStart);
     _depositRoundForAllMembers(baseCircleId, 2);
-    assertEq(savingCircles.circleState(baseCircleId), 3);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.DepositComplete));
   }
 
   function test_CircleStateWhenPreviousRoundMissedDeposits() external {
     vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
-    assertEq(savingCircles.circleState(baseCircleId), 6);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.MissedDeposit));
   }
 
   function test_CircleStateWhenCircleIsDecommissioned() external {
@@ -1156,23 +1156,24 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     vm.prank(alice);
     savingCircles.decommission(baseCircleId);
 
-    assertEq(savingCircles.circleState(baseCircleId), 5);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
+    savingCircles.circleState(baseCircleId);
   }
 
   function test_RoundStateWhenRoundHasNotStartedYet() external {
     vm.warp(baseCircleStart);
-    assertEq(savingCircles.roundState(baseCircleId), 0);
+    assertEq(uint256(savingCircles.roundState(baseCircleId)), uint256(ISavingCircles.RoundState.DepositInProgress));
   }
 
   function test_RoundStateWhenDepositIsInProgress() external {
     vm.warp(baseCircleStart + 1);
-    assertEq(savingCircles.roundState(baseCircleId), 1);
+    assertEq(uint256(savingCircles.roundState(baseCircleId)), uint256(ISavingCircles.RoundState.DepositInProgress));
   }
 
   function test_RoundStateWhenCurrentRoundDepositsAreComplete() external {
     vm.warp(baseCircleStart + 1);
     _depositRoundForAllMembers(baseCircleId, 1);
-    assertEq(savingCircles.roundState(baseCircleId), 2);
+    assertEq(uint256(savingCircles.roundState(baseCircleId)), uint256(ISavingCircles.RoundState.Claimable));
   }
 
   // ============ View Function Edge Cases ============

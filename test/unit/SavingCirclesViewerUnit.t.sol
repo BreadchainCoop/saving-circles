@@ -7,6 +7,7 @@ import {TransparentUpgradeableProxy} from '@openzeppelin/contracts/proxy/transpa
 import {SavingCircles} from 'src/contracts/SavingCircles.sol';
 import {SavingCirclesViewer} from 'src/contracts/SavingCirclesViewer.sol';
 import {ISavingCircles} from 'src/interfaces/ISavingCircles.sol';
+import {ISavingCirclesViewer} from 'src/interfaces/ISavingCirclesViewer.sol';
 import {MockERC20} from 'test/mocks/MockERC20.sol';
 import {SavingCirclesTestBase} from 'test/utils/SavingCirclesTestBase.t.sol';
 
@@ -290,5 +291,40 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     assertTrue(userData.circleData[0].isDecommissionable);
     assertEq(userData.membershipStatus.decommissionableCircleIds.length, 1);
     assertEq(userData.membershipStatus.decommissionableCircleIds[0], baseCircleId);
+  }
+
+  function test_GetComprehensiveUserDataHandlesDecommissionedCircle() external {
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL + 1);
+    vm.prank(alice);
+    savingCircles.decommission(baseCircleId);
+
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(bob);
+
+    assertEq(userData.membershipStatus.allCircleIds.length, 1);
+    assertEq(userData.membershipStatus.decommissionedCircleIds.length, 1);
+    assertEq(userData.membershipStatus.decommissionedCircleIds[0], baseCircleId);
+
+    assertEq(userData.circleData.length, 1);
+    assertTrue(userData.circleData[0].isDecommissioned);
+
+    assertEq(userData.financialSummary.totalBalance, 0);
+    assertEq(userData.financialSummary.activeCirclesCount, 0);
+    assertEq(userData.financialSummary.completedCirclesCount, 1);
+  }
+
+  function test_GetCirclesStateHandlesDecommissionedCircle() external {
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL + 1);
+    vm.prank(alice);
+    savingCircles.decommission(baseCircleId);
+
+    uint256[] memory ids = new uint256[](1);
+    ids[0] = baseCircleId;
+
+    ISavingCirclesViewer.CircleState[] memory states = savingCirclesViewer.getCirclesState(ids);
+
+    assertEq(states.length, 1);
+    assertEq(states[0].circleId, baseCircleId);
+    assertEq(uint256(states[0].circleState), uint256(ISavingCircles.CircleState.Decommissioned));
+    assertEq(uint256(states[0].roundState), uint256(ISavingCircles.RoundState.NotStarted));
   }
 }
