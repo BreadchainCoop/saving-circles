@@ -310,15 +310,14 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function circleState(uint256 _id) public view override returns (CircleState state) {
+  function circleState(uint256 _id) public view override onlyCommissioned(_id) returns (CircleState state) {
     Circle memory _circle = circles[_id];
     if (isActive[_id]) {
       state = CircleState.Active;
       uint256 currentRound = _currentRoundIndex(_circle);
       if (currentRound >= circleMembers[_id].length) {
         state = CircleState.Expired;
-      }
-      if (currentRound > 0) {
+      } else if (currentRound > 0) {
         uint256 prev = currentRound - 1;
         if (
           block.timestamp >= _roundEndTime(_circle, prev)
@@ -339,15 +338,21 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function roundState(uint256 _id) public view override returns (RoundState state) {
+  function roundState(uint256 _id) public view override onlyCommissioned(_id) returns (RoundState state) {
     Circle memory _circle = circles[_id];
     uint256 currentRound = _currentRoundIndex(_circle);
+
+    if (currentRound >= circleMembers[_id].length) return RoundState.NotStarted;
+
     if (block.timestamp <= _circle.effectiveCircleStartTime + (currentRound * _circle.depositInterval)) {
       state = RoundState.NotStarted;
-    } else if (_allMembersDepositedForRound(_id, currentRound, _circle.depositAmount)) {
-      state = RoundState.DepositComplete;
-    } else if (_claimable(_id, circleMembers[_id][currentRound])) {
-      state = RoundState.Claimed;
+    }
+    if (_allMembersDepositedForRound(_id, currentRound, _circle.depositAmount)) {
+      if (_claimable(_id, circleMembers[_id][currentRound])) {
+        state = RoundState.Claimable;
+      } else {
+        state = RoundState.Claimed;
+      }
     } else {
       state = RoundState.DepositInProgress;
     }
