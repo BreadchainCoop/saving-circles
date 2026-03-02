@@ -310,13 +310,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function circleState(uint256 _id) public view override returns (uint8 state) {
+  function circleState(uint256 _id) public view override returns (CircleState state) {
     Circle memory _circle = circles[_id];
     if (isActive[_id]) {
-      state = 1;
+      state = CircleState.Active;
       uint256 currentRound = _currentRoundIndex(_circle);
       if (currentRound >= circleMembers[_id].length) {
-        state = 4;
+        state = CircleState.Expired;
       }
       if (currentRound > 0) {
         uint256 prev = currentRound - 1;
@@ -324,32 +324,32 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
           block.timestamp >= _roundEndTime(_circle, prev)
             && !_allMembersDepositedForRound(_id, prev, _circle.depositAmount)
         ) {
-          state = 6;
+          state = CircleState.MissedDeposit;
         } else if (!_allMembersDepositedForRound(_id, currentRound, _circle.depositAmount)) {
-          state = 2;
+          state = CircleState.DepositInProgress;
         } else {
-          state = 3;
+          state = CircleState.DepositComplete;
         }
       }
     } else if (_isDecommissioned(_circle)) {
-      state = 5;
+      state = CircleState.Decommissioned;
     } else {
-      state = 0;
+      state = CircleState.NotStarted;
     }
   }
 
   /// @inheritdoc ISavingCircles
-  function roundState(uint256 _id) public view override returns (uint8 state) {
+  function roundState(uint256 _id) public view override returns (RoundState state) {
     Circle memory _circle = circles[_id];
     uint256 currentRound = _currentRoundIndex(_circle);
     if (block.timestamp <= _circle.effectiveCircleStartTime + (currentRound * _circle.depositInterval)) {
-      state = 0;
+      state = RoundState.NotStarted;
     } else if (_allMembersDepositedForRound(_id, currentRound, _circle.depositAmount)) {
-      state = 2;
+      state = RoundState.DepositComplete;
     } else if (_claimable(_id, circleMembers[_id][currentRound])) {
-      state = 3;
+      state = RoundState.Claimed;
     } else {
-      state = 1;
+      state = RoundState.DepositInProgress;
     }
   }
 

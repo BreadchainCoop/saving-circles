@@ -23,6 +23,31 @@ interface ISavingCircles {
     uint256 circleEnd;
   }
 
+  /**
+   * @notice An enum representing the state of a circle
+   * @dev NotStarted = 0, Active = 1, DepositInProgress = 2, DepositComplete = 3, Expired = 4, Decommissioned = 5, MissedDeposit = 6
+   */
+  enum CircleState {
+    NotStarted,
+    Active,
+    DepositInProgress,
+    DepositComplete,
+    Expired,
+    Decommissioned,
+    MissedDeposit
+  }
+
+  /**
+   * @notice An enum representing the state of a round
+   * @dev NotStarted = 0, DepositInProgress = 1, Claimable = 2, Claimed = 3
+   */
+  enum RoundState {
+    NotStarted,
+    DepositInProgress,
+    Claimable,
+    Claimed
+  }
+
   // =======================
   // EVENTS
   // =======================
@@ -357,18 +382,16 @@ interface ISavingCircles {
   /**
    * @notice Get the current state of a circle
    * @param id The ID of the circle
-   * @dev 0 = Not started, 1 = Active, 2 = Deposit in progress, 3 = Deposit complete, 4 = Expired, 5 = Decommissioned, 6 = Missed deposit(s) in current round
    * @return state The current state of the circle
    */
-  function circleState(uint256 id) external view returns (uint8 state);
+  function circleState(uint256 id) external view returns (CircleState state);
 
   /**
    * @notice Get the current round of a circle
    * @param id The ID of the circle
    * @return state The current round's state of the circle
-   * @dev 0 = Not started, 1 = Deposit in progress, 2 = Deposit complete, 3 = Claimed
    */
-  function roundState(uint256 id) external view returns (uint8 state);
+  function roundState(uint256 id) external view returns (RoundState state);
 
   /**
    * @notice Get the next ID that will be assigned to a new circle
