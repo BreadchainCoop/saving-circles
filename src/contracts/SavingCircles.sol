@@ -296,7 +296,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     address[] memory members = circleMembers[_id];
     for (uint256 i = 0; i < members.length; i++) {
-      if (_claimableWithoutDecommissionCheck(_id, members[i])) return true;
+      if (_activeClaimableCheck(_id, members[i])) return true;
     }
 
     return false;
@@ -391,10 +391,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
    */
   function _claimable(uint256 _id, address _member) internal view onlyCommissioned(_id) returns (bool) {
     if (_isDecommissionable(_id)) return false;
-    return _claimableWithoutDecommissionCheck(_id, _member);
+    return _activeClaimableCheck(_id, _member);
   }
 
-  function _claimableWithoutDecommissionCheck(uint256 _id, address _member) internal view returns (bool) {
+  function _activeClaimableCheck(uint256 _id, address _member) internal view returns (bool) {
     Circle memory _circle = circles[_id];
     if (_memberStates[_id][_member].hasClaimed) return false;
 
