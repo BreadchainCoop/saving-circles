@@ -3,27 +3,6 @@ pragma solidity ^0.8.28;
 
 interface ISavingCircles {
   /**
-   * @notice A struct representing a saving circle
-   * @param owner The owner of the circle
-   * @param members The members of the circle
-   * @param currentIndex The current index of the circle
-   * @param depositAmount The deposit amount of the circle
-   * @param token The token of the circle
-   * @param depositInterval The deposit interval of the circle
-   * @param circleStart The start time of the circle
-   * @param circleEnd The end time of the circle
-   */
-  struct Circle {
-    address owner;
-    uint256 currentIndex;
-    uint256 depositAmount;
-    address token;
-    uint256 depositInterval;
-    uint256 effectiveCircleStartTime;
-    uint256 circleEnd;
-  }
-
-  /**
    * @notice An enum representing the state of a circle
    * @dev NotStarted = 0, Active = 1, DepositInProgress = 2, DepositComplete = 3, Expired = 4, Decommissioned = 5, MissedDeposit = 6
    */
@@ -46,6 +25,27 @@ interface ISavingCircles {
     DepositInProgress,
     Claimable,
     Claimed
+  }
+
+  /**
+   * @notice A struct representing a saving circle
+   * @param owner The owner of the circle
+   * @param members The members of the circle
+   * @param currentIndex The current index of the circle
+   * @param depositAmount The deposit amount of the circle
+   * @param token The token of the circle
+   * @param depositInterval The deposit interval of the circle
+   * @param circleStart The start time of the circle
+   * @param circleEnd The end time of the circle
+   */
+  struct Circle {
+    address owner;
+    uint256 currentIndex;
+    uint256 depositAmount;
+    address token;
+    uint256 depositInterval;
+    uint256 effectiveCircleStartTime;
+    uint256 circleEnd;
   }
 
   // =======================

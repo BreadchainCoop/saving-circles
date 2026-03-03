@@ -368,6 +368,18 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     return 0;
   }
 
+  function _getCircleOwner(uint256 _circleId) internal view returns (address owner) {
+    (owner,,,,,,) = SAVING_CIRCLES.circles(_circleId);
+  }
+
+  function _getCircle(uint256 _circleId) internal view returns (ISavingCircles.Circle memory circle) {
+    uint256[] memory ids = new uint256[](1);
+    ids[0] = _circleId;
+
+    ISavingCircles.Circle[] memory circles = SAVING_CIRCLES.getCircles(ids);
+    return circles[0];
+  }
+
   function _isInArray(uint256 value, uint256[] memory array) internal pure returns (bool) {
     for (uint256 i = 0; i < array.length; i++) {
       if (array[i] == value) {
@@ -392,17 +404,5 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     }
 
     return combined;
-  }
-
-  function _getCircleOwner(uint256 _circleId) internal view returns (address owner) {
-    (owner,,,,,,) = SAVING_CIRCLES.circles(_circleId);
-  }
-
-  function _getCircle(uint256 _circleId) internal view returns (ISavingCircles.Circle memory circle) {
-    uint256[] memory ids = new uint256[](1);
-    ids[0] = _circleId;
-
-    ISavingCircles.Circle[] memory circles = SAVING_CIRCLES.getCircles(ids);
-    return circles[0];
   }
 }
