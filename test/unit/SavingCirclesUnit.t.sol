@@ -98,6 +98,27 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     return _createCircle(savingCircles, circle, inviteMembers, _ownerPrivateKey);
   }
 
+  function _depositRoundForAllMembers(uint256 _circleId, uint256 _roundsPerMember) internal {
+    uint256 totalAmount = DEPOSIT_AMOUNT * _roundsPerMember;
+    for (uint256 i = 0; i < members.length; i++) {
+      token.mint(members[i], totalAmount);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), totalAmount);
+      vm.stopPrank();
+    }
+
+    for (uint256 round = 0; round < _roundsPerMember; round++) {
+      for (uint256 i = 0; i < members.length; i++) {
+        vm.prank(members[i]);
+        savingCircles.deposit(_circleId, DEPOSIT_AMOUNT);
+      }
+
+      if (round + 1 < _roundsPerMember) {
+        vm.warp(baseCircleStart + (DEPOSIT_INTERVAL * (round + 1)));
+      }
+    }
+  }
+
   function test_SetTokenAllowedWhenCallerIsNotOwner() external {
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, alice));
@@ -1097,6 +1118,62 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     // State 5: Decommissioned (final state)
     vm.expectRevert(ISavingCircles.NotCommissioned.selector);
     savingCircles.getCircle(circleId);
+  }
+
+  // ============ Circle/Round View State Tests ============
+
+  function test_CircleStateWhenCircleNotStarted() external {
+    uint256 circleId = _createUnstartedCircle();
+    assertEq(uint256(savingCircles.circleState(circleId)), uint256(ISavingCircles.CircleState.NotStarted));
+  }
+
+  function test_CircleStateWhenCircleIsActiveInFirstRound() external {
+    vm.warp(baseCircleStart);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.Active));
+  }
+
+  function test_CircleStateWhenCurrentRoundDepositsAreInProgress() external {
+    vm.warp(baseCircleStart);
+    _depositRoundForAllMembers(baseCircleId, 1);
+
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.DepositInProgress));
+  }
+
+  function test_CircleStateWhenCurrentRoundDepositsAreComplete() external {
+    vm.warp(baseCircleStart);
+    _depositRoundForAllMembers(baseCircleId, 2);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.DepositComplete));
+  }
+
+  function test_CircleStateWhenPreviousRoundMissedDeposits() external {
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.MissedDeposit));
+  }
+
+  function test_CircleStateWhenCircleIsDecommissioned() external {
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL + 1);
+    vm.prank(alice);
+    savingCircles.decommission(baseCircleId);
+
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
+    savingCircles.circleState(baseCircleId);
+  }
+
+  function test_RoundStateWhenRoundHasNotStartedYet() external {
+    vm.warp(baseCircleStart);
+    assertEq(uint256(savingCircles.roundState(baseCircleId)), uint256(ISavingCircles.RoundState.DepositInProgress));
+  }
+
+  function test_RoundStateWhenDepositIsInProgress() external {
+    vm.warp(baseCircleStart + 1);
+    assertEq(uint256(savingCircles.roundState(baseCircleId)), uint256(ISavingCircles.RoundState.DepositInProgress));
+  }
+
+  function test_RoundStateWhenCurrentRoundDepositsAreComplete() external {
+    vm.warp(baseCircleStart + 1);
+    _depositRoundForAllMembers(baseCircleId, 1);
+    assertEq(uint256(savingCircles.roundState(baseCircleId)), uint256(ISavingCircles.RoundState.Claimable));
   }
 
   // ============ View Function Edge Cases ============

@@ -3,6 +3,31 @@ pragma solidity ^0.8.28;
 
 interface ISavingCircles {
   /**
+   * @notice An enum representing the state of a circle
+   * @dev NotStarted = 0, Active = 1, DepositInProgress = 2, DepositComplete = 3, Expired = 4, Decommissioned = 5, MissedDeposit = 6
+   */
+  enum CircleState {
+    NotStarted,
+    Active,
+    DepositInProgress,
+    DepositComplete,
+    Expired,
+    Decommissioned,
+    MissedDeposit
+  }
+
+  /**
+   * @notice An enum representing the state of a round
+   * @dev NotStarted = 0, DepositInProgress = 1, Claimable = 2, Claimed = 3
+   */
+  enum RoundState {
+    NotStarted,
+    DepositInProgress,
+    Claimable,
+    Claimed
+  }
+
+  /**
    * @notice A struct representing a saving circle
    * @param owner The owner of the circle
    * @param members The members of the circle
@@ -353,6 +378,20 @@ interface ISavingCircles {
    * @return currentRoundWithdrawer The address of the current round withdrawer
    */
   function currentRoundWithdrawer(uint256 id) external view returns (address currentRoundWithdrawer);
+
+  /**
+   * @notice Get the current state of a circle
+   * @param id The ID of the circle
+   * @return state The current state of the circle
+   */
+  function circleState(uint256 id) external view returns (CircleState state);
+
+  /**
+   * @notice Get the current round of a circle
+   * @param id The ID of the circle
+   * @return state The current round's state of the circle
+   */
+  function roundState(uint256 id) external view returns (RoundState state);
 
   /**
    * @notice Get the next ID that will be assigned to a new circle

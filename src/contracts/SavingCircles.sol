@@ -309,6 +309,55 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     return circleMembers[_id][currentRound];
   }
 
+  /// @inheritdoc ISavingCircles
+  function circleState(uint256 _id) public view override onlyCommissioned(_id) returns (CircleState state) {
+    Circle memory _circle = circles[_id];
+    if (isActive[_id]) {
+      state = CircleState.Active;
+      uint256 currentRound = _currentRoundIndex(_circle);
+      if (currentRound >= circleMembers[_id].length) {
+        state = CircleState.Expired;
+      } else if (currentRound > 0) {
+        uint256 prev = currentRound - 1;
+        if (
+          block.timestamp >= _roundEndTime(_circle, prev)
+            && !_allMembersDepositedForRound(_id, prev, _circle.depositAmount)
+        ) {
+          state = CircleState.MissedDeposit;
+        } else if (!_allMembersDepositedForRound(_id, currentRound, _circle.depositAmount)) {
+          state = CircleState.DepositInProgress;
+        } else {
+          state = CircleState.DepositComplete;
+        }
+      }
+    } else if (_isDecommissioned(_circle)) {
+      state = CircleState.Decommissioned;
+    } else {
+      state = CircleState.NotStarted;
+    }
+  }
+
+  /// @inheritdoc ISavingCircles
+  function roundState(uint256 _id) public view override onlyCommissioned(_id) returns (RoundState state) {
+    Circle memory _circle = circles[_id];
+    uint256 currentRound = _currentRoundIndex(_circle);
+
+    if (currentRound >= circleMembers[_id].length) return RoundState.NotStarted;
+
+    if (block.timestamp <= _circle.effectiveCircleStartTime + (currentRound * _circle.depositInterval)) {
+      state = RoundState.NotStarted;
+    }
+    if (_allMembersDepositedForRound(_id, currentRound, _circle.depositAmount)) {
+      if (_claimable(_id, circleMembers[_id][currentRound])) {
+        state = RoundState.Claimable;
+      } else {
+        state = RoundState.Claimed;
+      }
+    } else {
+      state = RoundState.DepositInProgress;
+    }
+  }
+
   /**
    * @dev Make a withdrawal from a specified circle
    *      Permissionless: anyone can trigger the payout for the member whose turn it is to withdraw

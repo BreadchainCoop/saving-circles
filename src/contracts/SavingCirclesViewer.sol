@@ -104,6 +104,25 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     return _getTotalBalance(_member);
   }
 
+  /// @inheritdoc ISavingCirclesViewer
+  function getCirclesState(uint256[] calldata _circleIds) external view override returns (CircleState[] memory states) {
+    states = new CircleState[](_circleIds.length);
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      uint256 circleId = _circleIds[i];
+      states[i].circleId = circleId;
+
+      ISavingCircles.Circle memory circle = _getCircle(circleId);
+      if (circle.owner == address(0)) {
+        states[i].circleState = ISavingCircles.CircleState.Decommissioned;
+        states[i].roundState = ISavingCircles.RoundState.NotStarted;
+      } else {
+        states[i].circleState = SAVING_CIRCLES.circleState(circleId);
+        states[i].roundState = SAVING_CIRCLES.roundState(circleId);
+      }
+    }
+    return states;
+  }
+
   function _getTotalBalance(address _member) internal view returns (uint256 _totalBalance) {
     uint256[] memory _ids = SAVING_CIRCLES.getMemberCircles(_member);
 
@@ -130,7 +149,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
 
     uint256 currentIndex = 0;
     for (uint256 i = 0; i < SAVING_CIRCLES.nextId(); i++) {
-      if (SAVING_CIRCLES.getCircle(i).owner == _user && !_isInArray(i, memberCircleIds)) {
+      if (_getCircleOwner(i) == _user && !_isInArray(i, memberCircleIds)) {
         ownedOnlyIds[currentIndex] = i;
         currentIndex++;
       }
@@ -144,7 +163,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     uint256[] memory memberCircleIds
   ) internal view returns (uint256 count) {
     for (uint256 i = 0; i < SAVING_CIRCLES.nextId(); i++) {
-      if (SAVING_CIRCLES.getCircle(i).owner == _user && !_isInArray(i, memberCircleIds)) {
+      if (_getCircleOwner(i) == _user && !_isInArray(i, memberCircleIds)) {
         count++;
       }
     }
@@ -265,9 +284,8 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
   ) internal view returns (UserCircleData memory circleData) {
     circleData.circleId = _circleId;
 
-    ISavingCircles.Circle memory circle = SAVING_CIRCLES.getCircle(_circleId);
-
-    if (SAVING_CIRCLES.isDecommissioned(circle)) {
+    ISavingCircles.Circle memory circle = _getCircle(_circleId);
+    if (circle.owner == address(0)) {
       circleData.isDecommissioned = true;
       return circleData;
     }
@@ -279,7 +297,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     _setUserBalanceData(circleData, _user, _circleId);
     _setUserPermissions(circleData, _user, circle, _circleId);
     _setCircleTimingData(circleData, circle);
-    _setDepositProgress(circleData, _circleId);
+    _setDepositProgress(circleData, _circleId, circle);
   }
 
   function _setUserBalanceData(UserCircleData memory circleData, address _user, uint256 _circleId) internal view {
@@ -320,9 +338,12 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     circleData.totalRounds = circleMembers.length;
   }
 
-  function _setDepositProgress(UserCircleData memory circleData, uint256 _circleId) internal view {
+  function _setDepositProgress(
+    UserCircleData memory circleData,
+    uint256 _circleId,
+    ISavingCircles.Circle memory circle
+  ) internal view {
     (, uint256[] memory memberBalances) = SAVING_CIRCLES.getMemberBalances(_circleId);
-    ISavingCircles.Circle memory circle = SAVING_CIRCLES.getCircle(_circleId);
 
     uint256 membersWithFullDeposits = 0;
     for (uint256 i = 0; i < memberBalances.length; i++) {
@@ -334,6 +355,10 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
   }
 
   function _memberBalance(uint256 _circleId, address _member) internal view returns (uint256) {
+    if (_getCircleOwner(_circleId) == address(0)) {
+      return 0;
+    }
+
     (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
     for (uint256 i = 0; i < members.length; i++) {
       if (members[i] == _member) {
@@ -341,6 +366,18 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
       }
     }
     return 0;
+  }
+
+  function _getCircleOwner(uint256 _circleId) internal view returns (address owner) {
+    (owner,,,,,,) = SAVING_CIRCLES.circles(_circleId);
+  }
+
+  function _getCircle(uint256 _circleId) internal view returns (ISavingCircles.Circle memory circle) {
+    uint256[] memory ids = new uint256[](1);
+    ids[0] = _circleId;
+
+    ISavingCircles.Circle[] memory circles = SAVING_CIRCLES.getCircles(ids);
+    return circles[0];
   }
 
   function _isInArray(uint256 value, uint256[] memory array) internal pure returns (bool) {
