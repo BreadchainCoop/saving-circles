@@ -115,11 +115,10 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
       if (circle.owner == address(0)) {
         states[i].circleState = ISavingCircles.CircleState.Decommissioned;
         states[i].roundState = ISavingCircles.RoundState.NotStarted;
-        continue;
+      } else {
+        states[i].circleState = SAVING_CIRCLES.circleState(circleId);
+        states[i].roundState = SAVING_CIRCLES.roundState(circleId);
       }
-
-      states[i].circleState = SAVING_CIRCLES.circleState(circleId);
-      states[i].roundState = SAVING_CIRCLES.roundState(circleId);
     }
     return states;
   }
