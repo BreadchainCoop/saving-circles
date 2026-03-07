@@ -339,6 +339,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
   /// @inheritdoc ISavingCircles
   function roundState(uint256 _id) public view override onlyCommissioned(_id) returns (RoundState state) {
+    if (!isActive[_id]) return RoundState.NotStarted;
+
     Circle memory _circle = circles[_id];
     uint256 currentRound = _currentRoundIndex(_circle);
 
