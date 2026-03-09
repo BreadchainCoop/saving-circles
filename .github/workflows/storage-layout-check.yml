@@ -19,7 +19,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
 
       - name: Install Node dependencies
-        run: npm ci
+        run: yarn --frozen-lockfile --network-concurrency 1
 
       - name: Fetch dev branch
         run: git fetch origin dev:refs/remotes/origin/dev
