@@ -33,6 +33,7 @@ contract UpgradeValidate is Common {
     console2.log('AdminOwner', ProxyAdmin(proxyAdmin).owner());
     console2.log('CurrentImplementation', expectedCurrentImplementation);
     console2.log('NewImplementation', newImplementation);
-    console2.log('SmokeCheck.nextId', nextId);
+    console2.log('SmokeCheck.nextId');
+    console2.log(nextId);
   }
 }
