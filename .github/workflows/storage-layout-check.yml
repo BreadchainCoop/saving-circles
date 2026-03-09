@@ -3,7 +3,7 @@ name: Storage Layout Check
 on:
   pull_request:
     branches:
-      - main
+      - dev
 
 jobs:
   storage-layout:
