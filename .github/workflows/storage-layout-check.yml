@@ -1,0 +1,25 @@
+name: Storage Layout Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  storage-layout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Check SavingCircles storage layout
+        run: ./scripts/check_storage_layout.sh ${{ github.event.pull_request.base.sha }} HEAD src/contracts/SavingCircles.sol:SavingCircles
