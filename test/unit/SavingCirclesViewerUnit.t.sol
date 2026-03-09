@@ -229,6 +229,55 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
     assertFalse(userData.circleData[0].isDecommissionable);
   }
 
+  function test_GetComprehensiveUserDataCanWithdrawForLateClaimablePastRoundMember() external {
+    // Complete rounds 0 and 1 so alice (round 0) remains claimable at round 2.
+    for (uint256 i = 0; i < members.length; i++) {
+      token.mint(members[i], DEPOSIT_AMOUNT * 2);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), DEPOSIT_AMOUNT * 2);
+      savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT); // round 0
+      vm.stopPrank();
+    }
+
+    vm.warp(baseCircleStart + DEPOSIT_INTERVAL);
+    for (uint256 i = 0; i < members.length; i++) {
+      vm.startPrank(members[i]);
+      savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT); // round 1
+      vm.stopPrank();
+    }
+
+    vm.warp(baseCircleStart + (DEPOSIT_INTERVAL * 2)); // round 2, current withdrawer is carol
+
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(alice);
+
+    assertFalse(userData.circleData[0].isCurrentWithdrawer);
+    assertTrue(userData.circleData[0].canWithdraw);
+    assertFalse(userData.circleData[0].isDecommissionable);
+    assertEq(userData.financialSummary.pendingWithdrawals, 1);
+    assertEq(userData.membershipStatus.withdrawableCircleIds.length, 1);
+    assertEq(userData.membershipStatus.withdrawableCircleIds[0], baseCircleId);
+  }
+
+  function test_GetComprehensiveUserDataCanWithdrawFalseWhenLateClaimWouldBeDecommissionable() external {
+    // Complete only round 0 and skip round 1 deposits.
+    for (uint256 i = 0; i < members.length; i++) {
+      token.mint(members[i], DEPOSIT_AMOUNT);
+      vm.startPrank(members[i]);
+      token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+      savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
+      vm.stopPrank();
+    }
+
+    vm.warp(baseCircleStart + (DEPOSIT_INTERVAL * 2)); // decommissionable due to incomplete round 1
+
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(alice);
+
+    assertTrue(userData.circleData[0].isDecommissionable);
+    assertFalse(userData.circleData[0].canWithdraw);
+    assertEq(userData.financialSummary.pendingWithdrawals, 0);
+    assertEq(userData.membershipStatus.withdrawableCircleIds.length, 0);
+  }
+
   function test_GetComprehensiveUserDataForNonMember() external {
     // Get comprehensive data for a non-member
     SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(STRANGER);

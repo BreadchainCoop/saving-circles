@@ -529,10 +529,10 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
 
     // Withdrawal
     vm.warp(startTime + (depositInterval * (round + 1)));
-    if (savingCircles.isWithdrawable(circleId)) {
-      ISavingCircles.Circle memory circleData = savingCircles.getCircle(circleId);
-      address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
-      address recipient = storedMembers[circleData.currentIndex];
+    ISavingCircles.Circle memory circleData = savingCircles.getCircle(circleId);
+    address[] memory storedMembers = savingCircles.getCircleMembers(circleId);
+    address recipient = storedMembers[circleData.currentIndex];
+    if (savingCircles.isMemberWithdrawable(circleId, recipient)) {
       vm.prank(recipient);
       savingCircles.withdraw(circleId);
     }

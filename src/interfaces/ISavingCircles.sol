@@ -366,11 +366,19 @@ interface ISavingCircles {
   function isDecommissionable(uint256 id) external view returns (bool decommissionable);
 
   /**
-   * @notice Check if a circle is withdrawable
+   * @notice Check whether at least one member in a circle can currently claim a withdrawal
    * @param id The ID of the circle
-   * @return withdrawable Whether the circle is withdrawable
+   * @return withdrawable Whether any member in the circle is currently withdrawable
    */
   function isWithdrawable(uint256 id) external view returns (bool withdrawable);
+
+  /**
+   * @notice Check if a specific member is eligible to claim their withdrawal from a circle
+   * @param id The ID of the circle
+   * @param member The member to check
+   * @return withdrawable Whether the member is withdrawable
+   */
+  function isMemberWithdrawable(uint256 id, address member) external view returns (bool withdrawable);
 
   /**
    * @notice Get the address of the withdrawable by

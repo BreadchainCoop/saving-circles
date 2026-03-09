@@ -323,7 +323,7 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     address currentWithdrawer = SAVING_CIRCLES.currentRoundWithdrawer(_circleId);
     circleData.currentWithdrawer = currentWithdrawer;
     circleData.isCurrentWithdrawer = (currentWithdrawer == _user);
-    circleData.canWithdraw = circleData.isCurrentWithdrawer && SAVING_CIRCLES.isWithdrawable(_circleId);
+    circleData.canWithdraw = SAVING_CIRCLES.isMemberWithdrawable(_circleId, _user);
   }
 
   function _setCircleTimingData(UserCircleData memory circleData, ISavingCircles.Circle memory circle) internal view {
