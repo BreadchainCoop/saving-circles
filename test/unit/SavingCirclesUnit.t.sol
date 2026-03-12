@@ -644,9 +644,11 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   function test_DecommissionWhenOwner() external {
     vm.warp(block.timestamp + DEPOSIT_INTERVAL + 1);
 
+    vm.startPrank(alice);
     vm.expectEmit(true, true, true, true);
     emit ISavingCircles.CircleDecommissioned(baseCircleId);
     savingCircles.decommission(baseCircleId);
+    vm.stopPrank();
 
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
     savingCircles.getCircle(baseCircleId);
@@ -1086,7 +1088,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   function test_DecommissionWhenNotOwnerOrMember() external {
     // Test that non-owner/non-member cannot decommission
     vm.prank(STRANGER);
-    vm.expectRevert(ISavingCircles.NotDecommissionable.selector);
+    vm.expectRevert(ISavingCircles.NotMember.selector);
     savingCircles.decommission(baseCircleId);
   }
 
