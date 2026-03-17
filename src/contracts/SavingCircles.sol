@@ -146,7 +146,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function decommission(uint256 _id) external override nonReentrant onlyActive(_id) {
+  function decommission(uint256 _id) external override nonReentrant onlyActive(_id) onlyMember(_id, msg.sender) {
     if (!_isDecommissionable(_id)) revert NotDecommissionable();
 
     address token = circles[_id].token;
