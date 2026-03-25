@@ -10,10 +10,6 @@ concurrency:
   group: ${{github.workflow}}-${{github.ref}}
   cancel-in-progress: true
 
-env:
-  OPTIMISM_RPC: ${{ secrets.OPTIMISM_RPC }}
-  SEPOLIA_RPC: ${{ secrets.SEPOLIA_RPC }}
-
 jobs:
   foundry:
     uses: BreadchainCoop/etherform/.github/workflows/_foundry-cicd.yml@Rubydusa/upgrade-safety-validation
