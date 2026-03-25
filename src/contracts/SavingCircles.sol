@@ -34,6 +34,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   bytes32 private constant _INVITE_TYPEHASH = keccak256('Invite(uint256 id,uint256 nonce)');
 
   uint256 public nextId;
+  uint256 public shouldNotBeHere;
   mapping(uint256 id => Circle circle) public circles;
   mapping(uint256 id => mapping(address token => uint256 balance)) public balances;
   mapping(uint256 id => mapping(address member => bool status)) public isMember;
