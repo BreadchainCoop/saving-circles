@@ -15,6 +15,22 @@ env:
   SEPOLIA_RPC: ${{ secrets.SEPOLIA_RPC }}
 
 jobs:
+  foundry:
+    uses: BreadchainCoop/etherform/.github/workflows/_foundry-cicd.yml@Rubydusa/upgrade-safety-validation
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      deploy-on-pr: true
+      deploy-on-main: false
+      main-branch: "dev"
+      deploy-script: "script/Deploy.sol:Deploy"
+      run-slither: false
+      run-upgrade-safety: true
+      run-coverage: true
+    secrets:
+      PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+      RPC_URL: ${{ secrets.RPC_URL }}
   unit-tests:
     name: Run Unit Tests
     runs-on: ubuntu-latest
