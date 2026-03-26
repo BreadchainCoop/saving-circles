@@ -17,9 +17,10 @@ jobs:
       contents: read
       pull-requests: write
     with:
+      main-branch: "dev"
+      package-manager: "yarn"
       deploy-on-pr: true
       deploy-on-main: false
-      main-branch: "dev"
       deploy-script: "script/Deploy.sol:Deploy"
       run-slither: false
       run-upgrade-safety: true
