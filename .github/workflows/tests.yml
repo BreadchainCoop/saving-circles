@@ -20,7 +20,6 @@ jobs:
       main-branch: "dev"
       package-manager: "yarn"
       deploy-on-pr: true
-      deploy-on-main: false
       deploy-script: "script/Deploy.sol:Deploy"
       run-slither: false
       run-upgrade-safety: true
