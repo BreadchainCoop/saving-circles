@@ -9,8 +9,6 @@ multiline_func_header = 'params_first_multi'
 sort_imports = true
 
 [profile.default]
-build_info = true
-extra_output = ["storageLayout"]
 via_ir = true
 solc_version = '0.8.28'
 libs = ['node_modules', 'lib']
@@ -60,8 +58,3 @@ shrink_sequence = true
 gnosis = 'https://rpc.gnosis.gateway.fm'
 optimism = 'https://mainnet.optimism.io'
 sepolia = 'https://rpc.sepolia.io'
-
-# [etherscan]
-# gnosis = { key = "${ETHERSCAN_API_KEY}", url = "https://api.gnosisscan.io/api" ,name="gnosis" }
-# optimism = { key = "${ETHERSCAN_API_KEY}" }
-# sepolia = { key = "${ETHERSCAN_API_KEY}" }

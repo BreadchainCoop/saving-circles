@@ -25,114 +25,11 @@ jobs:
       run-slither: false
       run-upgrade-safety: true
       run-coverage: true
+      run-halmos: true
     secrets:
       PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
       RPC_URL: ${{ secrets.RPC_URL }}
       DEPLOY_ENV_VARS: ${{ secrets.DEPLOY_ENV_VARS }}
-  unit-tests:
-    name: Run Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: "yarn"
-
-      - name: Install dependencies
-        run: yarn --frozen-lockfile --network-concurrency 1
-
-      - name: Precompile using 0.8.14 and via-ir=false
-        run: yarn build
-
-      - name: Run tests
-        shell: bash
-        run: yarn test:unit
-
-  integration-tests:
-    name: Run Integration Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: "yarn"
-
-      - name: Install dependencies
-        run: yarn --frozen-lockfile --network-concurrency 1
-
-      - name: Precompile using 0.8.14 and via-ir=false
-        run: yarn build
-
-      - name: Run tests
-        run: yarn test:integration
-
-  fuzz-tests:
-    name: Run Fuzz Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: "yarn"
-
-      - name: Install dependencies
-        run: yarn --frozen-lockfile --network-concurrency 1
-
-      - name: Precompile using 0.8.14 and via-ir=false
-        run: yarn build
-
-      - name: Run fuzz tests
-        run: forge test --match-contract Fuzz -vvv
-
-  halmos-tests:
-    name: Run symbolic execution tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20.x
-          cache: "yarn"
-
-      - name: Install dependencies
-        run: yarn --frozen-lockfile --network-concurrency 1
-
-      - name: Precompile with via-ir=false
-        run: yarn build
-
-      - name: Run tests
-        run: yarn test:integration
 
   lint:
     name: Lint Commit Messages
