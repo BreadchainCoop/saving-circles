@@ -9,6 +9,7 @@ multiline_func_header = 'params_first_multi'
 sort_imports = true
 
 [profile.default]
+build_info = true
 via_ir = true
 solc_version = '0.8.28'
 libs = ['node_modules', 'lib']
