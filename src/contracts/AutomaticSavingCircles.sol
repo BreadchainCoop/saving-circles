@@ -106,39 +106,35 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   function _executeAutomatedDepositsForCircle(uint256 _circleId) internal {
-    try SAVING_CIRCLES.getCircle(_circleId) returns (ISavingCircles.Circle memory _circle) {
-      try SAVING_CIRCLES.getMemberBalances(_circleId) returns (address[] memory members, uint256[] memory balances) {
-        if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return;
+    ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
+    (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
+    if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return;
 
-        IERC20 token = IERC20(_circle.token);
-        for (uint256 i = 0; i < members.length; i++) {
-          address member = members[i];
-          uint256 currentBalance = balances[i];
-          if (!_isEligibleForAutomatedDeposit(_circle, member, currentBalance)) continue;
+    IERC20 token = IERC20(_circle.token);
+    for (uint256 i = 0; i < members.length; i++) {
+      address member = members[i];
+      uint256 currentBalance = balances[i];
+      if (!_isEligibleForAutomatedDeposit(_circle, member, currentBalance)) continue;
 
-          uint256 requiredAmount = _circle.depositAmount - currentBalance;
+      uint256 requiredAmount = _circle.depositAmount - currentBalance;
 
-          token.safeTransferFrom(member, address(this), requiredAmount);
-          token.forceApprove(address(SAVING_CIRCLES), requiredAmount);
-          SAVING_CIRCLES.depositFor(_circleId, requiredAmount, member);
-        }
-      } catch {}
-    } catch {}
+      token.safeTransferFrom(member, address(this), requiredAmount);
+      token.forceApprove(address(SAVING_CIRCLES), requiredAmount);
+      SAVING_CIRCLES.depositFor(_circleId, requiredAmount, member);
+    }
   }
 
   function _canExecuteAutomatedDepositsForCircle(uint256 _circleId) internal view returns (bool) {
-    try SAVING_CIRCLES.getCircle(_circleId) returns (ISavingCircles.Circle memory _circle) {
-      try SAVING_CIRCLES.getMemberBalances(_circleId) returns (address[] memory members, uint256[] memory balances) {
-        if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return false;
+    ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
+    (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
 
-        for (uint256 i = 0; i < members.length; i++) {
-          if (_isEligibleForAutomatedDeposit(_circle, members[i], balances[i])) {
-            return true;
-          }
-        }
-      } catch {}
-    } catch {}
+    if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return false;
 
+    for (uint256 i = 0; i < members.length; i++) {
+      if (_isEligibleForAutomatedDeposit(_circle, members[i], balances[i])) {
+        return true;
+      }
+    }
     return false;
   }
 
