@@ -5,7 +5,7 @@ import {ProxyAdmin} from '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {TransparentUpgradeableProxy} from '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Script} from 'forge-std/Script.sol';
 
-import {DelegatedSavingCircles} from '../src/contracts/DelegatedSavingCircles.sol';
+import {AutomaticSavingCircles} from '../src/contracts/AutomaticSavingCircles.sol';
 import {SavingCircles} from '../src/contracts/SavingCircles.sol';
 import {SavingCirclesViewer} from '../src/contracts/SavingCirclesViewer.sol';
 
@@ -42,7 +42,7 @@ contract Common is Script {
     );
 
     // Deploy auxiliary contracts that reference the SavingCircles proxy
-    new DelegatedSavingCircles(address(proxy));
+    new AutomaticSavingCircles(address(proxy), _admin);
     new SavingCirclesViewer(address(proxy));
 
     return proxy;
