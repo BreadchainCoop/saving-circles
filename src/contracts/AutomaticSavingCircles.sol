@@ -10,17 +10,17 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 using SafeERC20 for IERC20;
+
 /**
  * @title AutomaticSavingCircles
  * @notice Extension contract for automatic deposits in SavingCircles
- * @dev This contract exposes a Gelato-only automated deposit path
+ * @dev This contract exposes a Gelato-only automated deposit sweep across every circle
  */
-
 contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyGuard {
   /// @notice The main SavingCircles contract
   ISavingCircles public immutable SAVING_CIRCLES;
 
-  /// @notice Dedicated Gelato msg.sender allowed to execute automated deposits
+  /// @notice Dedicated Gelato msg.sender allowed to execute automated deposit sweeps
   address public automationExecutor;
 
   /// @notice Mapping to track which members have enabled automatic deposits
@@ -54,11 +54,12 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /// @inheritdoc IAutomaticSavingCircles
-  function executeAutomatedDeposit(
-    uint256 _circleId,
-    address _member
-  ) external override nonReentrant onlyAutomationExecutor {
-    _executeAutomatedDeposit(_circleId, _member);
+  function executeAutomatedDeposits() external override nonReentrant onlyAutomationExecutor {
+    uint256 circleCount = SAVING_CIRCLES.nextId();
+
+    for (uint256 circleId = 0; circleId < circleCount; circleId++) {
+      _executeAutomatedDepositsForCircle(circleId);
+    }
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -67,71 +68,16 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /// @inheritdoc IAutomaticSavingCircles
-  function checker(
-    uint256 _circleId,
-    address _member
-  ) external view override returns (bool canExec, bytes memory execPayload) {
-    execPayload = abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposit, (_circleId, _member));
+  function checker() external view override returns (bool canExec, bytes memory execPayload) {
+    execPayload = abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposits, ());
     if (automationExecutor == address(0)) return (false, execPayload);
-    canExec = _canExecuteAutomatedDeposit(_circleId, _member);
-  }
 
-  /**
-   * @dev Internal function to handle automated deposits
-   * @param _circleId Circle ID
-   * @param _member Member address to deposit for
-   */
-  function _executeAutomatedDeposit(uint256 _circleId, address _member) internal {
-    // Check if automatic deposits are enabled for this member
-    if (!automaticDepositsEnabled[_member]) revert AutomaticDepositsNotEnabled();
-
-    if (SAVING_CIRCLES.isDecommissionable(_circleId)) revert ISavingCircles.NotActive();
-
-    // Get circle information
-    ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
-    address[] memory circleMembers = SAVING_CIRCLES.getCircleMembers(_circleId);
-
-    if (_circle.effectiveCircleStartTime == 0) revert ISavingCircles.NotActive();
-
-    // Check if member is part of the circle
-    bool isMember = false;
-    for (uint256 i = 0; i < circleMembers.length; i++) {
-      if (circleMembers[i] == _member) {
-        isMember = true;
-        break;
+    uint256 circleCount = SAVING_CIRCLES.nextId();
+    for (uint256 circleId = 0; circleId < circleCount; circleId++) {
+      if (_canExecuteAutomatedDepositsForCircle(circleId)) {
+        return (true, execPayload);
       }
     }
-    if (!isMember) revert ISavingCircles.NotMember();
-
-    // Calculate the remaining deposit amount needed
-    uint256 currentBalance = _memberBalance(_circleId, _member);
-    if (currentBalance >= _circle.depositAmount) revert ISavingCircles.AlreadyDeposited();
-    uint256 requiredAmount = _circle.depositAmount - currentBalance;
-
-    // Check allowance (member must approve this extension contract)
-    uint256 allowance = IERC20(_circle.token).allowance(_member, address(this));
-    if (allowance < requiredAmount) revert InsufficientAllowance();
-
-    uint256 balance = IERC20(_circle.token).balanceOf(_member);
-    if (balance < requiredAmount) revert InsufficientBalance();
-
-    // Check deposit window validity
-    if (block.timestamp < _circle.effectiveCircleStartTime) {
-      revert ISavingCircles.DepositBeforeCircleStart();
-    }
-    // Check if all deposit periods have passed
-    if (_currentRoundIndex(_circle) >= circleMembers.length) {
-      revert ISavingCircles.CircleExpired();
-    }
-
-    // Transfer tokens from member to this contract
-    IERC20(_circle.token).safeTransferFrom(_member, address(this), requiredAmount);
-
-    // Approve the main contract to spend the tokens
-    IERC20(_circle.token).forceApprove(address(SAVING_CIRCLES), requiredAmount);
-
-    // Call depositFor on the main contract
-    SAVING_CIRCLES.depositFor(_circleId, requiredAmount, _member);
   }
 
   function _currentRoundIndex(ISavingCircles.Circle memory _circle) internal view returns (uint256) {
@@ -143,16 +89,6 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     }
 
     return (block.timestamp - _circle.effectiveCircleStartTime) / _circle.depositInterval;
-  }
-
-  function _memberBalance(uint256 _circleId, address _member) internal view returns (uint256) {
-    (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
-    for (uint256 i = 0; i < members.length; i++) {
-      if (members[i] == _member) {
-        return balances[i];
-      }
-    }
-    return 0;
   }
 
   function _isEligibleForAutomatedDeposit(
@@ -169,25 +105,53 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     return token.allowance(_member, address(this)) >= requiredAmount && token.balanceOf(_member) >= requiredAmount;
   }
 
-  function _canExecuteAutomatedDeposit(uint256 _circleId, address _member) internal view returns (bool) {
+  function _executeAutomatedDepositsForCircle(uint256 _circleId) internal {
     try SAVING_CIRCLES.getCircle(_circleId) returns (ISavingCircles.Circle memory _circle) {
-      if (_circle.effectiveCircleStartTime == 0) return false;
-      if (block.timestamp < _circle.effectiveCircleStartTime) return false;
-      if (SAVING_CIRCLES.isDecommissionable(_circleId)) return false;
+      try SAVING_CIRCLES.getMemberBalances(_circleId) returns (address[] memory members, uint256[] memory balances) {
+        if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return;
 
-      (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
-      uint256 currentRound = _currentRoundIndex(_circle);
-      if (currentRound >= members.length) return false;
+        IERC20 token = IERC20(_circle.token);
+        for (uint256 i = 0; i < members.length; i++) {
+          address member = members[i];
+          uint256 currentBalance = balances[i];
+          if (!_isEligibleForAutomatedDeposit(_circle, member, currentBalance)) continue;
 
-      for (uint256 i = 0; i < members.length; i++) {
-        if (members[i] == _member) {
-          return _isEligibleForAutomatedDeposit(_circle, _member, balances[i]);
+          uint256 requiredAmount = _circle.depositAmount - currentBalance;
+
+          token.safeTransferFrom(member, address(this), requiredAmount);
+          token.forceApprove(address(SAVING_CIRCLES), requiredAmount);
+          SAVING_CIRCLES.depositFor(_circleId, requiredAmount, member);
         }
-      }
+      } catch {}
+    } catch {}
+  }
 
-      return false;
-    } catch {
-      return false;
-    }
+  function _canExecuteAutomatedDepositsForCircle(uint256 _circleId) internal view returns (bool) {
+    try SAVING_CIRCLES.getCircle(_circleId) returns (ISavingCircles.Circle memory _circle) {
+      try SAVING_CIRCLES.getMemberBalances(_circleId) returns (address[] memory members, uint256[] memory balances) {
+        if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return false;
+
+        for (uint256 i = 0; i < members.length; i++) {
+          if (_isEligibleForAutomatedDeposit(_circle, members[i], balances[i])) {
+            return true;
+          }
+        }
+      } catch {}
+    } catch {}
+
+    return false;
+  }
+
+  function _isCircleEligibleForAutomation(
+    uint256 _circleId,
+    ISavingCircles.Circle memory _circle,
+    uint256 _memberCount
+  ) internal view returns (bool) {
+    if (_circle.effectiveCircleStartTime == 0) return false;
+    if (block.timestamp < _circle.effectiveCircleStartTime) return false;
+    if (SAVING_CIRCLES.isDecommissionable(_circleId)) return false;
+    if (_currentRoundIndex(_circle) >= _memberCount) return false;
+
+    return true;
   }
 }

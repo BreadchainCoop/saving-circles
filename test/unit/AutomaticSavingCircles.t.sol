@@ -102,99 +102,56 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     automaticSavingCircles.setAutomationExecutor(makeAddr('newExecutor'));
   }
 
-  function test_ExecuteAutomatedDeposit_WithSufficientAllowance() external {
-    token.mint(alice, DEPOSIT_AMOUNT);
+  function test_ExecuteAutomatedDeposits_DepositsForEligibleMembersAcrossAllCircles() external {
+    uint256 secondCircleId = _createStartedCircle();
+    uint256 totalRequiredPerMember = DEPOSIT_AMOUNT * 2;
 
-    vm.prank(alice);
-    automaticSavingCircles.setAutomaticDepositsEnabled(true);
-
-    vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
+    _fundEnableAndApprove(alice, totalRequiredPerMember);
+    _fundEnableAndApprove(bob, totalRequiredPerMember);
+    _fundEnableAndApprove(carol, totalRequiredPerMember);
 
     vm.prank(gelatoExecutor);
-    vm.expectEmit(true, true, true, true);
-    emit ISavingCircles.FundsDeposited(baseCircleId, alice, DEPOSIT_AMOUNT);
-    automaticSavingCircles.executeAutomatedDeposit(baseCircleId, alice);
+    automaticSavingCircles.executeAutomatedDeposits();
 
     assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(baseCircleId, bob), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(baseCircleId, carol), DEPOSIT_AMOUNT);
+
+    assertEq(savingCircles.balances(secondCircleId, alice), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(secondCircleId, bob), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(secondCircleId, carol), DEPOSIT_AMOUNT);
   }
 
-  function test_ExecuteAutomatedDeposit_WhenCallerIsNotAutomationExecutor() external {
-    token.mint(alice, DEPOSIT_AMOUNT);
+  function test_ExecuteAutomatedDeposits_SkipsIneligibleMembersAndUnstartedCircles() external {
+    uint256 unstartedCircleId = _createUnstartedCircle();
 
-    vm.prank(alice);
+    _fundEnableAndApprove(alice, DEPOSIT_AMOUNT * 2);
+
+    token.mint(bob, DEPOSIT_AMOUNT);
+    vm.prank(bob);
     automaticSavingCircles.setAutomaticDepositsEnabled(true);
 
-    vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
-
-    vm.prank(owner);
-    vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.OnlyAutomationExecutor.selector));
-    automaticSavingCircles.executeAutomatedDeposit(baseCircleId, alice);
-  }
-
-  function test_ExecuteAutomatedDeposit_NotOptedIn() external {
-    token.mint(alice, DEPOSIT_AMOUNT);
-
-    vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
-
-    vm.prank(gelatoExecutor);
-    vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.AutomaticDepositsNotEnabled.selector));
-    automaticSavingCircles.executeAutomatedDeposit(baseCircleId, alice);
-  }
-
-  function test_ExecuteAutomatedDeposit_WithInsufficientAllowance() external {
-    token.mint(alice, DEPOSIT_AMOUNT);
-
-    vm.prank(alice);
+    vm.prank(carol);
     automaticSavingCircles.setAutomaticDepositsEnabled(true);
 
-    vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT / 2);
-
-    vm.prank(gelatoExecutor);
-    vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.InsufficientAllowance.selector));
-    automaticSavingCircles.executeAutomatedDeposit(baseCircleId, alice);
-  }
-
-  function test_ExecuteAutomatedDeposit_WithInsufficientBalance() external {
-    vm.prank(alice);
-    automaticSavingCircles.setAutomaticDepositsEnabled(true);
-
-    vm.prank(alice);
+    vm.prank(carol);
     token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
 
     vm.prank(gelatoExecutor);
-    vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.InsufficientBalance.selector));
-    automaticSavingCircles.executeAutomatedDeposit(baseCircleId, alice);
+    automaticSavingCircles.executeAutomatedDeposits();
+
+    assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
+    assertEq(savingCircles.balances(baseCircleId, bob), 0);
+    assertEq(savingCircles.balances(baseCircleId, carol), 0);
+
+    assertEq(savingCircles.balances(unstartedCircleId, alice), 0);
+    assertEq(savingCircles.balances(unstartedCircleId, bob), 0);
+    assertEq(savingCircles.balances(unstartedCircleId, carol), 0);
   }
 
-  function test_ExecuteAutomatedDeposit_WhenAlreadyDeposited() external {
-    token.mint(alice, DEPOSIT_AMOUNT * 2);
-
-    vm.prank(alice);
-    automaticSavingCircles.setAutomaticDepositsEnabled(true);
-
-    vm.startPrank(alice);
-    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
-    savingCircles.depositFor(baseCircleId, DEPOSIT_AMOUNT, alice);
-    vm.stopPrank();
-
-    vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
-
-    vm.prank(gelatoExecutor);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyDeposited.selector));
-    automaticSavingCircles.executeAutomatedDeposit(baseCircleId, alice);
-  }
-
-  function test_ExecuteAutomatedDeposit_PartialDeposit() external {
+  function test_ExecuteAutomatedDeposits_CompletesPartialDeposit() external {
     uint256 partialAmount = DEPOSIT_AMOUNT / 2;
     token.mint(alice, DEPOSIT_AMOUNT);
-
-    vm.prank(alice);
-    automaticSavingCircles.setAutomaticDepositsEnabled(true);
 
     vm.startPrank(alice);
     token.approve(address(savingCircles), partialAmount);
@@ -202,109 +159,95 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     vm.stopPrank();
 
     vm.prank(alice);
+    automaticSavingCircles.setAutomaticDepositsEnabled(true);
+
+    vm.prank(alice);
     token.approve(address(automaticSavingCircles), partialAmount);
 
     vm.prank(gelatoExecutor);
-    vm.expectEmit(true, true, true, true);
-    emit ISavingCircles.FundsDeposited(baseCircleId, alice, partialAmount);
-    automaticSavingCircles.executeAutomatedDeposit(baseCircleId, alice);
+    automaticSavingCircles.executeAutomatedDeposits();
 
     assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
   }
 
-  function test_ExecuteAutomatedDeposit_NotMember() external {
-    address nonMember = makeAddr('nonMember');
-    token.mint(nonMember, DEPOSIT_AMOUNT);
-
-    vm.startPrank(nonMember);
-    automaticSavingCircles.setAutomaticDepositsEnabled(true);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
-    vm.stopPrank();
-
-    vm.prank(gelatoExecutor);
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotMember.selector));
-    automaticSavingCircles.executeAutomatedDeposit(baseCircleId, nonMember);
+  function test_ExecuteAutomatedDeposits_WhenCallerIsNotAutomationExecutor() external {
+    vm.prank(owner);
+    vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.OnlyAutomationExecutor.selector));
+    automaticSavingCircles.executeAutomatedDeposits();
   }
 
-  function test_Checker_ReturnsTrueAndExecPayloadWhenEligible() external {
-    token.mint(alice, DEPOSIT_AMOUNT);
+  function test_Checker_ReturnsTrueAndExecPayloadWhenAnyEligibleMemberExists() external {
+    _fundEnableAndApprove(alice, DEPOSIT_AMOUNT);
 
-    vm.prank(alice);
-    automaticSavingCircles.setAutomaticDepositsEnabled(true);
-
-    vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
-
-    (bool canExec, bytes memory execPayload) = automaticSavingCircles.checker(baseCircleId, alice);
+    (bool canExec, bytes memory execPayload) = automaticSavingCircles.checker();
 
     assertTrue(canExec);
-    assertEq(execPayload, abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposit, (baseCircleId, alice)));
+    assertEq(execPayload, abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposits, ()));
   }
 
   function test_Checker_ReturnsFalseWhenAutomationExecutorUnset() external {
-    token.mint(alice, DEPOSIT_AMOUNT);
-
-    vm.prank(alice);
-    automaticSavingCircles.setAutomaticDepositsEnabled(true);
-
-    vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
+    _fundEnableAndApprove(alice, DEPOSIT_AMOUNT);
 
     vm.prank(owner);
     automaticSavingCircles.setAutomationExecutor(address(0));
 
-    (bool canExec, bytes memory execPayload) = automaticSavingCircles.checker(baseCircleId, alice);
+    (bool canExec, bytes memory execPayload) = automaticSavingCircles.checker();
 
     assertFalse(canExec);
-    assertEq(execPayload, abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposit, (baseCircleId, alice)));
+    assertEq(execPayload, abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposits, ()));
   }
 
-  function test_Checker_ReturnsFalseWhenCircleNotStarted() external {
-    uint256 unstartedCircleId = _createCircle(savingCircles, baseCircle, members, _alicePrivateKey);
+  function test_Checker_ReturnsFalseWhenNoEligibleMembersExist() external view {
+    (bool canExec, bytes memory execPayload) = automaticSavingCircles.checker();
 
-    token.mint(alice, DEPOSIT_AMOUNT);
+    assertFalse(canExec);
+    assertEq(execPayload, abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposits, ()));
+  }
+
+  function test_Checker_ReturnsFalseWhenOnlyUnstartedCirclesHaveEligibleMembers() external {
+    _depositBaseCircleForAlice();
+    _createUnstartedCircle();
+
+    token.mint(alice, DEPOSIT_AMOUNT * 2);
 
     vm.prank(alice);
     automaticSavingCircles.setAutomaticDepositsEnabled(true);
 
     vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
+    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT * 2);
 
-    (bool canExec, bytes memory execPayload) = automaticSavingCircles.checker(unstartedCircleId, alice);
+    (bool canExec, bytes memory execPayload) = automaticSavingCircles.checker();
 
     assertFalse(canExec);
-    assertEq(execPayload, abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposit, (unstartedCircleId, alice)));
+    assertEq(execPayload, abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposits, ()));
   }
 
-  function test_Checker_ReturnsFalseWhenInsufficientBalance() external {
-    vm.prank(alice);
+  function _fundEnableAndApprove(address _member, uint256 _amount) internal {
+    token.mint(_member, _amount);
+
+    vm.prank(_member);
     automaticSavingCircles.setAutomaticDepositsEnabled(true);
 
-    vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
-
-    (bool canExec,) = automaticSavingCircles.checker(baseCircleId, alice);
-
-    assertFalse(canExec);
+    vm.prank(_member);
+    token.approve(address(automaticSavingCircles), _amount);
   }
 
-  function test_Checker_ReturnsFalseWhenNotOptedIn() external {
+  function _createStartedCircle() internal returns (uint256) {
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
+    return _createCircleWithMembers(savingCircles, circle, members, _alicePrivateKey);
+  }
+
+  function _createUnstartedCircle() internal returns (uint256) {
+    ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
+    return _createCircle(savingCircles, circle, members, _alicePrivateKey);
+  }
+
+  function _depositBaseCircleForAlice() internal {
     token.mint(alice, DEPOSIT_AMOUNT);
 
-    vm.prank(alice);
-    token.approve(address(automaticSavingCircles), DEPOSIT_AMOUNT);
-
-    (bool canExec,) = automaticSavingCircles.checker(baseCircleId, alice);
-
-    assertFalse(canExec);
-  }
-
-  function test_Checker_ReturnsFalseForMissingCircleWithoutReverting() external view {
-    uint256 missingCircleId = type(uint256).max;
-
-    (bool canExec, bytes memory execPayload) = automaticSavingCircles.checker(missingCircleId, alice);
-
-    assertFalse(canExec);
-    assertEq(execPayload, abi.encodeCall(IAutomaticSavingCircles.executeAutomatedDeposit, (missingCircleId, alice)));
+    vm.startPrank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
+    savingCircles.depositFor(baseCircleId, DEPOSIT_AMOUNT, alice);
+    vm.stopPrank();
   }
 }

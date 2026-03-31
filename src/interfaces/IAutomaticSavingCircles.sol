@@ -22,27 +22,12 @@ interface IAutomaticSavingCircles {
   event AutomationExecutorUpdated(address indexed previousExecutor, address indexed newExecutor);
 
   /**
-   * @notice Thrown when a member has insufficient allowance for automatic deposit
-   */
-  error InsufficientAllowance();
-
-  /**
-   * @notice Thrown when a member has insufficient token balance for automatic deposit
-   */
-  error InsufficientBalance();
-
-  /**
    * @notice Thrown when a non-Gelato caller attempts an automated execution
    */
   error OnlyAutomationExecutor();
 
   /**
-   * @notice Thrown when automatic deposits are not enabled for a member
-   */
-  error AutomaticDepositsNotEnabled();
-
-  /**
-   * @notice Enable or disable automatic deposits for the caller
+   * @notice Enable or disable automatic deposits for the caller across every circle they belong to
    * @param enabled Whether to enable automatic deposits
    */
   function setAutomaticDepositsEnabled(bool enabled) external;
@@ -54,11 +39,9 @@ interface IAutomaticSavingCircles {
   function setAutomationExecutor(address automationExecutor) external;
 
   /**
-   * @notice Gelato automation entrypoint for automatic deposits
-   * @param circleId The ID of the circle
-   * @param member The address of the member to deposit for
+   * @notice Gelato automation entrypoint for automatic deposits across every active circle
    */
-  function executeAutomatedDeposit(uint256 circleId, address member) external;
+  function executeAutomatedDeposits() external;
 
   /**
    * @notice The configured Gelato dedicated msg.sender
@@ -74,11 +57,9 @@ interface IAutomaticSavingCircles {
   function isAutomaticDepositsEnabled(address member) external view returns (bool);
 
   /**
-   * @notice Gelato resolver-style checker for automated deposits
-   * @param circleId The ID of the circle
-   * @param member The address of the member to deposit for
-   * @return canExec Whether Gelato should execute the deposit
+   * @notice Gelato resolver-style checker for automatic deposits across every circle
+   * @return canExec Whether Gelato should execute the sweep
    * @return execPayload Encoded calldata for the automated deposit execution
    */
-  function checker(uint256 circleId, address member) external view returns (bool canExec, bytes memory execPayload);
+  function checker() external view returns (bool canExec, bytes memory execPayload);
 }
