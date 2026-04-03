@@ -337,6 +337,13 @@ interface ISavingCircles {
   function getCircleMembers(uint256 id) external view returns (address[] memory members);
 
   /**
+   * @notice Check if a circle is active
+   * @param id The ID of the circle
+   * @return active Whether the circle is active
+   */
+  function isActive(uint256 id) external view returns (bool active);
+
+  /**
    * @notice Check if a member is a member of a circle
    * @param member The address of the member
    * @param ids The IDs of the circles
