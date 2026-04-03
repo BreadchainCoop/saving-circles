@@ -197,8 +197,9 @@ contract SavingCirclesFuzzTest is SavingCirclesTestBase {
       assertEq(token.balanceOf(members[i]), _depositAmount / 2);
     }
 
-    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-    savingCircles.getCircle(circleId);
+    assertEq(savingCircles.getCircle(circleId).owner, alice);
+    assertEq(uint256(savingCircles.circleState(circleId)), uint256(ISavingCircles.CircleState.Decommissioned));
+    assertFalse(savingCircles.isDecommissionable(circleId));
   }
 
   function testFuzz_InvalidCircleCreation_ZeroValues(uint256 _depositAmount, uint256 _depositInterval) public {

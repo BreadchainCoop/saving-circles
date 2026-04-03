@@ -262,9 +262,10 @@ contract SavingCirclesMultiRoundFuzzTest is SavingCirclesTestBase {
       assertEq(token.balanceOf(members[i]), balancesBefore[i]);
     }
 
-    // Circle should be decommissioned
-    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-    savingCircles.getCircle(circleId);
+    // Circle should remain queryable but decommissioned
+    assertEq(savingCircles.getCircle(circleId).owner, alice);
+    assertEq(uint256(savingCircles.circleState(circleId)), uint256(ISavingCircles.CircleState.Decommissioned));
+    assertFalse(savingCircles.isDecommissionable(circleId));
   }
 
   function testFuzz_SequentialCirclesWithSameMembers(

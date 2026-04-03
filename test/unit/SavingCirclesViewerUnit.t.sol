@@ -355,6 +355,9 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
 
     assertEq(userData.circleData.length, 1);
     assertTrue(userData.circleData[0].isDecommissioned);
+    assertEq(userData.circleData[0].circleInfo.owner, alice);
+    assertTrue(userData.circleData[0].isMember);
+    assertFalse(userData.circleData[0].isDecommissionable);
 
     assertEq(userData.financialSummary.totalBalance, 0);
     assertEq(userData.financialSummary.activeCirclesCount, 0);
