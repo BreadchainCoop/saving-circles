@@ -183,7 +183,9 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
       UserCircleData memory circleData = _getUserCircleData(_user, circleId);
 
       if (!circleData.isDecommissioned) {
-        summary.activeCirclesCount++;
+        if (!circleData.isExpired) {
+          summary.activeCirclesCount++;
+        }
 
         if (circleData.isOwner) {
           summary.ownedCirclesCount++;
