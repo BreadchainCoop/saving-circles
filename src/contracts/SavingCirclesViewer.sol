@@ -301,8 +301,9 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
 
     if (SAVING_CIRCLES.circleState(_circleId) == ISavingCircles.CircleState.Decommissioned) {
       circleData.isDecommissioned = true;
-      circleData.completedRounds = circle.currentIndex;
       circleData.totalRounds = SAVING_CIRCLES.getCircleMembers(_circleId).length;
+      circleData.completedRounds =
+        circle.currentIndex > circleData.totalRounds ? circleData.totalRounds : circle.currentIndex;
       return circleData;
     }
 
