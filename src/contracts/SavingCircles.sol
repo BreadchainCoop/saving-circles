@@ -44,10 +44,17 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => address[] members) public circleMembers;
   mapping(uint256 id => mapping(address member => MemberState state)) internal _memberStates;
   mapping(uint256 id => mapping(uint256 round => mapping(address member => uint256 amount))) public roundDeposits;
+  mapping(uint256 id => bool status) public override isDecommissioned;
 
-  /// @dev Requires circle is commissioned by checking if an owner is set
+  /// @dev Requires circle exists and has not been decommissioned
   modifier onlyCommissioned(uint256 _id) {
-    if (_isDecommissioned(circles[_id])) revert NotCommissioned();
+    if (!_exists(_id) || isDecommissioned[_id]) revert NotCommissioned();
+    _;
+  }
+
+  /// @dev Requires circle exists, including retained decommissioned circles
+  modifier onlyExisting(uint256 _id) {
+    if (!_exists(_id)) revert NotCommissioned();
     _;
   }
 
@@ -154,6 +161,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     uint256 membersLength = members.length;
 
     isActive[_id] = false;
+    isDecommissioned[_id] = true;
 
     // Return all funds still held by the contract to the members who deposited them.
     for (uint256 r = 0; r < membersLength; r++) {
@@ -171,6 +179,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
       }
     }
 
+    for (uint256 i = 0; i < membersLength; i++) {
+      balances[_id][members[i]] = 0;
+    }
+
     emit CircleDecommissioned(_id);
   }
 
@@ -178,7 +190,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   function redeemInvite(uint256 _id, uint256 _nonce, bytes calldata _signature) external override nonReentrant {
     Circle storage _circle = circles[_id];
 
-    if (_circle.owner == address(0)) revert NotCommissioned();
+    if (_circle.owner == address(0) || isDecommissioned[_id]) revert NotCommissioned();
     if (usedNonces[_id][_nonce]) revert InviteAlreadyUsed();
     if (isMember[_id][msg.sender]) revert AlreadyMember();
     if (isActive[_id]) revert AlreadyActive();
@@ -201,7 +213,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function getCircle(uint256 _id) external view override onlyCommissioned(_id) returns (Circle memory _circle) {
+  function getCircle(uint256 _id) external view override onlyExisting(_id) returns (Circle memory _circle) {
     _circle = circles[_id];
     _circle.currentIndex = _currentRoundIndex(_circle);
   }
@@ -244,9 +256,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     override
     returns (address[] memory _members, uint256[] memory _balances)
   {
-    Circle memory _circle = circles[_id];
+    if (!_exists(_id) || isDecommissioned[_id]) revert NotCommissioned();
 
-    if (_isDecommissioned(_circle)) revert NotCommissioned();
+    Circle memory _circle = circles[_id];
 
     uint256 currentRound = _currentRoundIndex(_circle);
     _balances = new uint256[](circleMembers[_id].length);
@@ -284,11 +296,6 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function isDecommissioned(Circle calldata _circle) external pure override returns (bool) {
-    return _isDecommissioned(_circle);
-  }
-
-  /// @inheritdoc ISavingCircles
   function isWithdrawable(uint256 _id) public view override returns (bool) {
     if (!isActive[_id]) return false;
     if (_isDecommissionable(_id)) return false;
@@ -308,8 +315,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function currentRoundWithdrawer(uint256 _id) public view override onlyCommissioned(_id) returns (address) {
-    if (!isActive[_id]) return address(0);
+  function currentRoundWithdrawer(uint256 _id) public view override onlyExisting(_id) returns (address) {
+    if (isDecommissioned[_id] || !isActive[_id]) return address(0);
     Circle memory _circle = circles[_id];
 
     uint256 currentRound = _currentRoundIndex(_circle);
@@ -318,9 +325,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function circleState(uint256 _id) public view override onlyCommissioned(_id) returns (CircleState state) {
+  function circleState(uint256 _id) public view override onlyExisting(_id) returns (CircleState state) {
     Circle memory _circle = circles[_id];
-    if (isActive[_id]) {
+    if (isDecommissioned[_id]) {
+      state = CircleState.Decommissioned;
+    } else if (isActive[_id]) {
       state = CircleState.Active;
       uint256 currentRound = _currentRoundIndex(_circle);
       if (currentRound >= circleMembers[_id].length) {
@@ -338,16 +347,14 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
           state = CircleState.DepositComplete;
         }
       }
-    } else if (_isDecommissioned(_circle)) {
-      state = CircleState.Decommissioned;
     } else {
       state = CircleState.NotStarted;
     }
   }
 
   /// @inheritdoc ISavingCircles
-  function roundState(uint256 _id) public view override onlyCommissioned(_id) returns (RoundState state) {
-    if (!isActive[_id]) return RoundState.NotStarted;
+  function roundState(uint256 _id) public view override onlyExisting(_id) returns (RoundState state) {
+    if (isDecommissioned[_id] || !isActive[_id]) return RoundState.NotStarted;
 
     Circle memory _circle = circles[_id];
     uint256 currentRound = _currentRoundIndex(_circle);
@@ -461,6 +468,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
    *      and that round must have incomplete deposits.
    */
   function _isDecommissionable(uint256 _id) internal view returns (bool) {
+    if (!_exists(_id) || isDecommissioned[_id] || !isActive[_id]) return false;
+
     Circle memory _circle = circles[_id];
     uint256 len = circleMembers[_id].length;
     if (len == 0) return false;
@@ -517,11 +526,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     return true;
   }
 
-  /**
-   * @dev Return if a specified circle is decommissioned by checking if an owner is set
-   */
-  function _isDecommissioned(Circle memory _circle) internal pure returns (bool) {
-    return _circle.owner == address(0);
+  function _exists(uint256 _id) internal view returns (bool) {
+    return circles[_id].owner != address(0);
   }
 
   function _roundEndTime(Circle memory _circle, uint256 round) internal pure returns (uint256) {
