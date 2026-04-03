@@ -113,6 +113,7 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     for (uint256 id = 0; id < nextId; id++) {
       try SAVING_CIRCLES.getCircle(id) returns (ISavingCircles.Circle memory _circle) {
         if (SAVING_CIRCLES.circleState(id) == ISavingCircles.CircleState.Decommissioned) continue;
+        if (SAVING_CIRCLES.isDecommissionable(id)) continue;
 
         address[] memory circleMembers = SAVING_CIRCLES.getCircleMembers(id);
         // Check if we're in a valid deposit window
