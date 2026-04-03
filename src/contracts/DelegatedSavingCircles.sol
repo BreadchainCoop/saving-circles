@@ -71,8 +71,10 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     uint256 nextId = SAVING_CIRCLES.nextId();
 
     for (uint256 id = 0; id < nextId; id++) {
-      // Skip if circle doesn't exist or is decommissioned
+      // Skip if circle doesn't exist or can no longer accept deposits.
       try SAVING_CIRCLES.getCircle(id) returns (ISavingCircles.Circle memory _circle) {
+        if (SAVING_CIRCLES.circleState(id) == ISavingCircles.CircleState.Decommissioned) continue;
+
         address[] memory circleMembers = SAVING_CIRCLES.getCircleMembers(id);
         // Check if we're in a valid deposit window
         if (block.timestamp < _circle.effectiveCircleStartTime) continue;
@@ -97,7 +99,7 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
           }
         }
       } catch {
-        // Circle doesn't exist or is decommissioned, skip it
+        // Circle doesn't exist, skip it
         continue;
       }
     }
@@ -110,6 +112,8 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     uint256 index = 0;
     for (uint256 id = 0; id < nextId; id++) {
       try SAVING_CIRCLES.getCircle(id) returns (ISavingCircles.Circle memory _circle) {
+        if (SAVING_CIRCLES.circleState(id) == ISavingCircles.CircleState.Decommissioned) continue;
+
         address[] memory circleMembers = SAVING_CIRCLES.getCircleMembers(id);
         // Check if we're in a valid deposit window
         if (block.timestamp < _circle.effectiveCircleStartTime) continue;
@@ -151,6 +155,9 @@ contract DelegatedSavingCircles is IDelegatedSavingCircles, ReentrancyGuard {
     if (!delegatedDepositsEnabled[_member]) revert DelegatedDepositsNotEnabled();
 
     if (SAVING_CIRCLES.isDecommissionable(_circleId)) revert ISavingCircles.NotActive();
+    if (SAVING_CIRCLES.circleState(_circleId) == ISavingCircles.CircleState.Decommissioned) {
+      revert ISavingCircles.NotActive();
+    }
 
     // Get circle information
     ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);

@@ -116,8 +116,11 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
         states[i].circleState = ISavingCircles.CircleState.Decommissioned;
         states[i].roundState = ISavingCircles.RoundState.NotStarted;
       } else {
-        states[i].circleState = SAVING_CIRCLES.circleState(circleId);
-        states[i].roundState = SAVING_CIRCLES.roundState(circleId);
+        ISavingCircles.CircleState circleState = SAVING_CIRCLES.circleState(circleId);
+        states[i].circleState = circleState;
+        states[i].roundState = circleState == ISavingCircles.CircleState.Decommissioned
+          ? ISavingCircles.RoundState.NotStarted
+          : SAVING_CIRCLES.roundState(circleId);
       }
     }
     return states;
@@ -291,6 +294,16 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
     }
 
     circleData.circleInfo = circle;
+    circleData.isOwner = (circle.owner == _user);
+    circleData.isMember = SAVING_CIRCLES.isMember(_circleId, _user);
+
+    if (SAVING_CIRCLES.circleState(_circleId) == ISavingCircles.CircleState.Decommissioned) {
+      circleData.isDecommissioned = true;
+      circleData.completedRounds = circle.currentIndex;
+      circleData.totalRounds = SAVING_CIRCLES.getCircleMembers(_circleId).length;
+      return circleData;
+    }
+
     circleData.isDecommissioned = false;
     circleData.isDecommissionable = SAVING_CIRCLES.isDecommissionable(_circleId);
 
@@ -356,6 +369,10 @@ contract SavingCirclesViewer is ISavingCirclesViewer {
 
   function _memberBalance(uint256 _circleId, address _member) internal view returns (uint256) {
     if (_getCircleOwner(_circleId) == address(0)) {
+      return 0;
+    }
+
+    if (SAVING_CIRCLES.circleState(_circleId) == ISavingCircles.CircleState.Decommissioned) {
       return 0;
     }
 
