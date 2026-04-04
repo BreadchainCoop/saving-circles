@@ -5,6 +5,15 @@ interface ISavingCircles {
   /**
    * @notice An enum representing the state of a circle
    * @dev NotStarted = 0, Active = 1, DepositInProgress = 2, DepositComplete = 3, Expired = 4, Decommissioned = 5, MissedDeposit = 6
+   *      - NotStarted:       Circle is created but has not been started by the owner yet.
+   *      - Active:           Circle is running; the first deposit round is open and no issues have been detected.
+   *      - DepositInProgress: The current round's deposit window is open and not all members have completed their deposits.
+   *      - DepositComplete:  All members have deposited the full amount for the current round; the round recipient may now withdraw.
+   *      - Expired:          All rounds have concluded and every member has had their turn to receive the pot.
+   *      - Decommissioned:   The circle was forcefully shut down (owner set to address(0)). All remaining funds have
+   *                          been returned to depositors. No further interaction is possible.
+   *      - MissedDeposit:    A previous round's deposit window closed without all members depositing in full.
+   *                          Deposits and withdrawals are blocked; only `decommission()` can be called to recover funds.
    */
   enum CircleState {
     NotStarted,
@@ -63,6 +72,7 @@ interface ISavingCircles {
 
   /**
    * @notice Emitted when a circle is decommissioned
+   * @dev Emitted after all recoverable funds have been returned to depositors and the circle struct has been deleted.
    * @param id The ID of the circle
    */
   event CircleDecommissioned(uint256 indexed id);
@@ -230,6 +240,8 @@ interface ISavingCircles {
   error NotActive();
   /**
    * @notice Thrown when a previous round ended with incomplete deposits, blocking deposits and withdrawals until decommission
+   * @dev A round is considered timed-out when `block.timestamp >= roundEndTime(prevRound)` and not all members
+   *      deposited the full amount in that round. The only valid action from this state is calling `decommission()`.
    */
   error CircleTimedOut();
 
@@ -260,36 +272,70 @@ interface ISavingCircles {
   function start(uint256 id) external;
 
   /**
-   * @notice Deposit funds into a circle
+   * @notice Deposit funds into a circle for the calling member
+   * @dev Deposits can be made incrementally (partial deposits) within the current round's window,
+   *      as long as the cumulative amount does not exceed `depositAmount`.
+   *      Reverts with `CircleTimedOut` if a previous round's window has passed without all members depositing in full —
+   *      indicating a missed-deposit situation. Call `decommission()` first to recover funds before any new activity.
+   *      Reverts with `CircleExpired` once all rounds have elapsed.
    * @param id The ID of the circle
-   * @param value The amount of funds to deposit
+   * @param value The amount of funds to deposit (cumulative per round must equal `depositAmount`)
    */
   function deposit(uint256 id, uint256 value) external;
 
   /**
-   * @notice Deposit funds into a circle for a member
+   * @notice Deposit funds into a circle on behalf of a member
+   * @dev Identical deposit rules apply as in `deposit()`. The caller pays the tokens but they are credited to `member`.
+   *      Reverts with `CircleTimedOut` if a missed-deposit situation is detected (see `deposit()`).
    * @param id The ID of the circle
    * @param value The amount of funds to deposit
-   * @param member The address of the member
+   * @param member The address of the member to credit the deposit to
    */
   function depositFor(uint256 id, uint256 value, address member) external;
 
   /**
-   * @notice Withdraw funds from a circle
+   * @notice Withdraw the rotating pot for the calling member
+   * @dev The caller must be a member of the circle. Withdrawal is only permitted when:
+   *      1. The circle is active.
+   *      2. The current round's index matches the caller's position in the member list.
+   *      3. All members have deposited the full `depositAmount` for that round.
+   *      4. The circle is not in a missed-deposit / decommissionable state.
+   *      The withdrawal amount equals `depositAmount * numberOfMembers`.
+   *      Each member may only claim once; subsequent calls revert with `NotWithdrawable`.
+   *      If the caller is the last member to claim, the circle is automatically marked inactive.
    * @param id The ID of the circle
    */
   function withdraw(uint256 id) external;
 
   /**
-   * @notice Withdraw funds from a circle for a member
+   * @notice Withdraw the rotating pot on behalf of a member
+   * @dev Same rules apply as in `withdraw()`. The caller must be a member of the circle, but the
+   *      funds are sent to `member`. This is useful for automating payouts when the designated
+   *      recipient cannot call the contract directly.
    * @param id The ID of the circle
-   * @param member The address of the member
+   * @param member The address of the member to receive the withdrawal
    */
   function withdrawFor(uint256 id, address member) external;
 
   /**
-   * @notice Decommission a circle
-   * @param id The ID of the circle
+   * @notice Decommission a circle after a missed-deposit event, returning all funds to depositors
+   * @dev Any member of the circle may call this function once the conditions for decommissioning are met:
+   *      1. The circle is active.
+   *      2. A previous round's deposit window has passed (`block.timestamp >= roundEndTime(prevRound)`).
+   *      3. Not all members completed their deposit in that previous round.
+   *
+   *      Decommission flow:
+   *      - Sets `isActive[id]` to false, preventing further deposits and withdrawals.
+   *      - Iterates over every member-round combination that has not yet been claimed and refunds each
+   *        depositor their exact `roundDeposits[id][round][member]` amount directly in the same transaction.
+   *      - Deletes the `circles[id]` storage entry, setting `owner` to `address(0)` — this is the canonical
+   *        indicator that a circle is decommissioned (checked by `isDecommissioned()`).
+   *      - Emits `CircleDecommissioned`.
+   *
+   *      After decommission the circle ID is permanently inactive: `getCircle()` and most view functions
+   *      will revert with `NotCommissioned` for that ID.
+   *
+   * @param id The ID of the circle to decommission
    */
   function decommission(uint256 id) external;
 

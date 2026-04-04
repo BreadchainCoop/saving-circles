@@ -147,6 +147,14 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
   /// @inheritdoc ISavingCircles
   function decommission(uint256 _id) external override nonReentrant onlyActive(_id) onlyMember(_id, msg.sender) {
+    // @notice Decommissions a circle when a previous round's deposit window has closed with incomplete deposits.
+    // @dev This function returns all deposited funds to their respective depositors.
+    //      A circle becomes decommissionable when:
+    //      1. The circle is active
+    //      2. A previous deposit round's window has expired
+    //      3. Not all members completed deposits in that round
+    //      After decommission, the circle struct is deleted (owner set to address(0)).
+    //      Any member can trigger decommission once conditions are met.
     if (!_isDecommissionable(_id)) revert NotDecommissionable();
 
     address token = circles[_id].token;
@@ -290,6 +298,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
+  /**
+   * @notice Returns true if at least one member in the circle is currently eligible to withdraw.
+   * @dev Iterates over all members and checks _activeClaimableCheck for each. Returns false if
+   *      the circle is inactive or decommissionable. O(N) where N is the number of members.
+   * @param _id The ID of the circle to check
+   * @return True if any member can withdraw, false otherwise
+   */
   function isWithdrawable(uint256 _id) public view override returns (bool) {
     if (!isActive[_id]) return false;
     if (_isDecommissionable(_id)) return false;
@@ -460,6 +475,11 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
    * @dev Return if a specified circle is decommissionable
    *      To be considered decommissionable, the previous round's deposit window must have ended
    *      and that round must have incomplete deposits.
+   * @notice A circle is decommissionable when a deposit round's time window has passed without
+   *         all members completing their deposits. This protects participants by allowing fund
+   *         recovery when a circle is stuck due to missing deposits.
+   * @param _id The ID of the circle to check
+   * @return True if the circle can be decommissioned, false otherwise
    */
   function _isDecommissionable(uint256 _id) internal view returns (bool) {
     Circle memory _circle = circles[_id];
