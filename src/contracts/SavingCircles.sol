@@ -94,11 +94,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     if (_circle.owner == address(0)) revert InvalidOwner();
     if (_circle.effectiveCircleStartTime != 0) revert InvalidCircleStartTime();
 
-    address owner = _circle.owner;
-    isMember[_id][owner] = true;
-    memberCircles[owner].push(_id);
-    circleMembers[_id].push(owner);
-    _memberStates[_id][owner].memberIndex = 0;
+    _registerMember(_id, _circle.owner);
 
     circles[_id] = _circle;
     emit CircleCreated(_id, _circle.token, _circle.depositAmount, _circle.depositInterval);
@@ -192,11 +188,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     usedNonces[_id][_nonce] = true;
 
     // No max count validation, the owner issues a finite amount of invites
-    isMember[_id][msg.sender] = true;
-    memberCircles[msg.sender].push(_id);
-    address[] storage _circleMembers = circleMembers[_id];
-    _circleMembers.push(msg.sender);
-    _memberStates[_id][msg.sender].memberIndex = _circleMembers.length - 1;
+    _registerMember(_id, msg.sender);
 
     emit InviteRedeemed(_id, msg.sender);
   }
@@ -327,11 +319,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
       if (currentRound >= circleMembers[_id].length) {
         state = CircleState.Expired;
       } else if (currentRound > 0) {
-        uint256 prev = currentRound - 1;
-        if (
-          block.timestamp >= _roundEndTime(_circle, prev)
-            && !_allMembersDepositedForRound(_id, prev, _circle.depositAmount)
-        ) {
+        if (_isPreviousRoundTimedOut(_id, _circle, currentRound)) {
           state = CircleState.MissedDeposit;
         } else if (!_allMembersDepositedForRound(_id, currentRound, _circle.depositAmount)) {
           state = CircleState.DepositInProgress;
@@ -412,14 +400,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
       revert CircleExpired();
     }
 
-    if (currentRound > 0) {
-      uint256 prev = currentRound - 1;
-      if (
-        block.timestamp >= _roundEndTime(_circle, prev)
-          && !_allMembersDepositedForRound(_id, prev, _circle.depositAmount)
-      ) {
-        revert CircleTimedOut();
-      }
+    if (_isPreviousRoundTimedOut(_id, _circle, currentRound)) {
+      revert CircleTimedOut();
     }
 
     uint256 depositedSoFar = roundDeposits[_id][currentRound][_member];
@@ -467,14 +449,45 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     if (len == 0) return false;
 
     uint256 currentRound = _currentRoundIndex(_circle);
-
     if (currentRound == 0) return false;
 
-    uint256 checkRound = currentRound - 1;
+    // Use min(currentRound, len) so that an expired circle (currentRound >= len)
+    // checks the last real round rather than an out-of-bounds index.
+    uint256 effectiveRound = currentRound <= len ? currentRound : len;
+    return _isPreviousRoundTimedOut(_id, _circle, effectiveRound);
+  }
 
-    if (checkRound >= len) checkRound = len - 1;
-    if (block.timestamp < _roundEndTime(_circle, checkRound)) return false;
-    return !_allMembersDepositedForRound(_id, checkRound, _circle.depositAmount);
+  /**
+   * @dev Registers a member into a circle by updating all relevant membership mappings.
+   *      Sets `isMember`, appends to `memberCircles` and `circleMembers`, and records the
+   *      member's index in `_memberStates`. Used by both `create` and `redeemInvite`.
+   * @param _id    The circle ID to register the member into.
+   * @param _member The address of the member to register.
+   */
+  function _registerMember(uint256 _id, address _member) internal {
+    isMember[_id][_member] = true;
+    memberCircles[_member].push(_id);
+    circleMembers[_id].push(_member);
+    _memberStates[_id][_member].memberIndex = circleMembers[_id].length - 1;
+  }
+
+  /**
+   * @dev Returns true when the previous round's deposit window has closed and that round did
+   *      not receive full deposits from all members — i.e. the circle has timed out.
+   *      Returns false when `currentRound` is 0 (there is no previous round to check).
+   * @param _id          The circle ID.
+   * @param _circle      The in-memory Circle struct (avoids redundant storage reads by callers).
+   * @param currentRound The current time-based round index (must be > 0 for a meaningful check).
+   */
+  function _isPreviousRoundTimedOut(
+    uint256 _id,
+    Circle memory _circle,
+    uint256 currentRound
+  ) internal view returns (bool) {
+    if (currentRound == 0) return false;
+    uint256 prev = currentRound - 1;
+    return
+      block.timestamp >= _roundEndTime(_circle, prev) && !_allMembersDepositedForRound(_id, prev, _circle.depositAmount);
   }
 
   function _currentRoundIndex(Circle memory _circle) internal view returns (uint256) {
