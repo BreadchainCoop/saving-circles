@@ -14,7 +14,6 @@ solc_version = '0.8.28'
 libs = ['node_modules', 'lib']
 remappings = [
   'forge-std/=node_modules/forge-std/src/',
-  'halmos-cheatcodes/=node_modules/halmos-cheatcodes/',
   '@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/',
   '@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/',
   '@openzeppelin/=node_modules/@openzeppelin/',
