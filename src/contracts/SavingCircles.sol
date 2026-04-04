@@ -290,6 +290,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
+  /// @dev @deprecated O(N²) gas cost: iterates all members and for each calls _activeClaimableCheck,
+  ///   which itself calls _allMembersDepositedForRound (another O(N) scan). Prefer
+  ///   isMemberWithdrawable(_id, member) for O(N) per-member checks, or currentRoundWithdrawer(_id)
+  ///   for O(1) lookup of the current round's designated recipient.
   function isWithdrawable(uint256 _id) public view override returns (bool) {
     if (!isActive[_id]) return false;
     if (_isDecommissionable(_id)) return false;
