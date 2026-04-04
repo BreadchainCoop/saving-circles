@@ -367,6 +367,11 @@ interface ISavingCircles {
 
   /**
    * @notice Check whether at least one member in a circle can currently claim a withdrawal
+   * @dev @deprecated This function has O(N²) gas cost: it iterates all members and for each
+   *   calls an inner check that itself iterates all members to verify deposits. Use
+   *   `isMemberWithdrawable(id, member)` for per-member checks or `currentRoundWithdrawer(id)`
+   *   to identify the current round's designated recipient. This function is retained for
+   *   backward compatibility and will be removed in the next breaking release.
    * @param id The ID of the circle
    * @return withdrawable Whether any member in the circle is currently withdrawable
    */
