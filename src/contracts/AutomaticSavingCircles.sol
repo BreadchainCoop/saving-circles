@@ -84,6 +84,22 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /// @inheritdoc IAutomaticSavingCircles
+  function checker() external view override returns (bool canExec, bytes memory execPayload) {
+    uint256[] memory circleIds;
+    address[] memory members;
+
+    if (automationExecutor != address(0)) {
+      (circleIds, members) = getEligibleAutomatedDeposits();
+      canExec = circleIds.length > 0;
+    } else {
+      circleIds = new uint256[](0);
+      members = new address[](0);
+    }
+
+    execPayload = abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedDeposits, (circleIds, members));
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
   function getEligibleAutomatedDeposits()
     public
     view
@@ -104,22 +120,6 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     for (uint256 circleId = 0; circleId < circleCount; circleId++) {
       index = _populateEligibleAutomatedDepositsForCircle(circleId, circleIds, members, index);
     }
-  }
-
-  /// @inheritdoc IAutomaticSavingCircles
-  function checker() external view override returns (bool canExec, bytes memory execPayload) {
-    uint256[] memory circleIds;
-    address[] memory members;
-
-    if (automationExecutor != address(0)) {
-      (circleIds, members) = getEligibleAutomatedDeposits();
-      canExec = circleIds.length > 0;
-    } else {
-      circleIds = new uint256[](0);
-      members = new address[](0);
-    }
-
-    execPayload = abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedDeposits, (circleIds, members));
   }
 
   /**
