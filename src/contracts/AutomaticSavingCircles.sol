@@ -207,6 +207,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
    */
   function _countEligibleAutomatedDepositsForCircle(uint256 _circleId) internal view returns (uint256 eligibleCount) {
     try SAVING_CIRCLES.getCircle(_circleId) returns (ISavingCircles.Circle memory _circle) {
+      if (!SAVING_CIRCLES.isActive(_circleId)) return 0;
       (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
       if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return 0;
 
@@ -237,6 +238,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     nextIndex = _index;
 
     try SAVING_CIRCLES.getCircle(_circleId) returns (ISavingCircles.Circle memory _circle) {
+      if (!SAVING_CIRCLES.isActive(_circleId)) return nextIndex;
       (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
       if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return nextIndex;
 
