@@ -650,8 +650,11 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     savingCircles.decommission(baseCircleId);
     vm.stopPrank();
 
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
-    savingCircles.getCircle(baseCircleId);
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
+    assertEq(circle.owner, alice);
+    assertFalse(savingCircles.isActive(baseCircleId));
+    assertFalse(savingCircles.isDecommissionable(baseCircleId));
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.Decommissioned));
   }
 
   function test_DecommissionWhenMemberAndIncompleteDeposits() external {
@@ -671,9 +674,11 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     emit ISavingCircles.CircleDecommissioned(baseCircleId);
     savingCircles.decommission(baseCircleId);
 
-    // Verify circle was deleted
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
-    savingCircles.getCircle(baseCircleId);
+    // Verify circle remains queryable for the UI but is marked decommissioned
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
+    assertEq(circle.owner, alice);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.Decommissioned));
+    assertFalse(savingCircles.isDecommissionable(baseCircleId));
 
     // Verify alice got her deposit back
     assertEq(token.balanceOf(alice), DEPOSIT_AMOUNT);
@@ -1201,8 +1206,9 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     savingCircles.decommission(circleId);
 
     // State 5: Decommissioned (final state)
-    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-    savingCircles.getCircle(circleId);
+    assertEq(uint256(savingCircles.circleState(circleId)), uint256(ISavingCircles.CircleState.Decommissioned));
+    assertFalse(savingCircles.isDecommissionable(circleId));
+    assertEq(savingCircles.getCircle(circleId).owner, alice);
   }
 
   // ============ Circle/Round View State Tests ============
@@ -1241,8 +1247,8 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     vm.prank(alice);
     savingCircles.decommission(baseCircleId);
 
-    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector));
-    savingCircles.circleState(baseCircleId);
+    assertEq(uint256(savingCircles.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.Decommissioned));
+    assertEq(uint256(savingCircles.roundState(baseCircleId)), uint256(ISavingCircles.RoundState.NotStarted));
   }
 
   function test_RoundStateWhenRoundHasNotStartedYet() external {

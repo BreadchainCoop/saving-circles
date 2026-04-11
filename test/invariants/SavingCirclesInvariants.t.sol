@@ -100,12 +100,16 @@ contract SavingCirclesInvariantsTest is StdInvariant, Test {
     }
   }
 
-  function invariant_DecommissionedCirclesAreEmpty() public {
+  function invariant_DecommissionedCirclesRemainClosed() public view {
     uint256[] memory decommissionedIds = handler.getDecommissionedCircles();
 
     for (uint256 i = 0; i < decommissionedIds.length; i++) {
-      vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-      savingCircles.getCircle(decommissionedIds[i]);
+      uint256 circleId = decommissionedIds[i];
+
+      assertEq(uint256(savingCircles.circleState(circleId)), uint256(ISavingCircles.CircleState.Decommissioned));
+      assertEq(savingCircles.currentRoundWithdrawer(circleId), address(0));
+      assertFalse(savingCircles.isActive(circleId));
+      assertFalse(savingCircles.isDecommissionable(circleId));
     }
   }
 

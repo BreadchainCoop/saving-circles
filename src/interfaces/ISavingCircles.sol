@@ -353,10 +353,10 @@ interface ISavingCircles {
 
   /**
    * @notice Check if a circle is decommissioned
-   * @param circle The circle
+   * @param id The ID of the circle
    * @return decommissioned Whether the circle is decommissioned
    */
-  function isDecommissioned(Circle memory circle) external view returns (bool decommissioned);
+  function isDecommissioned(uint256 id) external view returns (bool decommissioned);
 
   /**
    * @notice Check if a circle is decommissionable

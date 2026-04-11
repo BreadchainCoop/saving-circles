@@ -355,10 +355,29 @@ contract SavingCirclesViewerUnit is SavingCirclesTestBase {
 
     assertEq(userData.circleData.length, 1);
     assertTrue(userData.circleData[0].isDecommissioned);
+    assertEq(userData.circleData[0].circleInfo.owner, alice);
+    assertTrue(userData.circleData[0].isMember);
+    assertFalse(userData.circleData[0].isDecommissionable);
 
     assertEq(userData.financialSummary.totalBalance, 0);
     assertEq(userData.financialSummary.activeCirclesCount, 0);
     assertEq(userData.financialSummary.completedCirclesCount, 1);
+  }
+
+  function test_GetComprehensiveUserDataHandlesExpiredCircle() external {
+    vm.warp(baseCircleStart + (DEPOSIT_INTERVAL * members.length));
+
+    SavingCirclesViewer.ComprehensiveUserData memory userData = savingCirclesViewer.getComprehensiveUserData(alice);
+
+    assertEq(userData.membershipStatus.allCircleIds.length, 1);
+    assertEq(userData.membershipStatus.expiredCircleIds.length, 1);
+    assertEq(userData.membershipStatus.expiredCircleIds[0], baseCircleId);
+
+    assertEq(userData.circleData.length, 1);
+    assertTrue(userData.circleData[0].isExpired);
+    assertFalse(userData.circleData[0].isDecommissioned);
+
+    assertEq(userData.financialSummary.activeCirclesCount, 0);
   }
 
   function test_GetCirclesStateHandlesDecommissionedCircle() external {

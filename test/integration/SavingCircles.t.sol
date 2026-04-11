@@ -190,9 +190,10 @@ contract SavingCirclesIntegration is IntegrationBase {
     assertEq(token.balanceOf(alice) - aliceBalanceBefore, DEPOSIT_AMOUNT);
     assertEq(token.balanceOf(bob) - bobBalanceBefore, DEPOSIT_AMOUNT);
 
-    // Check circle deleted
-    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-    circle.getCircle(baseCircleId);
+    // Check circle remains queryable but is decommissioned
+    assertEq(circle.getCircle(baseCircleId).owner, alice);
+    assertEq(uint256(circle.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.Decommissioned));
+    assertFalse(circle.isDecommissionable(baseCircleId));
   }
 
   function test_MemberDecommissionWhenIncompleteDeposits() public {
@@ -217,9 +218,10 @@ contract SavingCirclesIntegration is IntegrationBase {
     // Check Alice got her deposit back
     assertEq(token.balanceOf(alice) - aliceBalanceBefore, DEPOSIT_AMOUNT);
 
-    // Check circle was deleted
-    vm.expectRevert(ISavingCircles.NotCommissioned.selector);
-    circle.getCircle(baseCircleId);
+    // Check circle remains queryable but is decommissioned
+    assertEq(circle.getCircle(baseCircleId).owner, alice);
+    assertEq(uint256(circle.circleState(baseCircleId)), uint256(ISavingCircles.CircleState.Decommissioned));
+    assertFalse(circle.isDecommissionable(baseCircleId));
   }
 
   function test_RevertWhen_NotEnoughContributions() public {
