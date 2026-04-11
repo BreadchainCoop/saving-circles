@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+/**
+ * @title IAutomaticSavingCircles
+ * @notice Interface for the SavingCircles automatic deposits extension contract
+ * @dev This extension is intended for Gelato-driven automated deposits only
+ */
+interface IAutomaticSavingCircles {
+  /**
+   * @notice Emitted when a member enables or disables automatic deposits
+   * @param member The address of the member
+   * @param enabled Whether automatic deposits are enabled
+   */
+  event AutomaticDepositsToggled(address indexed member, bool indexed enabled);
+
+  /**
+   * @notice Emitted when the Gelato automation executor is updated
+   * @param previousExecutor The previous dedicated executor
+   * @param newExecutor The new dedicated executor
+   */
+  event AutomationExecutorUpdated(address indexed previousExecutor, address indexed newExecutor);
+
+  /**
+   * @notice Emitted when an automated deposit target fails during batch execution
+   * @param circleId The circle that failed
+   * @param member The member that failed
+   * @param reason The raw revert data returned by the failed execution
+   */
+  event AutomatedDepositFailed(uint256 indexed circleId, address indexed member, bytes reason);
+
+  /**
+   * @notice Thrown when a non-Gelato caller attempts an automated execution
+   */
+  error OnlyAutomationExecutor();
+
+  /**
+   * @notice Thrown when automatic deposits have not been enabled for a member
+   */
+  error AutomaticDepositsNotEnabled();
+
+  /**
+   * @notice Thrown when batch execution inputs have mismatched array lengths
+   */
+  error ArrayLengthMismatch();
+
+  /**
+   * @notice Thrown when a member has not approved enough tokens for automation
+   */
+  error InsufficientAllowance();
+
+  /**
+   * @notice Thrown when a member does not hold enough tokens for automation
+   */
+  error InsufficientBalance();
+
+  /**
+   * @notice Enable or disable automatic deposits for the caller across every circle they belong to
+   * @param enabled Whether to enable automatic deposits
+   */
+  function setAutomaticDepositsEnabled(bool enabled) external;
+
+  /**
+   * @notice Configure the Gelato dedicated msg.sender allowed to execute automated deposits
+   * @param automationExecutor The dedicated Gelato executor address for this network
+   */
+  function setAutomationExecutor(address automationExecutor) external;
+
+  /**
+   * @notice Execute automated deposits for precomputed targets
+   * @param circleIds Circle IDs to process
+   * @param members Members to process for each circle ID
+   */
+  function batchExecuteAutomatedDeposits(uint256[] calldata circleIds, address[] calldata members) external;
+
+  /**
+   * @notice The configured Gelato dedicated msg.sender
+   * @return The automation executor address
+   */
+  function automationExecutor() external view returns (address);
+
+  /**
+   * @notice Check if automatic deposits are enabled for a member
+   * @param member The address to check
+   * @return Whether automatic deposits are enabled
+   */
+  function isAutomaticDepositsEnabled(address member) external view returns (bool);
+
+  /**
+   * @notice Return every member/circle pair currently eligible for automated deposit
+   * @return circleIds Circle IDs with pending automated deposits
+   * @return members Members eligible for automated deposits in each circle
+   */
+  function getEligibleAutomatedDeposits() external view returns (uint256[] memory circleIds, address[] memory members);
+
+  /**
+   * @notice Gelato resolver-style checker for automatic deposits across every circle
+   * @return canExec Whether Gelato should execute the sweep
+   * @return execPayload Encoded calldata for the automated deposit execution
+   */
+  function checker() external view returns (bool canExec, bytes memory execPayload);
+}

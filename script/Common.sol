@@ -4,8 +4,9 @@ pragma solidity 0.8.28;
 import {ProxyAdmin} from '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol';
 import {TransparentUpgradeableProxy} from '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Script} from 'forge-std/Script.sol';
+import {console2} from 'forge-std/console2.sol';
 
-import {DelegatedSavingCircles} from '../src/contracts/DelegatedSavingCircles.sol';
+import {AutomaticSavingCircles} from '../src/contracts/AutomaticSavingCircles.sol';
 import {SavingCircles} from '../src/contracts/SavingCircles.sol';
 import {SavingCirclesViewer} from '../src/contracts/SavingCirclesViewer.sol';
 
@@ -42,8 +43,12 @@ contract Common is Script {
     );
 
     // Deploy auxiliary contracts that reference the SavingCircles proxy
-    new DelegatedSavingCircles(address(proxy));
-    new SavingCirclesViewer(address(proxy));
+    AutomaticSavingCircles automaticSavingCircles = new AutomaticSavingCircles(address(proxy), _admin);
+    SavingCirclesViewer savingCirclesViewer = new SavingCirclesViewer(address(proxy));
+
+    console2.log('SavingCircles proxy:', address(proxy));
+    console2.log('AutomaticSavingCircles:', address(automaticSavingCircles));
+    console2.log('SavingCirclesViewer:', address(savingCirclesViewer));
 
     return proxy;
   }

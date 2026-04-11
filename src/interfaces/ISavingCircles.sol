@@ -234,6 +234,11 @@ interface ISavingCircles {
   error CircleTimedOut();
 
   /**
+   * @notice Thrown when the circle isn't started yet
+   */
+  error CircleNotStarted();
+
+  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -335,6 +340,13 @@ interface ISavingCircles {
    * @return members The members of the circle
    */
   function getCircleMembers(uint256 id) external view returns (address[] memory members);
+
+  /**
+   * @notice Check if a circle is active
+   * @param id The ID of the circle
+   * @return active Whether the circle is active
+   */
+  function isActive(uint256 id) external view returns (bool active);
 
   /**
    * @notice Check if a member is a member of a circle
