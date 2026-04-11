@@ -259,6 +259,12 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     automaticSavingCircles.batchExecuteAutomatedDeposits(circleIds, targetMembers);
   }
 
+  function test_ExecuteAutomatedDepositTarget_WhenCallerIsNotSelf() external {
+    vm.prank(alice);
+    vm.expectRevert(AutomaticSavingCircles.OnlySelf.selector);
+    automaticSavingCircles.executeAutomatedDepositTarget(baseCircleId, alice);
+  }
+
   function test_Checker_ReturnsTrueAndExecPayloadWhenAnyEligibleMemberExists() external {
     _fundEnableAndApprove(alice, DEPOSIT_AMOUNT);
     (uint256[] memory circleIds, address[] memory targetMembers) = automaticSavingCircles.getEligibleAutomatedDeposits();
