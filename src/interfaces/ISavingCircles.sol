@@ -234,6 +234,11 @@ interface ISavingCircles {
   error CircleTimedOut();
 
   /**
+   * @notice Thrown when the circle isn't started yet
+   */
+  error CircleNotStarted();
+
+  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */

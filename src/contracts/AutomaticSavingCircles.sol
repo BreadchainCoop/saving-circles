@@ -179,9 +179,9 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
 
     if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) {
       if (!SAVING_CIRCLES.isActive(_circleId)) revert ISavingCircles.NotActive();
-      if (block.timestamp < _circle.effectiveCircleStartTime) revert ISavingCircles.DepositBeforeCircleStart();
       if (SAVING_CIRCLES.isDecommissionable(_circleId)) revert ISavingCircles.CircleTimedOut();
-      revert ISavingCircles.CircleExpired();
+      if (block.timestamp < _circle.effectiveCircleStartTime) revert ISavingCircles.DepositBeforeCircleStart();
+      revert ISavingCircles.CircleNotStarted();
     }
 
     (bool isMember, uint256 currentBalance) = _getMemberBalance(members, balances, _member);
