@@ -63,6 +63,15 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     emit AutomationExecutorUpdated(previousExecutor, _automationExecutor);
   }
 
+  /**
+   * @dev External trampoline used to isolate single-target failures with try/catch during batch execution
+   * @param _circleId Circle to process
+   * @param _member Member to deposit for
+   */
+  function executeAutomatedDepositTarget(uint256 _circleId, address _member) external onlySelf {
+    _executeAutomatedDepositTarget(_circleId, _member);
+  }
+
   /// @inheritdoc IAutomaticSavingCircles
   function batchExecuteAutomatedDeposits(
     uint256[] calldata _circleIds,
@@ -123,6 +132,38 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /**
+   * @dev Executes a single automated deposit target after re-validating all onchain constraints
+   * @param _circleId Circle to process
+   * @param _member Member to deposit for
+   */
+  function _executeAutomatedDepositTarget(uint256 _circleId, address _member) internal {
+    ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
+    (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
+
+    if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) {
+      if (!SAVING_CIRCLES.isActive(_circleId)) revert ISavingCircles.NotActive();
+      if (SAVING_CIRCLES.isDecommissionable(_circleId)) revert ISavingCircles.CircleTimedOut();
+      if (block.timestamp < _circle.effectiveCircleStartTime) revert ISavingCircles.DepositBeforeCircleStart();
+      revert ISavingCircles.CircleNotStarted();
+    }
+
+    (bool isMember, uint256 currentBalance) = _getMemberBalance(members, balances, _member);
+    if (!isMember) revert ISavingCircles.NotMember();
+    if (!automaticDepositsEnabled[_member]) revert AutomaticDepositsNotEnabled();
+    if (currentBalance >= _circle.depositAmount) revert ISavingCircles.AlreadyDeposited();
+
+    uint256 requiredAmount = _circle.depositAmount - currentBalance;
+    IERC20 token = IERC20(_circle.token);
+
+    if (token.allowance(_member, address(this)) < requiredAmount) revert InsufficientAllowance();
+    if (token.balanceOf(_member) < requiredAmount) revert InsufficientBalance();
+
+    token.safeTransferFrom(_member, address(this), requiredAmount);
+    token.forceApprove(address(SAVING_CIRCLES), requiredAmount);
+    SAVING_CIRCLES.depositFor(_circleId, requiredAmount, _member);
+  }
+
+  /**
    * @dev Returns the current round index for a circle using the live block timestamp
    * @param _circle Circle configuration to evaluate
    * @return The zero-based round index
@@ -157,47 +198,6 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     IERC20 token = IERC20(_circle.token);
 
     return token.allowance(_member, address(this)) >= requiredAmount && token.balanceOf(_member) >= requiredAmount;
-  }
-
-  /**
-   * @dev External trampoline used to isolate single-target failures with try/catch during batch execution
-   * @param _circleId Circle to process
-   * @param _member Member to deposit for
-   */
-  function executeAutomatedDepositTarget(uint256 _circleId, address _member) external onlySelf {
-    _executeAutomatedDepositTarget(_circleId, _member);
-  }
-
-  /**
-   * @dev Executes a single automated deposit target after re-validating all onchain constraints
-   * @param _circleId Circle to process
-   * @param _member Member to deposit for
-   */
-  function _executeAutomatedDepositTarget(uint256 _circleId, address _member) internal {
-    ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
-    (address[] memory members, uint256[] memory balances) = SAVING_CIRCLES.getMemberBalances(_circleId);
-
-    if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) {
-      if (!SAVING_CIRCLES.isActive(_circleId)) revert ISavingCircles.NotActive();
-      if (SAVING_CIRCLES.isDecommissionable(_circleId)) revert ISavingCircles.CircleTimedOut();
-      if (block.timestamp < _circle.effectiveCircleStartTime) revert ISavingCircles.DepositBeforeCircleStart();
-      revert ISavingCircles.CircleNotStarted();
-    }
-
-    (bool isMember, uint256 currentBalance) = _getMemberBalance(members, balances, _member);
-    if (!isMember) revert ISavingCircles.NotMember();
-    if (!automaticDepositsEnabled[_member]) revert AutomaticDepositsNotEnabled();
-    if (currentBalance >= _circle.depositAmount) revert ISavingCircles.AlreadyDeposited();
-
-    uint256 requiredAmount = _circle.depositAmount - currentBalance;
-    IERC20 token = IERC20(_circle.token);
-
-    if (token.allowance(_member, address(this)) < requiredAmount) revert InsufficientAllowance();
-    if (token.balanceOf(_member) < requiredAmount) revert InsufficientBalance();
-
-    token.safeTransferFrom(_member, address(this), requiredAmount);
-    token.forceApprove(address(SAVING_CIRCLES), requiredAmount);
-    SAVING_CIRCLES.depositFor(_circleId, requiredAmount, _member);
   }
 
   /**
@@ -253,25 +253,6 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /**
-   * @dev Looks up whether a member belongs to the supplied balances snapshot and returns their current balance
-   * @param _members Snapshot of circle members
-   * @param _balances Snapshot of current round balances aligned with `_members`
-   * @param _member Member being searched for
-   * @return isMember Whether the member was found in the snapshot
-   * @return currentBalance Current round balance for the member
-   */
-  function _getMemberBalance(
-    address[] memory _members,
-    uint256[] memory _balances,
-    address _member
-  ) internal pure returns (bool isMember, uint256 currentBalance) {
-    for (uint256 i = 0; i < _members.length; i++) {
-      if (_members[i] != _member) continue;
-      return (true, _balances[i]);
-    }
-  }
-
-  /**
    * @dev Returns whether a circle is in a state where automation can process deposits
    * @param _circleId Circle identifier
    * @param _circle Circle configuration to evaluate
@@ -290,5 +271,24 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     if (_currentRoundIndex(_circle) >= _memberCount) return false;
 
     return true;
+  }
+
+  /**
+   * @dev Looks up whether a member belongs to the supplied balances snapshot and returns their current balance
+   * @param _members Snapshot of circle members
+   * @param _balances Snapshot of current round balances aligned with `_members`
+   * @param _member Member being searched for
+   * @return isMember Whether the member was found in the snapshot
+   * @return currentBalance Current round balance for the member
+   */
+  function _getMemberBalance(
+    address[] memory _members,
+    uint256[] memory _balances,
+    address _member
+  ) internal pure returns (bool isMember, uint256 currentBalance) {
+    for (uint256 i = 0; i < _members.length; i++) {
+      if (_members[i] != _member) continue;
+      return (true, _balances[i]);
+    }
   }
 }
