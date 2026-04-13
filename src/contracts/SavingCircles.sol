@@ -376,11 +376,10 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /**
-   * @dev Make a withdrawal from a specified circle
-   *      Permissionless: anyone can trigger the payout for the member whose turn it is to withdraw
-   *      A withdrawal must be made by a member of the circle, even if it is for another member.
+   * @dev Make a withdrawal from a specified circle.
+   *      Anyone can trigger the payout for a valid member whose turn is withdrawable.
    */
-  function _withdraw(uint256 _id, address _member) internal onlyMember(_id, msg.sender) {
+  function _withdraw(uint256 _id, address _member) internal onlyMember(_id, _member) {
     Circle storage _circle = circles[_id];
 
     if (!_claimable(_id, _member)) revert NotWithdrawable();
