@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - Rubydusa/etherform-with-upgrade-safety
+      - franrolotti/rebased-rubydusa
 
 concurrency:
   group: ${{github.workflow}}-${{github.ref}}
