@@ -240,11 +240,6 @@ interface ISavingCircles {
   error CircleTimedOut();
 
   /**
-   * @notice Thrown when the circle isn't started yet
-   */
-  error CircleNotStarted();
-
-  /**
    * @notice Initialize the contract
    * @param owner The owner of the contract
    */
@@ -368,13 +363,6 @@ interface ISavingCircles {
    * @return allowed Whether the token is allowed
    */
   function isTokenAllowed(address token) external view returns (bool allowed);
-
-  /**
-   * @notice Check if a circle is active
-   * @param id The ID of the circle
-   * @return active Whether the circle is active
-   */
-  function isActive(uint256 id) external view returns (bool active);
 
   /**
    * @notice Check if a circle is decommissioned
