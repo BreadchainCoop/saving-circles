@@ -44,9 +44,9 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   /**
    * @notice Constructor
    * @param _savingCircles Address of the main SavingCircles contract
-   * @param _owner Owner of the automatic deposits extension
+   * @param owner_ Owner of the automatic deposits extension
    */
-  constructor(address _savingCircles, address _owner) Ownable(_owner) {
+  constructor(address _savingCircles, address owner_) Ownable(owner_) {
     SAVING_CIRCLES = ISavingCircles(_savingCircles);
   }
 
