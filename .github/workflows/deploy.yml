@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     branches:
-      - franrolotti/etherform-upgrade-followup
+      - dev
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
