@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     branches:
-      - dev
+      - franrolotti/etherform-upgrade-followup
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -86,9 +86,19 @@ jobs:
           SUMMARY_TITLE: Testnet Upgrade Summary
         run: bash .etherform/scripts/deploy/deployment-summary.sh
 
-      - name: Verify contracts on Blockscout
+      - name: Verify contracts on Etherscan
         env:
-          BLOCKSCOUT_URL: ${{ steps.network.outputs.blockscout_url }}
-          ETH_RPC_URL: ${{ secrets.RPC_URL }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
           BROADCAST_FILE: ${{ steps.parse.outputs.broadcast_file }}
-        run: bash .etherform/scripts/deploy/verify-blockscout.sh
+        run: |
+          jq -c '.transactions[] | select(.transactionType == "CREATE") | {name: .contractName, address: .contractAddress}' "$BROADCAST_FILE" |
+          while read -r contract; do
+            CONTRACT_NAME=$(echo "$contract" | jq -r '.name')
+            CONTRACT_ADDR=$(echo "$contract" | jq -r '.address')
+
+            echo "Verifying $CONTRACT_NAME ($CONTRACT_ADDR) on Etherscan..."
+            forge verify-contract "$CONTRACT_ADDR" "$CONTRACT_NAME" \
+              --chain sepolia \
+              --etherscan-api-key "$ETHERSCAN_API_KEY" \
+              --guess-constructor-args
+          done

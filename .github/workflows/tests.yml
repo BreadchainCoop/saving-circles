@@ -1,13 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - dev
   pull_request:
     branches:
-      - Rubydusa/etherform-with-upgrade-safety
-      - franrolotti/rebased-rubydusa
+      - dev
 
 concurrency:
   group: ${{github.workflow}}-${{github.ref}}
