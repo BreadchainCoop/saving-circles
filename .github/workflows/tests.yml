@@ -26,6 +26,7 @@ jobs:
       run-slither: false
       run-upgrade-safety: true
       run-coverage: true
+      run-halmos: true
     secrets:
       PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
       RPC_URL: ${{ secrets.RPC_URL }}
