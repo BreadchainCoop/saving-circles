@@ -228,6 +228,12 @@ interface ISavingCircles {
    * @notice Thrown when the circle is not active
    */
   error NotActive();
+
+  /**
+   * @notice Thrown when the circle has not started
+   */
+  error CircleNotStarted();
+
   /**
    * @notice Thrown when a previous round ended with incomplete deposits, blocking deposits and withdrawals until decommission
    */
@@ -362,6 +368,13 @@ interface ISavingCircles {
    * @return allowed Whether the token is allowed
    */
   function isTokenAllowed(address token) external view returns (bool allowed);
+
+  /**
+   * @notice Check if a circle is active
+   * @param id The ID of the circle
+   * @return active Whether the circle is active
+   */
+  function isActive(uint256 id) external view returns (bool active);
 
   /**
    * @notice Check if a circle is decommissioned
