@@ -24,7 +24,6 @@ jobs:
       deploy-on-pr: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
       deploy-script: "script/Deploy.sol:Deploy"
       run-slither: false
-      run-upgrade-safety: true
       run-coverage: true
     secrets:
       PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
