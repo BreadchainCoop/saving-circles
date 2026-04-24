@@ -89,6 +89,7 @@ jobs:
       - name: Verify contracts on Etherscan
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          ETH_RPC_URL: ${{ secrets.RPC_URL }}
           BROADCAST_FILE: ${{ steps.parse.outputs.broadcast_file }}
         run: |
           jq -c '.transactions[] | select(.transactionType == "CREATE") | {name: .contractName, address: .contractAddress}' "$BROADCAST_FILE" |
@@ -99,6 +100,7 @@ jobs:
             echo "Verifying $CONTRACT_NAME ($CONTRACT_ADDR) on Etherscan..."
             forge verify-contract "$CONTRACT_ADDR" "$CONTRACT_NAME" \
               --chain sepolia \
+              --rpc-url "$ETH_RPC_URL" \
               --etherscan-api-key "$ETHERSCAN_API_KEY" \
               --guess-constructor-args
           done
