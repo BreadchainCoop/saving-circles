@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   foundry:
-    uses: BreadchainCoop/etherform/.github/workflows/_foundry-cicd.yml@a566c75290437054eeb28a1a059e008e0a0a05e7
+    uses: BreadchainCoop/etherform/.github/workflows/_foundry-cicd.yml@16ca06e46b634c9df22c391e5c22cabd4623306b
     permissions:
       contents: read
       pull-requests: write
