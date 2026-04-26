@@ -58,8 +58,3 @@ shrink_sequence = true
 gnosis = 'https://rpc.gnosis.gateway.fm'
 optimism = 'https://mainnet.optimism.io'
 sepolia = 'https://rpc.sepolia.io'
-
-[etherscan]
-gnosis = { key = "${ETHERSCAN_API_KEY}", url = "https://api.gnosisscan.io/api" ,name="gnosis" }
-optimism = { key = "${ETHERSCAN_API_KEY}" }
-sepolia = { key = "${ETHERSCAN_API_KEY}" }

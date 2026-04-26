@@ -1,0 +1,8 @@
+{
+  "contracts": [
+    {
+      "contract": "src/contracts/SavingCircles.sol:SavingCircles"
+    }
+  ]
+}
+
