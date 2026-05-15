@@ -124,7 +124,7 @@ interface IAutomaticSavingCircles {
 
   /**
    * @notice Gelato resolver-style checker for automatic claims across every circle
-   * @return canExec Whether Gelato should execute the claims
+   * @return canExec Whether Gelato can execute the claims
    * @return execPayload Encoded calldata for the automated claim execution
    */
   function claimChecker() external view returns (bool canExec, bytes memory execPayload);
