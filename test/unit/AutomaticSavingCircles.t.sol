@@ -384,6 +384,10 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     (bool canExec, bytes memory execPayload) = automaticSavingCircles.claimChecker();
     assertTrue(canExec);
 
+    assertFalse(savingCircles.hasClaimed(baseCircleId, alice));
+    assertFalse(savingCircles.hasClaimed(secondCircleId, alice));
+    assertEq(token.balanceOf(alice), 0);
+
     vm.prank(gelatoExecutor);
     (bool success,) = address(automaticSavingCircles).call(execPayload);
     assertTrue(success);
