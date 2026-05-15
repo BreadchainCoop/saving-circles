@@ -428,6 +428,31 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     automaticSavingCircles.batchExecuteAutomatedClaims(circleIds, targetMembers);
   }
 
+  function test_BatchExecuteAutomatedClaims_ContinuesWhenOneTargetFails() external {
+    _depositRound(baseCircleId);
+
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
+    vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
+
+    uint256[] memory circleIds = new uint256[](2);
+    address[] memory targetMembers = new address[](2);
+    circleIds[0] = baseCircleId;
+    circleIds[1] = baseCircleId;
+    targetMembers[0] = bob;
+    targetMembers[1] = alice;
+
+    vm.prank(gelatoExecutor);
+    vm.expectEmit(true, true, false, true, address(automaticSavingCircles));
+    emit IAutomaticSavingCircles.AutomatedClaimFailed(
+      baseCircleId, bob, abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector)
+    );
+    automaticSavingCircles.batchExecuteAutomatedClaims(circleIds, targetMembers);
+
+    assertFalse(savingCircles.hasClaimed(baseCircleId, bob));
+    assertTrue(savingCircles.hasClaimed(baseCircleId, alice));
+    assertEq(token.balanceOf(alice), DEPOSIT_AMOUNT * members.length);
+  }
+
   function test_BatchExecuteAutomatedClaims_RevertsOnMismatchedArrays() external {
     uint256[] memory circleIds = new uint256[](1);
     address[] memory targetMembers = new address[](0);
