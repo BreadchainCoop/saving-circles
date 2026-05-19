@@ -292,14 +292,14 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     (bool canExec, bytes memory execPayload) = automaticSavingCircles.depositChecker();
 
     assertFalse(canExec);
-    assertEq(execPayload, _emptyBatchPayload());
+    assertEq(execPayload, bytes(''));
   }
 
   function test_Checker_ReturnsFalseWhenNoEligibleMembersExist() external view {
     (bool canExec, bytes memory execPayload) = automaticSavingCircles.depositChecker();
 
     assertFalse(canExec);
-    assertEq(execPayload, _emptyBatchPayload());
+    assertEq(execPayload, bytes(''));
   }
 
   function test_Checker_ReturnsFalseWhenOnlyUnstartedCirclesHaveEligibleMembers() external {
@@ -317,7 +317,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     (bool canExec, bytes memory execPayload) = automaticSavingCircles.depositChecker();
 
     assertFalse(canExec);
-    assertEq(execPayload, _emptyBatchPayload());
+    assertEq(execPayload, bytes(''));
   }
 
   function test_GetEligibleAutomatedDeposits_SkipsDecommissionedCircles() external {
@@ -409,14 +409,14 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     (bool canExec, bytes memory execPayload) = automaticSavingCircles.claimChecker();
 
     assertFalse(canExec);
-    assertEq(execPayload, _emptyClaimBatchPayload());
+    assertEq(execPayload, bytes(''));
   }
 
   function test_ClaimChecker_ReturnsFalseWhenNoEligibleClaimsExist() external view {
     (bool canExec, bytes memory execPayload) = automaticSavingCircles.claimChecker();
 
     assertFalse(canExec);
-    assertEq(execPayload, _emptyClaimBatchPayload());
+    assertEq(execPayload, bytes(''));
   }
 
   function test_BatchExecuteAutomatedClaims_WhenCallerIsNotAutomationExecutor() external {
@@ -486,14 +486,6 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
   function _createUnstartedCircle() internal returns (uint256) {
     ISavingCircles.Circle memory circle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
     return _createCircle(savingCircles, circle, members, _alicePrivateKey);
-  }
-
-  function _emptyBatchPayload() internal pure returns (bytes memory) {
-    return abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedDeposits, (new uint256[](0), new address[](0)));
-  }
-
-  function _emptyClaimBatchPayload() internal pure returns (bytes memory) {
-    return abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedClaims, (new uint256[](0), new address[](0)));
   }
 
   function _depositRound(uint256 _circleId) internal {

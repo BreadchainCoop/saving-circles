@@ -118,32 +118,22 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
 
   /// @inheritdoc IAutomaticSavingCircles
   function depositChecker() external view override returns (bool canExec, bytes memory execPayload) {
-    uint256[] memory circleIds;
-    address[] memory members;
+    if (automationExecutor == address(0)) return (false, bytes(''));
 
-    if (automationExecutor != address(0)) {
-      (circleIds, members) = getEligibleAutomatedDeposits();
-      canExec = circleIds.length > 0;
-    } else {
-      circleIds = new uint256[](0);
-      members = new address[](0);
-    }
+    (uint256[] memory circleIds, address[] memory members) = getEligibleAutomatedDeposits();
+    canExec = circleIds.length > 0;
+    if (!canExec) return (false, bytes(''));
 
     execPayload = abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedDeposits, (circleIds, members));
   }
 
   /// @inheritdoc IAutomaticSavingCircles
   function claimChecker() external view override returns (bool canExec, bytes memory execPayload) {
-    uint256[] memory circleIds;
-    address[] memory members;
+    if (automationExecutor == address(0)) return (false, bytes(''));
 
-    if (automationExecutor != address(0)) {
-      (circleIds, members) = getEligibleAutomatedClaims();
-      canExec = circleIds.length > 0;
-    } else {
-      circleIds = new uint256[](0);
-      members = new address[](0);
-    }
+    (uint256[] memory circleIds, address[] memory members) = getEligibleAutomatedClaims();
+    canExec = circleIds.length > 0;
+    if (!canExec) return (false, bytes(''));
 
     execPayload = abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedClaims, (circleIds, members));
   }
