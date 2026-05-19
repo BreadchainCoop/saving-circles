@@ -190,7 +190,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
 
     uint256 index = 0;
     for (uint256 circleId = 0; circleId < circleCount; circleId++) {
-      index = _populateEligibleAutomatedClaimsForCircle(circleId, circleIds, members, index);
+      index = _appendEligibleAutomatedClaimsForCircle(circleId, circleIds, members, index);
     }
   }
 
@@ -374,7 +374,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
    * @param _index Current write index in the output arrays
    * @return nextIndex Updated write index after appending any eligible targets
    */
-  function _populateEligibleAutomatedClaimsForCircle(
+  function _appendEligibleAutomatedClaimsForCircle(
     uint256 _circleId,
     uint256[] memory _circleIds,
     address[] memory _members,
