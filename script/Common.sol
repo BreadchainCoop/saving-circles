@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ProxyAdmin} from '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol';
 import {TransparentUpgradeableProxy} from '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol';
 import {Script} from 'forge-std/Script.sol';
 import {console2} from 'forge-std/console2.sol';
@@ -23,23 +22,17 @@ contract Common is Script {
     return new SavingCircles();
   }
 
-  function _deployProxyAdmin(address _admin) internal returns (ProxyAdmin) {
-    return new ProxyAdmin(_admin);
-  }
-
   function _deployTransparentProxy(
     address _implementation,
-    address _proxyAdmin,
+    address _initialAdminOwner,
     bytes memory _initData
   ) internal returns (TransparentUpgradeableProxy) {
-    return new TransparentUpgradeableProxy(_implementation, _proxyAdmin, _initData);
+    return new TransparentUpgradeableProxy(_implementation, _initialAdminOwner, _initData);
   }
 
   function _deployContracts(address _admin) internal returns (TransparentUpgradeableProxy) {
     TransparentUpgradeableProxy proxy = _deployTransparentProxy(
-      address(_deploySavingCircles()),
-      address(_deployProxyAdmin(_admin)),
-      abi.encodeWithSelector(SavingCircles.initialize.selector, _admin)
+      address(_deploySavingCircles()), _admin, abi.encodeWithSelector(SavingCircles.initialize.selector, _admin)
     );
 
     // Deploy auxiliary contracts that reference the SavingCircles proxy
