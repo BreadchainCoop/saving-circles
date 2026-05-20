@@ -1068,8 +1068,8 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     vm.stopPrank();
   }
 
-  function test_WithdrawForNonMember() external {
-    // Test withdrawFor when caller is not a member
+  function test_WithdrawForWhenCallerIsNotMember() external {
+    // Test permissionless withdrawFor when caller is not a member
     // Complete deposits first
     vm.warp(baseCircleStart);
     for (uint256 i = 0; i < members.length; i++) {
@@ -1084,8 +1084,16 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     vm.warp(block.timestamp + DEPOSIT_INTERVAL);
 
     vm.prank(STRANGER); // Non-member trying to call withdrawFor
-    vm.expectRevert(ISavingCircles.NotMember.selector);
     savingCircles.withdrawFor(baseCircleId, alice);
+
+    assertTrue(savingCircles.hasClaimed(baseCircleId, alice));
+    assertEq(token.balanceOf(alice), DEPOSIT_AMOUNT * members.length);
+  }
+
+  function test_WithdrawForWhenTargetIsNotMember() external {
+    vm.prank(STRANGER);
+    vm.expectRevert(ISavingCircles.NotMember.selector);
+    savingCircles.withdrawFor(baseCircleId, STRANGER);
   }
 
   // ============ Edge Case Tests for Decommission ============

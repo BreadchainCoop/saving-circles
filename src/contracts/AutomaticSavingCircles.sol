@@ -72,6 +72,15 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     _executeAutomatedDepositTarget(_circleId, _member);
   }
 
+  /**
+   * @dev External trampoline used to isolate single-target failures with try/catch during batch claim execution
+   * @param _circleId Circle to process
+   * @param _member Member to claim for
+   */
+  function executeAutomatedClaimTarget(uint256 _circleId, address _member) external onlySelf {
+    _executeAutomatedClaimTarget(_circleId, _member);
+  }
+
   /// @inheritdoc IAutomaticSavingCircles
   function batchExecuteAutomatedDeposits(
     uint256[] calldata _circleIds,
@@ -88,24 +97,41 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /// @inheritdoc IAutomaticSavingCircles
+  function batchExecuteAutomatedClaims(
+    uint256[] calldata _circleIds,
+    address[] calldata _members
+  ) external override nonReentrant onlyAutomationExecutor {
+    if (_circleIds.length != _members.length) revert ArrayLengthMismatch();
+
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      try this.executeAutomatedClaimTarget(_circleIds[i], _members[i]) {}
+      catch (bytes memory reason) {
+        emit AutomatedClaimFailed(_circleIds[i], _members[i], reason);
+      }
+    }
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
   function isAutomaticDepositsEnabled(address _member) external view override returns (bool) {
     return automaticDepositsEnabled[_member];
   }
 
   /// @inheritdoc IAutomaticSavingCircles
-  function checker() external view override returns (bool canExec, bytes memory execPayload) {
-    uint256[] memory circleIds;
-    address[] memory members;
-
-    if (automationExecutor != address(0)) {
-      (circleIds, members) = getEligibleAutomatedDeposits();
-      canExec = circleIds.length > 0;
-    } else {
-      circleIds = new uint256[](0);
-      members = new address[](0);
-    }
+  function depositChecker() external view override returns (bool canExec, bytes memory execPayload) {
+    (uint256[] memory circleIds, address[] memory members) = getEligibleAutomatedDeposits();
+    canExec = _automationCanExecute(circleIds);
+    if (!canExec) return (false, bytes(''));
 
     execPayload = abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedDeposits, (circleIds, members));
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
+  function claimChecker() external view override returns (bool canExec, bytes memory execPayload) {
+    (uint256[] memory circleIds, address[] memory members) = getEligibleAutomatedClaims();
+    canExec = _automationCanExecute(circleIds);
+    if (!canExec) return (false, bytes(''));
+
+    execPayload = abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedClaims, (circleIds, members));
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -129,6 +155,38 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     for (uint256 circleId = 0; circleId < circleCount; circleId++) {
       index = _populateEligibleAutomatedDepositsForCircle(circleId, circleIds, members, index);
     }
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
+  function getEligibleAutomatedClaims()
+    public
+    view
+    override
+    returns (uint256[] memory circleIds, address[] memory members)
+  {
+    uint256 circleCount = SAVING_CIRCLES.nextId();
+    uint256 eligibleCount = 0;
+
+    for (uint256 circleId = 0; circleId < circleCount; circleId++) {
+      eligibleCount += _countEligibleAutomatedClaimsForCircle(circleId);
+    }
+
+    circleIds = new uint256[](eligibleCount);
+    members = new address[](eligibleCount);
+
+    uint256 index = 0;
+    for (uint256 circleId = 0; circleId < circleCount; circleId++) {
+      index = _appendEligibleAutomatedClaimsForCircle(circleId, circleIds, members, index);
+    }
+  }
+
+  /**
+   * @dev Returns whether Gelato automation can execute for the selected targets
+   * @param _circleIds Circle IDs selected for automated execution
+   * @return Whether an automation executor is configured and at least one target exists
+   */
+  function _automationCanExecute(uint256[] memory _circleIds) internal view returns (bool) {
+    return automationExecutor != address(0) && _circleIds.length > 0;
   }
 
   /**
@@ -164,6 +222,24 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /**
+   * @dev Executes a single automated claim target after re-validating all onchain constraints
+   * @param _circleId Circle to process
+   * @param _member Member to claim for
+   */
+  function _executeAutomatedClaimTarget(uint256 _circleId, address _member) internal {
+    ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
+    address[] memory members = SAVING_CIRCLES.getCircleMembers(_circleId);
+    (bool isMember, uint256 memberIndex) = _getMemberIndex(members, _member);
+
+    if (!isMember) revert ISavingCircles.NotMember();
+    if (!_isEligibleForAutomatedClaim(_circleId, _circle, _member, memberIndex)) {
+      revert ISavingCircles.NotWithdrawable();
+    }
+
+    SAVING_CIRCLES.withdrawFor(_circleId, _member);
+  }
+
+  /**
    * @dev Returns the current round index for a circle using the live block timestamp
    * @param _circle Circle configuration to evaluate
    * @return The zero-based round index
@@ -177,6 +253,16 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     }
 
     return (block.timestamp - _circle.effectiveCircleStartTime) / _circle.depositInterval;
+  }
+
+  /**
+   * @dev Returns the ending timestamp for a round
+   * @param _circle Circle configuration to evaluate
+   * @param _round Zero-based round index
+   * @return Timestamp when the round's time condition has passed
+   */
+  function _roundEndTime(ISavingCircles.Circle memory _circle, uint256 _round) internal pure returns (uint256) {
+    return _circle.effectiveCircleStartTime + (_circle.depositInterval * (_round + 1));
   }
 
   /**
@@ -222,6 +308,27 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /**
+   * @dev Counts how many members in a circle are currently eligible for automated claim
+   * @param _circleId Circle to inspect
+   * @return eligibleCount Number of eligible claim targets found
+   */
+  function _countEligibleAutomatedClaimsForCircle(uint256 _circleId) internal view returns (uint256 eligibleCount) {
+    try SAVING_CIRCLES.getCircle(_circleId) returns (ISavingCircles.Circle memory _circle) {
+      if (!SAVING_CIRCLES.isActive(_circleId)) return 0;
+      if (SAVING_CIRCLES.isDecommissionable(_circleId)) return 0;
+
+      address[] memory members = SAVING_CIRCLES.getCircleMembers(_circleId);
+      for (uint256 i = 0; i < members.length; i++) {
+        if (_isEligibleForAutomatedClaim(_circleId, _circle, members[i], i)) {
+          eligibleCount++;
+        }
+      }
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
    * @dev Appends the eligible targets for a circle into the output arrays used by the selector
    * @param _circleId Circle to inspect
    * @param _circleIds Output array of eligible circle IDs
@@ -255,6 +362,39 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /**
+   * @dev Appends the eligible claim targets for a circle into the output arrays used by the selector
+   * @param _circleId Circle to inspect
+   * @param _circleIds Output array of eligible circle IDs
+   * @param _members Output array of eligible members
+   * @param _index Current write index in the output arrays
+   * @return nextIndex Updated write index after appending any eligible targets
+   */
+  function _appendEligibleAutomatedClaimsForCircle(
+    uint256 _circleId,
+    uint256[] memory _circleIds,
+    address[] memory _members,
+    uint256 _index
+  ) internal view returns (uint256 nextIndex) {
+    nextIndex = _index;
+
+    try SAVING_CIRCLES.getCircle(_circleId) returns (ISavingCircles.Circle memory _circle) {
+      if (!SAVING_CIRCLES.isActive(_circleId)) return nextIndex;
+      if (SAVING_CIRCLES.isDecommissionable(_circleId)) return nextIndex;
+
+      address[] memory members = SAVING_CIRCLES.getCircleMembers(_circleId);
+      for (uint256 i = 0; i < members.length; i++) {
+        if (!_isEligibleForAutomatedClaim(_circleId, _circle, members[i], i)) continue;
+
+        _circleIds[nextIndex] = _circleId;
+        _members[nextIndex] = members[i];
+        nextIndex++;
+      }
+    } catch {
+      return nextIndex;
+    }
+  }
+
+  /**
    * @dev Returns whether a circle is in a state where automation can process deposits
    * @param _circleId Circle identifier
    * @param _circle Circle configuration to evaluate
@@ -276,6 +416,29 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /**
+   * @dev Returns whether a member currently satisfies the automated claim criteria.
+   *      Gelato should only claim after every member deposited for the member's round and that round's time has passed.
+   * @param _circleId Circle identifier
+   * @param _circle Circle configuration to evaluate
+   * @param _member Member being checked
+   * @param _memberIndex The member's zero-based payout round
+   * @return Whether the member can be included in the claim automation payload
+   */
+  function _isEligibleForAutomatedClaim(
+    uint256 _circleId,
+    ISavingCircles.Circle memory _circle,
+    address _member,
+    uint256 _memberIndex
+  ) internal view returns (bool) {
+    if (!SAVING_CIRCLES.isActive(_circleId)) return false;
+    if (_circle.effectiveCircleStartTime == 0) return false;
+    if (SAVING_CIRCLES.isDecommissionable(_circleId)) return false;
+    if (block.timestamp < _roundEndTime(_circle, _memberIndex)) return false;
+
+    return SAVING_CIRCLES.isMemberWithdrawable(_circleId, _member);
+  }
+
+  /**
    * @dev Looks up whether a member belongs to the supplied balances snapshot and returns their current balance
    * @param _members Snapshot of circle members
    * @param _balances Snapshot of current round balances aligned with `_members`
@@ -291,6 +454,23 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     for (uint256 i = 0; i < _members.length; i++) {
       if (_members[i] != _member) continue;
       return (true, _balances[i]);
+    }
+  }
+
+  /**
+   * @dev Looks up whether a member belongs to the supplied member snapshot and returns their index
+   * @param _members Snapshot of circle members
+   * @param _member Member being searched for
+   * @return isMember Whether the member was found in the snapshot
+   * @return memberIndex The member's zero-based index in the circle
+   */
+  function _getMemberIndex(
+    address[] memory _members,
+    address _member
+  ) internal pure returns (bool isMember, uint256 memberIndex) {
+    for (uint256 i = 0; i < _members.length; i++) {
+      if (_members[i] != _member) continue;
+      return (true, i);
     }
   }
 }

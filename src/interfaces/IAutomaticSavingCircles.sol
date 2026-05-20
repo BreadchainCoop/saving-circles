@@ -30,6 +30,14 @@ interface IAutomaticSavingCircles {
   event AutomatedDepositFailed(uint256 indexed circleId, address indexed member, bytes reason);
 
   /**
+   * @notice Emitted when an automated claim target fails during batch execution
+   * @param circleId The circle that failed
+   * @param member The member that failed
+   * @param reason The raw revert data returned by the failed execution
+   */
+  event AutomatedClaimFailed(uint256 indexed circleId, address indexed member, bytes reason);
+
+  /**
    * @notice Thrown when a non-Gelato caller attempts an automated execution
    */
   error OnlyAutomationExecutor();
@@ -74,6 +82,13 @@ interface IAutomaticSavingCircles {
   function batchExecuteAutomatedDeposits(uint256[] calldata circleIds, address[] calldata members) external;
 
   /**
+   * @notice Execute automated claims for precomputed targets
+   * @param circleIds Circle IDs to process
+   * @param members Members to process for each circle ID
+   */
+  function batchExecuteAutomatedClaims(uint256[] calldata circleIds, address[] calldata members) external;
+
+  /**
    * @notice The configured Gelato dedicated msg.sender
    * @return The automation executor address
    */
@@ -94,9 +109,23 @@ interface IAutomaticSavingCircles {
   function getEligibleAutomatedDeposits() external view returns (uint256[] memory circleIds, address[] memory members);
 
   /**
+   * @notice Return every member/circle pair currently eligible for automated claim
+   * @return circleIds Circle IDs with pending automated claims
+   * @return members Members eligible to claim in each circle
+   */
+  function getEligibleAutomatedClaims() external view returns (uint256[] memory circleIds, address[] memory members);
+
+  /**
    * @notice Gelato resolver-style checker for automatic deposits across every circle
    * @return canExec Whether Gelato should execute the sweep
    * @return execPayload Encoded calldata for the automated deposit execution
    */
-  function checker() external view returns (bool canExec, bytes memory execPayload);
+  function depositChecker() external view returns (bool canExec, bytes memory execPayload);
+
+  /**
+   * @notice Gelato resolver-style checker for automatic claims across every circle
+   * @return canExec Whether Gelato can execute the claims
+   * @return execPayload Encoded calldata for the automated claim execution
+   */
+  function claimChecker() external view returns (bool canExec, bytes memory execPayload);
 }
