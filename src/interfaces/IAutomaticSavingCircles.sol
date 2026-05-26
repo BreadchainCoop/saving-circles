@@ -58,7 +58,7 @@ interface IAutomaticSavingCircles {
   /**
    * @notice Thrown when automatic claims have not been enabled for a member in a circle
    */
-  error AutomaticClaimsNotEnabled();
+  error AutomaticClaimsDisabled();
 
   /**
    * @notice Thrown when batch execution inputs have mismatched array lengths

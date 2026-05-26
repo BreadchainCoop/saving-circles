@@ -510,7 +510,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     vm.prank(gelatoExecutor);
     vm.expectEmit(true, true, false, true, address(automaticSavingCircles));
     emit IAutomaticSavingCircles.AutomatedClaimFailed(
-      baseCircleId, alice, abi.encodeWithSelector(IAutomaticSavingCircles.AutomaticClaimsNotEnabled.selector)
+      baseCircleId, alice, abi.encodeWithSelector(IAutomaticSavingCircles.AutomaticClaimsDisabled.selector)
     );
     automaticSavingCircles.batchExecuteAutomatedClaims(circleIds, targetMembers);
 
