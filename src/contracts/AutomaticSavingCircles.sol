@@ -13,18 +13,21 @@ using SafeERC20 for IERC20;
 
 /**
  * @title AutomaticSavingCircles
- * @notice Extension contract for automatic deposits in SavingCircles
- * @dev This contract exposes Gelato-friendly target selection and batch execution for automated deposits
+ * @notice Extension contract for automated deposits and claims in SavingCircles
+ * @dev This contract exposes Gelato-friendly target selection and batch execution for automated actions
  */
 contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyGuard {
   /// @notice The main SavingCircles contract
   ISavingCircles public immutable SAVING_CIRCLES;
 
-  /// @notice Dedicated Gelato msg.sender allowed to execute automated deposit batches
+  /// @notice Dedicated Gelato msg.sender allowed to execute automated batches
   address public automationExecutor;
 
   /// @notice Mapping to track which members have enabled automatic deposits
   mapping(address member => bool enabled) public automaticDepositsEnabled;
+
+  /// @notice Mapping to track which members have enabled automatic claims in each circle
+  mapping(uint256 circleId => mapping(address member => bool enabled)) public automaticClaimsEnabled;
 
   /// @notice Thrown when an internal execution trampoline is called externally
   error OnlySelf();
@@ -54,6 +57,12 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   function setAutomaticDepositsEnabled(bool _enabled) external override {
     automaticDepositsEnabled[msg.sender] = _enabled;
     emit AutomaticDepositsToggled(msg.sender, _enabled);
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
+  function setAutomaticClaimsEnabled(uint256 _circleId, bool _enabled) external override {
+    automaticClaimsEnabled[_circleId][msg.sender] = _enabled;
+    emit AutomaticClaimsToggled(_circleId, msg.sender, _enabled);
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -114,6 +123,11 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   /// @inheritdoc IAutomaticSavingCircles
   function isAutomaticDepositsEnabled(address _member) external view override returns (bool) {
     return automaticDepositsEnabled[_member];
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
+  function isAutomaticClaimsEnabled(uint256 _circleId, address _member) external view override returns (bool) {
+    return automaticClaimsEnabled[_circleId][_member];
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -232,6 +246,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     (bool isMember, uint256 memberIndex) = _getMemberIndex(members, _member);
 
     if (!isMember) revert ISavingCircles.NotMember();
+    if (!automaticClaimsEnabled[_circleId][_member]) revert AutomaticClaimsNotEnabled();
     if (!_isEligibleForAutomatedClaim(_circleId, _circle, _member, memberIndex)) {
       revert ISavingCircles.NotWithdrawable();
     }
@@ -430,6 +445,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     address _member,
     uint256 _memberIndex
   ) internal view returns (bool) {
+    if (!automaticClaimsEnabled[_circleId][_member]) return false;
     if (!SAVING_CIRCLES.isActive(_circleId)) return false;
     if (_circle.effectiveCircleStartTime == 0) return false;
     if (SAVING_CIRCLES.isDecommissionable(_circleId)) return false;

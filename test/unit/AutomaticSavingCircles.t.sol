@@ -85,6 +85,24 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     assertFalse(automaticSavingCircles.isAutomaticDepositsEnabled(alice));
   }
 
+  function test_SetAutomaticClaimsEnabled() external {
+    assertFalse(automaticSavingCircles.isAutomaticClaimsEnabled(baseCircleId, alice));
+
+    vm.prank(alice);
+    vm.expectEmit(true, true, true, true);
+    emit IAutomaticSavingCircles.AutomaticClaimsToggled(baseCircleId, alice, true);
+    automaticSavingCircles.setAutomaticClaimsEnabled(baseCircleId, true);
+
+    assertTrue(automaticSavingCircles.isAutomaticClaimsEnabled(baseCircleId, alice));
+
+    vm.prank(alice);
+    vm.expectEmit(true, true, true, true);
+    emit IAutomaticSavingCircles.AutomaticClaimsToggled(baseCircleId, alice, false);
+    automaticSavingCircles.setAutomaticClaimsEnabled(baseCircleId, false);
+
+    assertFalse(automaticSavingCircles.isAutomaticClaimsEnabled(baseCircleId, alice));
+  }
+
   function test_SetAutomationExecutor() external {
     address newExecutor = makeAddr('newExecutor');
 
@@ -339,6 +357,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
 
   function test_GetEligibleAutomatedClaims_ReturnsOnlyWhenAllMembersDepositedAndRoundTimePassed() external {
     _depositRound(baseCircleId);
+    _enableAutomaticClaim(baseCircleId, alice);
 
     (uint256[] memory circleIdsBefore, address[] memory targetMembersBefore) =
       automaticSavingCircles.getEligibleAutomatedClaims();
@@ -358,6 +377,8 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
   }
 
   function test_GetEligibleAutomatedClaims_ReturnsFalseWhenRoundTimePassedButDepositsIncomplete() external {
+    _enableAutomaticClaim(baseCircleId, alice);
+
     token.mint(alice, DEPOSIT_AMOUNT);
     vm.startPrank(alice);
     token.approve(address(savingCircles), DEPOSIT_AMOUNT);
@@ -373,10 +394,29 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     assertEq(targetMembers.length, 0);
   }
 
+  function test_GetEligibleAutomatedClaims_ReturnsOnlyEnabledCircleForMember() external {
+    uint256 secondCircleId = _createStartedCircle();
+    _depositRound(baseCircleId);
+    _depositRound(secondCircleId);
+    _enableAutomaticClaim(baseCircleId, alice);
+
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
+    vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
+
+    (uint256[] memory circleIds, address[] memory targetMembers) = automaticSavingCircles.getEligibleAutomatedClaims();
+
+    assertEq(circleIds.length, 1);
+    assertEq(targetMembers.length, 1);
+    assertEq(circleIds[0], baseCircleId);
+    assertEq(targetMembers[0], alice);
+  }
+
   function test_ClaimCheckerPayload_ClaimsForEligibleMembersAcrossAllCircles() external {
     uint256 secondCircleId = _createStartedCircle();
     _depositRound(baseCircleId);
     _depositRound(secondCircleId);
+    _enableAutomaticClaim(baseCircleId, alice);
+    _enableAutomaticClaim(secondCircleId, alice);
 
     ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
     vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
@@ -399,6 +439,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
 
   function test_ClaimChecker_ReturnsFalseWhenAutomationExecutorUnset() external {
     _depositRound(baseCircleId);
+    _enableAutomaticClaim(baseCircleId, alice);
 
     ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
     vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
@@ -430,6 +471,8 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
 
   function test_BatchExecuteAutomatedClaims_ContinuesWhenOneTargetFails() external {
     _depositRound(baseCircleId);
+    _enableAutomaticClaim(baseCircleId, bob);
+    _enableAutomaticClaim(baseCircleId, alice);
 
     ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
     vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
@@ -453,6 +496,27 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     assertEq(token.balanceOf(alice), DEPOSIT_AMOUNT * members.length);
   }
 
+  function test_BatchExecuteAutomatedClaims_DoesNotClaimForMemberWithoutOptIn() external {
+    _depositRound(baseCircleId);
+
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
+    vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
+
+    uint256[] memory circleIds = new uint256[](1);
+    address[] memory targetMembers = new address[](1);
+    circleIds[0] = baseCircleId;
+    targetMembers[0] = alice;
+
+    vm.prank(gelatoExecutor);
+    vm.expectEmit(true, true, false, true, address(automaticSavingCircles));
+    emit IAutomaticSavingCircles.AutomatedClaimFailed(
+      baseCircleId, alice, abi.encodeWithSelector(IAutomaticSavingCircles.AutomaticClaimsNotEnabled.selector)
+    );
+    automaticSavingCircles.batchExecuteAutomatedClaims(circleIds, targetMembers);
+
+    assertFalse(savingCircles.hasClaimed(baseCircleId, alice));
+  }
+
   function test_BatchExecuteAutomatedClaims_RevertsOnMismatchedArrays() external {
     uint256[] memory circleIds = new uint256[](1);
     address[] memory targetMembers = new address[](0);
@@ -471,6 +535,11 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
 
     vm.prank(_member);
     token.approve(address(automaticSavingCircles), _amount);
+  }
+
+  function _enableAutomaticClaim(uint256 _circleId, address _member) internal {
+    vm.prank(_member);
+    automaticSavingCircles.setAutomaticClaimsEnabled(_circleId, true);
   }
 
   function _createStartedCircle() internal returns (uint256) {

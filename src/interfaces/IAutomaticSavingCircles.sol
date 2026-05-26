@@ -3,8 +3,8 @@ pragma solidity 0.8.28;
 
 /**
  * @title IAutomaticSavingCircles
- * @notice Interface for the SavingCircles automatic deposits extension contract
- * @dev This extension is intended for Gelato-driven automated deposits only
+ * @notice Interface for the SavingCircles automation extension contract
+ * @dev This extension is intended for Gelato-driven automated deposits and claims
  */
 interface IAutomaticSavingCircles {
   /**
@@ -13,6 +13,14 @@ interface IAutomaticSavingCircles {
    * @param enabled Whether automatic deposits are enabled
    */
   event AutomaticDepositsToggled(address indexed member, bool indexed enabled);
+
+  /**
+   * @notice Emitted when a member enables or disables automatic claims for a circle
+   * @param circleId The circle configured by the member
+   * @param member The address of the member
+   * @param enabled Whether automatic claims are enabled
+   */
+  event AutomaticClaimsToggled(uint256 indexed circleId, address indexed member, bool indexed enabled);
 
   /**
    * @notice Emitted when the Gelato automation executor is updated
@@ -48,6 +56,11 @@ interface IAutomaticSavingCircles {
   error AutomaticDepositsNotEnabled();
 
   /**
+   * @notice Thrown when automatic claims have not been enabled for a member in a circle
+   */
+  error AutomaticClaimsNotEnabled();
+
+  /**
    * @notice Thrown when batch execution inputs have mismatched array lengths
    */
   error ArrayLengthMismatch();
@@ -69,7 +82,14 @@ interface IAutomaticSavingCircles {
   function setAutomaticDepositsEnabled(bool enabled) external;
 
   /**
-   * @notice Configure the Gelato dedicated msg.sender allowed to execute automated deposits
+   * @notice Enable or disable automatic claims for the caller in one circle
+   * @param circleId The circle to configure
+   * @param enabled Whether to enable automatic claims
+   */
+  function setAutomaticClaimsEnabled(uint256 circleId, bool enabled) external;
+
+  /**
+   * @notice Configure the Gelato dedicated msg.sender allowed to execute automated batches
    * @param automationExecutor The dedicated Gelato executor address for this network
    */
   function setAutomationExecutor(address automationExecutor) external;
@@ -100,6 +120,14 @@ interface IAutomaticSavingCircles {
    * @return Whether automatic deposits are enabled
    */
   function isAutomaticDepositsEnabled(address member) external view returns (bool);
+
+  /**
+   * @notice Check if automatic claims are enabled for a member in a circle
+   * @param circleId The circle to check
+   * @param member The address to check
+   * @return Whether automatic claims are enabled
+   */
+  function isAutomaticClaimsEnabled(uint256 circleId, address member) external view returns (bool);
 
   /**
    * @notice Return every member/circle pair currently eligible for automated deposit
