@@ -91,7 +91,7 @@ interface IAutomaticSavingCircles {
   function setAutomaticClaimsEnabled(uint256 circleId, bool enabled) external;
 
   /**
-   * @notice Configure the Gelato dedicated msg.sender allowed to execute automated batches
+   * @notice Configure the Gelato dedicated `msg.sender` allowed to execute automated batches
    * @param automationExecutor The dedicated Gelato executor address for this network
    */
   function setAutomationExecutor(address automationExecutor) external;
@@ -111,7 +111,7 @@ interface IAutomaticSavingCircles {
   function batchExecuteAutomatedClaims(uint256[] calldata circleIds, address[] calldata members) external;
 
   /**
-   * @notice The configured Gelato dedicated msg.sender
+   * @notice The configured Gelato dedicated `msg.sender`
    * @return The automation executor address
    */
   function automationExecutor() external view returns (address);

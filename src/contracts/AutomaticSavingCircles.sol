@@ -20,7 +20,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   /// @notice The main SavingCircles contract
   ISavingCircles public immutable SAVING_CIRCLES;
 
-  /// @notice Dedicated Gelato msg.sender allowed to execute automated batches
+  /// @notice Dedicated Gelato `msg.sender` allowed to execute automated batches
   address public automationExecutor;
 
   /// @notice Mapping to track which members have enabled automatic deposits in each circle
