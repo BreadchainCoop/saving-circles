@@ -538,8 +538,10 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
   }
 
   function _enableAutomaticClaim(uint256 _circleId, address _member) internal {
+    assertFalse(automaticSavingCircles.isAutomaticClaimsEnabled(_circleId, _member));
     vm.prank(_member);
     automaticSavingCircles.setAutomaticClaimsEnabled(_circleId, true);
+    assertTrue(automaticSavingCircles.isAutomaticClaimsEnabled(_circleId, _member));
   }
 
   function _createStartedCircle() internal returns (uint256) {
