@@ -82,7 +82,7 @@ interface IAutomaticSavingCircles {
   function setAutomaticDepositsEnabled(bool enabled) external;
 
   /**
-   * @notice Enable or disable automatic claims for the caller in one circle
+   * @notice Enable or disable automatic claims for the caller for one circle
    * @param circleId The circle to configure
    * @param enabled Whether to enable automatic claims
    */
