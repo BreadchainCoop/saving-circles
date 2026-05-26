@@ -246,6 +246,8 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     (bool isMember, uint256 memberIndex) = _getMemberIndex(members, _member);
 
     if (!isMember) revert ISavingCircles.NotMember();
+    // Re-checked here so executor-supplied targets get a specific AutomaticClaimsNotEnabled error
+    // instead of the generic NotWithdrawable returned by _isEligibleForAutomatedClaim.
     if (!automaticClaimsEnabled[_circleId][_member]) revert AutomaticClaimsNotEnabled();
     if (!_isEligibleForAutomatedClaim(_circleId, _circle, _member, memberIndex)) {
       revert ISavingCircles.NotWithdrawable();
