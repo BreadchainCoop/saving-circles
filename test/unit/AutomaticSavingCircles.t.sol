@@ -552,6 +552,21 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     assertFalse(savingCircles.hasClaimed(baseCircleId, alice));
   }
 
+  function test_BatchExecuteAutomatedClaims_ReportsUnknownCircleBeforeDisabledClaim() external {
+    uint256 invalidCircleId = savingCircles.nextId();
+    uint256[] memory circleIds = new uint256[](1);
+    address[] memory targetMembers = new address[](1);
+    circleIds[0] = invalidCircleId;
+    targetMembers[0] = alice;
+
+    vm.prank(gelatoExecutor);
+    vm.expectEmit(true, true, false, true, address(automaticSavingCircles));
+    emit IAutomaticSavingCircles.AutomatedClaimFailed(
+      invalidCircleId, alice, abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector)
+    );
+    automaticSavingCircles.batchExecuteAutomatedClaims(circleIds, targetMembers);
+  }
+
   function test_BatchExecuteAutomatedClaims_RevertsOnMismatchedArrays() external {
     uint256[] memory circleIds = new uint256[](1);
     address[] memory targetMembers = new address[](0);

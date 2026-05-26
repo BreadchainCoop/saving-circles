@@ -242,13 +242,13 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
    */
   function _executeAutomatedClaimTarget(uint256 _circleId, address _member) internal {
     ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
+    // Check opt-in before fetching members while retaining the specific error for an invalid circle.
+    if (!automaticClaimsEnabled[_circleId][_member]) revert AutomaticClaimsDisabled();
+
     address[] memory members = SAVING_CIRCLES.getCircleMembers(_circleId);
     (bool isMember, uint256 memberIndex) = _getMemberIndex(members, _member);
 
     if (!isMember) revert ISavingCircles.NotMember();
-    // Re-checked here so executor-supplied targets get a specific AutomaticClaimsDisabled error
-    // instead of the generic NotWithdrawable returned by _isEligibleForAutomatedClaim.
-    if (!automaticClaimsEnabled[_circleId][_member]) revert AutomaticClaimsDisabled();
     if (!_isEligibleForAutomatedClaim(_circleId, _circle, _member, memberIndex)) {
       revert ISavingCircles.NotWithdrawable();
     }
