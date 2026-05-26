@@ -8,11 +8,12 @@ pragma solidity 0.8.28;
  */
 interface IAutomaticSavingCircles {
   /**
-   * @notice Emitted when a member enables or disables automatic deposits
+   * @notice Emitted when a member enables or disables automatic deposits for a circle
+   * @param circleId The circle configured by the member
    * @param member The address of the member
    * @param enabled Whether automatic deposits are enabled
    */
-  event AutomaticDepositsToggled(address indexed member, bool indexed enabled);
+  event AutomaticDepositsToggled(uint256 indexed circleId, address indexed member, bool indexed enabled);
 
   /**
    * @notice Emitted when a member enables or disables automatic claims for a circle
@@ -51,7 +52,7 @@ interface IAutomaticSavingCircles {
   error OnlyAutomationExecutor();
 
   /**
-   * @notice Thrown when automatic deposits have not been enabled for a member
+   * @notice Thrown when automatic deposits have not been enabled for a member in a circle
    */
   error AutomaticDepositsNotEnabled();
 
@@ -76,10 +77,11 @@ interface IAutomaticSavingCircles {
   error InsufficientBalance();
 
   /**
-   * @notice Enable or disable automatic deposits for the caller across every circle they belong to
+   * @notice Enable or disable automatic deposits for the caller for one circle
+   * @param circleId The circle to configure
    * @param enabled Whether to enable automatic deposits
    */
-  function setAutomaticDepositsEnabled(bool enabled) external;
+  function setAutomaticDepositsEnabled(uint256 circleId, bool enabled) external;
 
   /**
    * @notice Enable or disable automatic claims for the caller for one circle
@@ -115,11 +117,12 @@ interface IAutomaticSavingCircles {
   function automationExecutor() external view returns (address);
 
   /**
-   * @notice Check if automatic deposits are enabled for a member
+   * @notice Check if automatic deposits are enabled for a member in a circle
+   * @param circleId The circle to check
    * @param member The address to check
    * @return Whether automatic deposits are enabled
    */
-  function isAutomaticDepositsEnabled(address member) external view returns (bool);
+  function isAutomaticDepositsEnabled(uint256 circleId, address member) external view returns (bool);
 
   /**
    * @notice Check if automatic claims are enabled for a member in a circle

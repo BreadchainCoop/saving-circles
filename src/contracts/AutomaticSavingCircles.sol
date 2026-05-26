@@ -23,8 +23,8 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   /// @notice Dedicated Gelato msg.sender allowed to execute automated batches
   address public automationExecutor;
 
-  /// @notice Mapping to track which members have enabled automatic deposits
-  mapping(address member => bool enabled) public automaticDepositsEnabled;
+  /// @notice Mapping to track which members have enabled automatic deposits in each circle
+  mapping(uint256 circleId => mapping(address member => bool enabled)) public automaticDepositsEnabled;
 
   /// @notice Mapping to track which members have enabled automatic claims in each circle
   mapping(uint256 circleId => mapping(address member => bool enabled)) public automaticClaimsEnabled;
@@ -54,9 +54,9 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /// @inheritdoc IAutomaticSavingCircles
-  function setAutomaticDepositsEnabled(bool _enabled) external override {
-    automaticDepositsEnabled[msg.sender] = _enabled;
-    emit AutomaticDepositsToggled(msg.sender, _enabled);
+  function setAutomaticDepositsEnabled(uint256 _circleId, bool _enabled) external override {
+    automaticDepositsEnabled[_circleId][msg.sender] = _enabled;
+    emit AutomaticDepositsToggled(_circleId, msg.sender, _enabled);
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -121,8 +121,8 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /// @inheritdoc IAutomaticSavingCircles
-  function isAutomaticDepositsEnabled(address _member) external view override returns (bool) {
-    return automaticDepositsEnabled[_member];
+  function isAutomaticDepositsEnabled(uint256 _circleId, address _member) external view override returns (bool) {
+    return automaticDepositsEnabled[_circleId][_member];
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -221,7 +221,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
 
     (bool isMember, uint256 currentBalance) = _getMemberBalance(members, balances, _member);
     if (!isMember) revert ISavingCircles.NotMember();
-    if (!automaticDepositsEnabled[_member]) revert AutomaticDepositsNotEnabled();
+    if (!automaticDepositsEnabled[_circleId][_member]) revert AutomaticDepositsNotEnabled();
     if (currentBalance >= _circle.depositAmount) revert ISavingCircles.AlreadyDeposited();
 
     uint256 requiredAmount = _circle.depositAmount - currentBalance;
@@ -284,17 +284,19 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
 
   /**
    * @dev Returns whether a member currently satisfies the offchain selection criteria for automated deposit
+   * @param _circleId Circle to inspect
    * @param _circle Circle configuration to evaluate
    * @param _member Member being checked
    * @param _currentBalance Amount already deposited by the member in the active round
    * @return Whether the member can be included in the automation payload
    */
   function _isEligibleForAutomatedDeposit(
+    uint256 _circleId,
     ISavingCircles.Circle memory _circle,
     address _member,
     uint256 _currentBalance
   ) internal view returns (bool) {
-    if (!automaticDepositsEnabled[_member]) return false;
+    if (!automaticDepositsEnabled[_circleId][_member]) return false;
     if (_currentBalance >= _circle.depositAmount) return false;
 
     uint256 requiredAmount = _circle.depositAmount - _currentBalance;
@@ -315,7 +317,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
       if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return 0;
 
       for (uint256 i = 0; i < members.length; i++) {
-        if (_isEligibleForAutomatedDeposit(_circle, members[i], balances[i])) {
+        if (_isEligibleForAutomatedDeposit(_circleId, _circle, members[i], balances[i])) {
           eligibleCount++;
         }
       }
@@ -367,7 +369,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
       if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return nextIndex;
 
       for (uint256 i = 0; i < members.length; i++) {
-        if (!_isEligibleForAutomatedDeposit(_circle, members[i], balances[i])) continue;
+        if (!_isEligibleForAutomatedDeposit(_circleId, _circle, members[i], balances[i])) continue;
 
         _circleIds[nextIndex] = _circleId;
         _members[nextIndex] = members[i];
