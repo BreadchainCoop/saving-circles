@@ -13,18 +13,21 @@ using SafeERC20 for IERC20;
 
 /**
  * @title AutomaticSavingCircles
- * @notice Extension contract for automatic deposits in SavingCircles
- * @dev This contract exposes Gelato-friendly target selection and batch execution for automated deposits
+ * @notice Extension contract for automated deposits and claims in SavingCircles
+ * @dev This contract exposes Gelato-friendly target selection and batch execution for automated actions
  */
 contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyGuard {
   /// @notice The main SavingCircles contract
   ISavingCircles public immutable SAVING_CIRCLES;
 
-  /// @notice Dedicated Gelato msg.sender allowed to execute automated deposit batches
+  /// @notice Dedicated Gelato `msg.sender` allowed to execute automated batches
   address public automationExecutor;
 
-  /// @notice Mapping to track which members have enabled automatic deposits
-  mapping(address member => bool enabled) public automaticDepositsEnabled;
+  /// @notice Mapping to track which members have enabled automatic deposits in each circle
+  mapping(uint256 circleId => mapping(address member => bool enabled)) public automaticDepositsEnabled;
+
+  /// @notice Mapping to track which members have enabled automatic claims in each circle
+  mapping(uint256 circleId => mapping(address member => bool enabled)) public automaticClaimsEnabled;
 
   /// @notice Thrown when an internal execution trampoline is called externally
   error OnlySelf();
@@ -51,9 +54,15 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /// @inheritdoc IAutomaticSavingCircles
-  function setAutomaticDepositsEnabled(bool _enabled) external override {
-    automaticDepositsEnabled[msg.sender] = _enabled;
-    emit AutomaticDepositsToggled(msg.sender, _enabled);
+  function setAutomaticDepositsEnabled(uint256 _circleId, bool _enabled) external override {
+    automaticDepositsEnabled[_circleId][msg.sender] = _enabled;
+    emit AutomaticDepositsToggled(_circleId, msg.sender, _enabled);
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
+  function setAutomaticClaimsEnabled(uint256 _circleId, bool _enabled) external override {
+    automaticClaimsEnabled[_circleId][msg.sender] = _enabled;
+    emit AutomaticClaimsToggled(_circleId, msg.sender, _enabled);
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -112,8 +121,13 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /// @inheritdoc IAutomaticSavingCircles
-  function isAutomaticDepositsEnabled(address _member) external view override returns (bool) {
-    return automaticDepositsEnabled[_member];
+  function isAutomaticDepositsEnabled(uint256 _circleId, address _member) external view override returns (bool) {
+    return automaticDepositsEnabled[_circleId][_member];
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
+  function isAutomaticClaimsEnabled(uint256 _circleId, address _member) external view override returns (bool) {
+    return automaticClaimsEnabled[_circleId][_member];
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -207,7 +221,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
 
     (bool isMember, uint256 currentBalance) = _getMemberBalance(members, balances, _member);
     if (!isMember) revert ISavingCircles.NotMember();
-    if (!automaticDepositsEnabled[_member]) revert AutomaticDepositsNotEnabled();
+    if (!automaticDepositsEnabled[_circleId][_member]) revert AutomaticDepositsNotEnabled();
     if (currentBalance >= _circle.depositAmount) revert ISavingCircles.AlreadyDeposited();
 
     uint256 requiredAmount = _circle.depositAmount - currentBalance;
@@ -228,6 +242,9 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
    */
   function _executeAutomatedClaimTarget(uint256 _circleId, address _member) internal {
     ISavingCircles.Circle memory _circle = SAVING_CIRCLES.getCircle(_circleId);
+    // Check opt-in before fetching members while retaining the specific error for an invalid circle.
+    if (!automaticClaimsEnabled[_circleId][_member]) revert AutomaticClaimsDisabled();
+
     address[] memory members = SAVING_CIRCLES.getCircleMembers(_circleId);
     (bool isMember, uint256 memberIndex) = _getMemberIndex(members, _member);
 
@@ -267,17 +284,19 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
 
   /**
    * @dev Returns whether a member currently satisfies the offchain selection criteria for automated deposit
+   * @param _circleId Circle to inspect
    * @param _circle Circle configuration to evaluate
    * @param _member Member being checked
    * @param _currentBalance Amount already deposited by the member in the active round
    * @return Whether the member can be included in the automation payload
    */
   function _isEligibleForAutomatedDeposit(
+    uint256 _circleId,
     ISavingCircles.Circle memory _circle,
     address _member,
     uint256 _currentBalance
   ) internal view returns (bool) {
-    if (!automaticDepositsEnabled[_member]) return false;
+    if (!automaticDepositsEnabled[_circleId][_member]) return false;
     if (_currentBalance >= _circle.depositAmount) return false;
 
     uint256 requiredAmount = _circle.depositAmount - _currentBalance;
@@ -298,7 +317,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
       if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return 0;
 
       for (uint256 i = 0; i < members.length; i++) {
-        if (_isEligibleForAutomatedDeposit(_circle, members[i], balances[i])) {
+        if (_isEligibleForAutomatedDeposit(_circleId, _circle, members[i], balances[i])) {
           eligibleCount++;
         }
       }
@@ -350,7 +369,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
       if (!_isCircleEligibleForAutomation(_circleId, _circle, members.length)) return nextIndex;
 
       for (uint256 i = 0; i < members.length; i++) {
-        if (!_isEligibleForAutomatedDeposit(_circle, members[i], balances[i])) continue;
+        if (!_isEligibleForAutomatedDeposit(_circleId, _circle, members[i], balances[i])) continue;
 
         _circleIds[nextIndex] = _circleId;
         _members[nextIndex] = members[i];
@@ -430,6 +449,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     address _member,
     uint256 _memberIndex
   ) internal view returns (bool) {
+    if (!automaticClaimsEnabled[_circleId][_member]) return false;
     if (!SAVING_CIRCLES.isActive(_circleId)) return false;
     if (_circle.effectiveCircleStartTime == 0) return false;
     if (SAVING_CIRCLES.isDecommissionable(_circleId)) return false;
