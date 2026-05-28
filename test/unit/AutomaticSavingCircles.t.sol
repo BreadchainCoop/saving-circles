@@ -22,7 +22,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
   address public alice = makeAddr('alice');
   address public bob = makeAddr('bob');
   address public carol = makeAddr('carol');
-  address public gelatoExecutor = makeAddr('gelatoExecutor');
+  address public automationExecutor = makeAddr('automationExecutor');
   uint256 internal _ownerPrivateKey;
   uint256 internal _alicePrivateKey;
   uint256 internal _bobPrivateKey;
@@ -53,7 +53,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     automaticSavingCircles = new AutomaticSavingCircles(address(savingCircles), owner);
 
     vm.prank(owner);
-    automaticSavingCircles.setAutomationExecutor(gelatoExecutor);
+    automaticSavingCircles.setAutomationExecutor(automationExecutor);
 
     members = new address[](3);
     members[0] = alice;
@@ -108,7 +108,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
 
     vm.prank(owner);
     vm.expectEmit(true, true, true, true);
-    emit IAutomaticSavingCircles.AutomationExecutorUpdated(gelatoExecutor, newExecutor);
+    emit IAutomaticSavingCircles.AutomationExecutorUpdated(automationExecutor, newExecutor);
     automaticSavingCircles.setAutomationExecutor(newExecutor);
 
     assertEq(automaticSavingCircles.automationExecutor(), newExecutor);
@@ -134,7 +134,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     (bool canExec, bytes memory execPayload) = automaticSavingCircles.depositChecker();
     assertTrue(canExec);
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     (bool success,) = address(automaticSavingCircles).call(execPayload);
     assertTrue(success);
 
@@ -199,7 +199,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     (bool canExec, bytes memory execPayload) = automaticSavingCircles.depositChecker();
     assertTrue(canExec);
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     (bool success,) = address(automaticSavingCircles).call(execPayload);
     assertTrue(success);
 
@@ -229,7 +229,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
 
     (uint256[] memory circleIds, address[] memory targetMembers) = automaticSavingCircles.getEligibleAutomatedDeposits();
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     automaticSavingCircles.batchExecuteAutomatedDeposits(circleIds, targetMembers);
 
     assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
@@ -248,7 +248,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
 
     (uint256[] memory circleIds, address[] memory targetMembers) = automaticSavingCircles.getEligibleAutomatedDeposits();
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     automaticSavingCircles.batchExecuteAutomatedDeposits(circleIds, targetMembers);
 
     assertEq(circleIds.length, 6);
@@ -269,7 +269,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     circleIds[0] = secondCircleId;
     targetMembers[0] = alice;
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     vm.expectEmit(true, true, false, true, address(automaticSavingCircles));
     emit IAutomaticSavingCircles.AutomatedDepositFailed(
       secondCircleId, alice, abi.encodeWithSelector(IAutomaticSavingCircles.AutomaticDepositsNotEnabled.selector)
@@ -292,7 +292,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     targetMembers[0] = alice;
     targetMembers[1] = bob;
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     automaticSavingCircles.batchExecuteAutomatedDeposits(circleIds, targetMembers);
 
     assertEq(savingCircles.balances(baseCircleId, alice), DEPOSIT_AMOUNT);
@@ -304,7 +304,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     address[] memory targetMembers = new address[](0);
     circleIds[0] = baseCircleId;
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.ArrayLengthMismatch.selector));
     automaticSavingCircles.batchExecuteAutomatedDeposits(circleIds, targetMembers);
   }
@@ -463,13 +463,74 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     assertFalse(savingCircles.hasClaimed(secondCircleId, alice));
     assertEq(token.balanceOf(alice), 0);
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     (bool success,) = address(automaticSavingCircles).call(execPayload);
     assertTrue(success);
 
     assertTrue(savingCircles.hasClaimed(baseCircleId, alice));
     assertTrue(savingCircles.hasClaimed(secondCircleId, alice));
     assertEq(token.balanceOf(alice), DEPOSIT_AMOUNT * members.length * 2);
+  }
+
+  function test_CheckUpkeep_ReturnsClaimCheckerPayload() external {
+    _depositRound(baseCircleId);
+    _enableAutomaticClaim(baseCircleId, alice);
+
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
+    vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
+
+    (bool expectedCanExec, bytes memory expectedPayload) = automaticSavingCircles.claimChecker();
+    (bool upkeepNeeded, bytes memory performData) = automaticSavingCircles.checkUpkeep(bytes(''));
+
+    assertTrue(expectedCanExec);
+    assertTrue(upkeepNeeded);
+    assertEq(performData, expectedPayload);
+  }
+
+  function test_PerformUpkeep_ClaimsForEligibleMembersAcrossAllCircles() external {
+    uint256 secondCircleId = _createStartedCircle();
+    _depositRound(baseCircleId);
+    _depositRound(secondCircleId);
+    _enableAutomaticClaim(baseCircleId, alice);
+    _enableAutomaticClaim(secondCircleId, alice);
+
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
+    vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
+
+    (bool upkeepNeeded, bytes memory performData) = automaticSavingCircles.checkUpkeep(bytes(''));
+    assertTrue(upkeepNeeded);
+
+    vm.prank(automationExecutor);
+    automaticSavingCircles.performUpkeep(performData);
+
+    assertTrue(savingCircles.hasClaimed(baseCircleId, alice));
+    assertTrue(savingCircles.hasClaimed(secondCircleId, alice));
+    assertEq(token.balanceOf(alice), DEPOSIT_AMOUNT * members.length * 2);
+  }
+
+  function test_PerformUpkeep_WhenCallerIsNotAutomationExecutor() external {
+    _depositRound(baseCircleId);
+    _enableAutomaticClaim(baseCircleId, alice);
+
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
+    vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
+
+    (, bytes memory performData) = automaticSavingCircles.checkUpkeep(bytes(''));
+
+    vm.prank(owner);
+    vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.OnlyAutomationExecutor.selector));
+    automaticSavingCircles.performUpkeep(performData);
+  }
+
+  function test_PerformUpkeep_WhenPerformDataIsInvalid() external {
+    uint256[] memory circleIds = new uint256[](0);
+    address[] memory targetMembers = new address[](0);
+    bytes memory performData =
+      abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedDeposits, (circleIds, targetMembers));
+
+    vm.prank(automationExecutor);
+    vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.InvalidPerformData.selector));
+    automaticSavingCircles.performUpkeep(performData);
   }
 
   function test_ClaimChecker_ReturnsFalseWhenAutomationExecutorUnset() external {
@@ -519,7 +580,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     targetMembers[0] = bob;
     targetMembers[1] = alice;
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     vm.expectEmit(true, true, false, true, address(automaticSavingCircles));
     emit IAutomaticSavingCircles.AutomatedClaimFailed(
       baseCircleId, bob, abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector)
@@ -542,7 +603,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     circleIds[0] = baseCircleId;
     targetMembers[0] = alice;
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     vm.expectEmit(true, true, false, true, address(automaticSavingCircles));
     emit IAutomaticSavingCircles.AutomatedClaimFailed(
       baseCircleId, alice, abi.encodeWithSelector(IAutomaticSavingCircles.AutomaticClaimsDisabled.selector)
@@ -559,7 +620,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     circleIds[0] = invalidCircleId;
     targetMembers[0] = alice;
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     vm.expectEmit(true, true, false, true, address(automaticSavingCircles));
     emit IAutomaticSavingCircles.AutomatedClaimFailed(
       invalidCircleId, alice, abi.encodeWithSelector(ISavingCircles.NotCommissioned.selector)
@@ -572,7 +633,7 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     address[] memory targetMembers = new address[](0);
     circleIds[0] = baseCircleId;
 
-    vm.prank(gelatoExecutor);
+    vm.prank(automationExecutor);
     vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.ArrayLengthMismatch.selector));
     automaticSavingCircles.batchExecuteAutomatedClaims(circleIds, targetMembers);
   }
