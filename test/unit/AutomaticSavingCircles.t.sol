@@ -533,6 +533,16 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     automaticSavingCircles.performUpkeep(performData);
   }
 
+  function test_PerformUpkeep_WhenPerformDataIsTooShort() external {
+    vm.prank(automationExecutor);
+    vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.InvalidPerformData.selector));
+    automaticSavingCircles.performUpkeep(bytes(''));
+
+    vm.prank(automationExecutor);
+    vm.expectRevert(abi.encodeWithSelector(IAutomaticSavingCircles.InvalidPerformData.selector));
+    automaticSavingCircles.performUpkeep(hex'00');
+  }
+
   function test_ClaimChecker_ReturnsFalseWhenAutomationExecutorUnset() external {
     _depositRound(baseCircleId);
     _enableAutomaticClaim(baseCircleId, alice);
