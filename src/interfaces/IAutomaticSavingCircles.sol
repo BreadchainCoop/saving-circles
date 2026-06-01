@@ -123,6 +123,8 @@ interface IAutomaticSavingCircles {
 
   /**
    * @notice Chainlink Automation custom-logic check entry point for claims
+   * @dev Intended for off-chain simulation only (via `eth_call`). Iterates over all circles and
+   * members, so on-chain callers can incur significant gas costs.
    * @return upkeepNeeded Whether at least one opted-in member has an eligible claim
    * @return performData Calldata for batchExecuteAutomatedClaims
    */
