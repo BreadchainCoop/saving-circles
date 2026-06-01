@@ -168,6 +168,7 @@ interface IAutomaticSavingCircles {
 
   /**
    * @notice Resolver-style checker for automatic deposits across every circle
+   * @dev Legacy resolver flow for automated deposits; not wired into Chainlink Automation.
    * @return canExec Whether automation should execute the sweep
    * @return execPayload Encoded calldata for the automated deposit execution
    */
@@ -175,6 +176,7 @@ interface IAutomaticSavingCircles {
 
   /**
    * @notice Resolver-style checker for automatic claims across every circle
+   * @dev Equivalent to `checkUpkeep`; retained for symmetry with `depositChecker`.
    * @return canExec Whether automation can execute the claims
    * @return execPayload Encoded calldata for the automated claim execution
    */
