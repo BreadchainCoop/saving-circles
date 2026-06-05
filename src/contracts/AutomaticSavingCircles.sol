@@ -14,13 +14,13 @@ using SafeERC20 for IERC20;
 /**
  * @title AutomaticSavingCircles
  * @notice Extension contract for automated deposits and claims in SavingCircles
- * @dev This contract exposes Gelato-friendly target selection and batch execution for automated actions
+ * @dev This contract exposes Chainlink-compatible claim automation and batch deposit execution helpers
  */
 contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyGuard {
   /// @notice The main SavingCircles contract
   ISavingCircles public immutable SAVING_CIRCLES;
 
-  /// @notice Dedicated Gelato `msg.sender` allowed to execute automated batches
+  /// @notice Dedicated automation `msg.sender` allowed to execute automated batches
   address public automationExecutor;
 
   /// @notice Mapping to track which members have enabled automatic deposits in each circle
@@ -110,14 +110,25 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     uint256[] calldata _circleIds,
     address[] calldata _members
   ) external override nonReentrant onlyAutomationExecutor {
-    if (_circleIds.length != _members.length) revert ArrayLengthMismatch();
+    _batchExecuteAutomatedClaims(_circleIds, _members);
+  }
 
-    for (uint256 i = 0; i < _circleIds.length; i++) {
-      try this.executeAutomatedClaimTarget(_circleIds[i], _members[i]) {}
-      catch (bytes memory reason) {
-        emit AutomatedClaimFailed(_circleIds[i], _members[i], reason);
-      }
+  /// @inheritdoc IAutomaticSavingCircles
+  function performUpkeep(bytes calldata _performData) external override nonReentrant onlyAutomationExecutor {
+    if (
+      _performData.length < 4
+        || bytes4(_performData[0:4]) != IAutomaticSavingCircles.batchExecuteAutomatedClaims.selector
+    ) {
+      revert InvalidPerformData();
     }
+
+    (uint256[] memory circleIds, address[] memory members) = abi.decode(_performData[4:], (uint256[], address[]));
+    _batchExecuteAutomatedClaims(circleIds, members);
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
+  function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory performData) {
+    return _claimChecker();
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -141,11 +152,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
 
   /// @inheritdoc IAutomaticSavingCircles
   function claimChecker() external view override returns (bool canExec, bytes memory execPayload) {
-    (uint256[] memory circleIds, address[] memory members) = getEligibleAutomatedClaims();
-    canExec = _automationCanExecute(circleIds);
-    if (!canExec) return (false, bytes(''));
-
-    execPayload = abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedClaims, (circleIds, members));
+    return _claimChecker();
   }
 
   /// @inheritdoc IAutomaticSavingCircles
@@ -195,12 +202,19 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /**
-   * @dev Returns whether Gelato automation can execute for the selected targets
-   * @param _circleIds Circle IDs selected for automated execution
-   * @return Whether an automation executor is configured and at least one target exists
+   * @dev Executes automated claims for a set of targets, continuing past individual target failures
+   * @param _circleIds Circle IDs to process
+   * @param _members Members to process for each circle ID
    */
-  function _automationCanExecute(uint256[] memory _circleIds) internal view returns (bool) {
-    return automationExecutor != address(0) && _circleIds.length > 0;
+  function _batchExecuteAutomatedClaims(uint256[] memory _circleIds, address[] memory _members) internal {
+    if (_circleIds.length != _members.length) revert ArrayLengthMismatch();
+
+    for (uint256 i = 0; i < _circleIds.length; i++) {
+      try this.executeAutomatedClaimTarget(_circleIds[i], _members[i]) {}
+      catch (bytes memory reason) {
+        emit AutomatedClaimFailed(_circleIds[i], _members[i], reason);
+      }
+    }
   }
 
   /**
@@ -254,6 +268,28 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     }
 
     SAVING_CIRCLES.withdrawFor(_circleId, _member);
+  }
+
+  /**
+   * @dev Returns whether automatic claims can execute and the calldata Chainlink should perform
+   * @return canExec Whether automation can execute the claims
+   * @return execPayload Encoded calldata for the automated claim execution
+   */
+  function _claimChecker() internal view returns (bool canExec, bytes memory execPayload) {
+    (uint256[] memory circleIds, address[] memory members) = getEligibleAutomatedClaims();
+    canExec = _automationCanExecute(circleIds);
+    if (!canExec) return (false, bytes(''));
+
+    execPayload = abi.encodeCall(IAutomaticSavingCircles.batchExecuteAutomatedClaims, (circleIds, members));
+  }
+
+  /**
+   * @dev Returns whether automation can execute for the selected targets
+   * @param _circleIds Circle IDs selected for automated execution
+   * @return Whether an automation executor is configured and at least one target exists
+   */
+  function _automationCanExecute(uint256[] memory _circleIds) internal view returns (bool) {
+    return automationExecutor != address(0) && _circleIds.length > 0;
   }
 
   /**
@@ -436,7 +472,7 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
 
   /**
    * @dev Returns whether a member currently satisfies the automated claim criteria.
-   *      Gelato should only claim after every member deposited for the member's round and that round's time has passed.
+   *      Automation should only claim after every member deposited for the member's round and that round's time has passed.
    * @param _circleId Circle identifier
    * @param _circle Circle configuration to evaluate
    * @param _member Member being checked
