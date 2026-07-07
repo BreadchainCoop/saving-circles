@@ -5,7 +5,10 @@ import {TransparentUpgradeableProxy} from '@openzeppelin/contracts/proxy/transpa
 import {Script} from 'forge-std/Script.sol';
 import {console2} from 'forge-std/console2.sol';
 
+import {AccumulatingSavingCircles} from '../src/contracts/AccumulatingSavingCircles.sol';
 import {AutomaticSavingCircles} from '../src/contracts/AutomaticSavingCircles.sol';
+import {CollectiveFundCircles} from '../src/contracts/CollectiveFundCircles.sol';
+import {GoalSavingCircles} from '../src/contracts/GoalSavingCircles.sol';
 import {SavingCircles} from '../src/contracts/SavingCircles.sol';
 import {SavingCirclesViewer} from '../src/contracts/SavingCirclesViewer.sol';
 
@@ -39,9 +42,27 @@ contract Common is Script {
     AutomaticSavingCircles automaticSavingCircles = new AutomaticSavingCircles(address(proxy), _admin);
     SavingCirclesViewer savingCirclesViewer = new SavingCirclesViewer(address(proxy));
 
+    // Deploy the other stack types behind their own transparent proxies
+    TransparentUpgradeableProxy accumulatingProxy = _deployTransparentProxy(
+      address(new AccumulatingSavingCircles()),
+      _admin,
+      abi.encodeWithSelector(AccumulatingSavingCircles.initialize.selector, _admin)
+    );
+    TransparentUpgradeableProxy goalProxy = _deployTransparentProxy(
+      address(new GoalSavingCircles()), _admin, abi.encodeWithSelector(GoalSavingCircles.initialize.selector, _admin)
+    );
+    TransparentUpgradeableProxy collectiveProxy = _deployTransparentProxy(
+      address(new CollectiveFundCircles()),
+      _admin,
+      abi.encodeWithSelector(CollectiveFundCircles.initialize.selector, _admin)
+    );
+
     console2.log('SavingCircles proxy:', address(proxy));
     console2.log('AutomaticSavingCircles:', address(automaticSavingCircles));
     console2.log('SavingCirclesViewer:', address(savingCirclesViewer));
+    console2.log('AccumulatingSavingCircles proxy:', address(accumulatingProxy));
+    console2.log('GoalSavingCircles proxy:', address(goalProxy));
+    console2.log('CollectiveFundCircles proxy:', address(collectiveProxy));
 
     return proxy;
   }
