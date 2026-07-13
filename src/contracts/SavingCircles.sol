@@ -29,6 +29,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   uint256 public constant MINIMUM_MEMBERS = 2;
+  /// @dev Total-member ceiling enforced on every join path (addMembers and
+  ///      redeemInvite), keeping the O(n^2) decommission refund loop bounded
+  uint256 public constant MAX_MEMBERS = 25;
   string private constant _EIP712_NAME = 'StacksInvite';
   string private constant _EIP712_VERSION = '1';
   bytes32 private constant _INVITE_TYPEHASH = keccak256('Invite(uint256 id,uint256 nonce)');
@@ -202,14 +205,89 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     usedNonces[_id][_nonce] = true;
 
-    // No max count validation, the owner issues a finite amount of invites
+    address[] storage _circleMembers = circleMembers[_id];
+    if (_circleMembers.length >= MAX_MEMBERS) revert InvalidMemberCount();
+
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
-    address[] storage _circleMembers = circleMembers[_id];
     _circleMembers.push(msg.sender);
     _memberStates[_id][msg.sender].memberIndex = _circleMembers.length - 1;
 
     emit InviteRedeemed(_id, msg.sender);
+  }
+
+  /// @inheritdoc ISavingCircles
+  function addMembers(uint256 _id, address[] calldata _members) external override nonReentrant onlyCommissioned(_id) {
+    Circle storage _circle = circles[_id];
+
+    // A direct call from the owner is the authorization — the signing-free
+    // counterpart to redeemInvite's EIP-712 check, for wallets (e.g. MiniPay)
+    // that cannot sign typed data.
+    if (msg.sender != _circle.owner) revert NotOwner();
+    // Never-started only: isActive alone would readmit finished circles
+    // (_withdraw resets it once everyone has claimed)
+    if (isActive[_id] || _circle.effectiveCircleStartTime != 0) revert AlreadyActive();
+    if (_members.length == 0) revert InvalidMemberCount();
+
+    address[] storage _circleMembers = circleMembers[_id];
+    if (_circleMembers.length + _members.length > MAX_MEMBERS) revert InvalidMemberCount();
+
+    for (uint256 i = 0; i < _members.length; i++) {
+      address _member = _members[i];
+
+      if (_member == address(0)) revert InvalidMemberAddress();
+      // Also catches duplicates within _members since isMember is set as we go
+      if (isMember[_id][_member]) revert AlreadyMember();
+
+      isMember[_id][_member] = true;
+      memberCircles[_member].push(_id);
+      _circleMembers.push(_member);
+      _memberStates[_id][_member].memberIndex = _circleMembers.length - 1;
+
+      emit MemberAdded(_id, _member);
+    }
+  }
+
+  /// @inheritdoc ISavingCircles
+  function removeMember(uint256 _id, address _member) external override nonReentrant onlyCommissioned(_id) {
+    Circle storage _circle = circles[_id];
+
+    // The owner can undo a mistaken add; the member themselves can decline a
+    // membership they never consented to. Pre-start only, so no deposits or
+    // payout accounting exist yet.
+    if (msg.sender != _circle.owner && msg.sender != _member) revert NotOwner();
+    if (isActive[_id] || _circle.effectiveCircleStartTime != 0) revert AlreadyActive();
+    if (_member == _circle.owner) revert InvalidMemberAddress();
+    if (!isMember[_id][_member]) revert NotMember();
+
+    isMember[_id][_member] = false;
+
+    // Splice out of circleMembers preserving payout order; reindex the tail
+    address[] storage _circleMembers = circleMembers[_id];
+    uint256 _index = _memberStates[_id][_member].memberIndex;
+    uint256 _length = _circleMembers.length;
+
+    for (uint256 i = _index; i + 1 < _length; i++) {
+      address _moved = _circleMembers[i + 1];
+      _circleMembers[i] = _moved;
+      _memberStates[_id][_moved].memberIndex = i;
+    }
+
+    _circleMembers.pop();
+    delete _memberStates[_id][_member];
+
+    // Drop the id from the member's circle list (order is not meaningful here)
+    uint256[] storage _ids = memberCircles[_member];
+
+    for (uint256 i = 0; i < _ids.length; i++) {
+      if (_ids[i] == _id) {
+        _ids[i] = _ids[_ids.length - 1];
+        _ids.pop();
+        break;
+      }
+    }
+
+    emit MemberRemoved(_id, _member);
   }
 
   /// @inheritdoc ISavingCircles
