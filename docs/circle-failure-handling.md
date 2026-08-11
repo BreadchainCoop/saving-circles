@@ -10,14 +10,42 @@ contract pushes every unclaimed round's deposits back to the members in an `O(n�
 
 Three problems with that:
 
-- **It can lock funds forever.** One `safeTransfer` that reverts — a blacklisted USDC holder, a
-  member contract that rejects the transfer — makes the whole function revert every time it is
-  called. There is no admin rescue path.
-- **It does not scale.** Up to `members × rounds` individual transfers in one transaction. At
-  ~15–20 members this approaches the block gas limit.
+- **It does not scale, and BREAD makes it worse.** Up to `members × rounds` individual transfers
+  in one transaction. BREAD is `ERC20VotesUpgradeable` and overrides `transfer`/`transferFrom` to
+  auto-delegate:
+
+  ```solidity
+  function transfer(address recipient, uint256 amount) public override returns (bool) {
+      super.transfer(recipient, amount);
+      if (this.delegates(recipient) == address(0)) _delegate(recipient, recipient);
+      return true;
+  }
+  ```
+
+  So every transfer pays for voting-checkpoint writes on both sides, plus an external self-call to
+  `this.delegates(recipient)`, plus a full `_delegate` the first time an address receives BREAD —
+  several times the cost of a vanilla ERC20 transfer. The ceiling on how large a circle can be
+  wound down is correspondingly lower. Needs a gas benchmark (§9) rather than an estimate.
+- **One member pays for everyone.** Whoever calls `decommission` funds the entire refund
+  distribution out of their own pocket. Pull-based settlement makes each member pay for their own
+  exit. This holds regardless of any gas limit.
 - **It does not make anyone whole.** Deposits that already funded a paid-out pot are gone. In a
   3-member circle where A and B claim and A then stops paying, C is down two full deposits and
   gets back only their partial round-2 deposit. A walks away net positive.
+
+### Token assumptions
+
+The only allowlisted token today is [BREAD on Gnosis](../script/Registry.sol) (`0xa555…5Ee3`),
+which is `ERC20VotesUpgradeable, OwnableUpgradeable, IBread` — no blacklist, no pause, no transfer
+hooks, no transfer restrictions. So the usual argument for pull payments — a recipient that can
+permanently revert a push and brick the loop for everyone — **does not apply to the current
+deployment**, and is not the justification for phase 1. The justification is gas and cost fairness.
+
+It is still worth building pull-first as defense in depth: `allowedTokens`/`setTokenAllowed` exists
+so the owner can add tokens, [`Registry.sol`](../script/Registry.sol) already lists `OPTIMISM_DAI`
+and `GNOSIS_XDAI` alongside BREAD, and this is an upgradeable long-lived contract. If a token with
+transfer restrictions is ever allowlisted, push-based refunds become a real hazard for every circle
+created afterwards. Treat that as a hedge, not a present-day risk.
 
 This spec replaces the single terminal action with a graded response — **pause → cure → eject →
 halt** — backed by collateral, so the loss falls on the defaulter rather than on whoever had not
@@ -107,7 +135,8 @@ phase 4 is optional and can be dropped without stranding the others.
 
 ### Phase 1 — Pull settlement
 
-Independent of everything else, and it fixes a live fund-locking bug. Ships alone.
+Independent of everything else, and it removes the gas ceiling and the cost-fairness problem on
+its own. Ships alone.
 
 ```solidity
 function halt(uint256 id) external;                       // O(1), any member
@@ -241,9 +270,14 @@ Other required changes:
 
 Beyond unit coverage of each new function:
 
-- Halt with a reverting/blacklisted recipient — every other member must still settle.
+- **Gas benchmark against real BREAD, not a mock.** `MockERC20` will badly understate the cost of a
+  transfer: it has no voting checkpoints and no auto-delegation. Fork Gnosis, measure the current
+  `decommission` and the new per-member `settle` at 5/10/15/20 members, and record the largest
+  circle the old path can actually wind down. This number is the concrete case for phase 1.
 - Settlement conservation: sum of all settlements equals the contract's circle balance, across
   fuzzed deposit/claim/eject sequences.
+- Settlement with a mock token whose `transfer` reverts for one recipient — every other member must
+  still settle. Defense-in-depth against a future allowlisted token; not a property of BREAD.
 - Clock monotonicity across repeated pause/resume cycles; round indices must match between
   `SavingCircles` and `AutomaticSavingCircles` at every step.
 - Ejection preserves the payout order and timing of every remaining member.
