@@ -66,6 +66,26 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
   }
 
   /// @inheritdoc IAutomaticSavingCircles
+  function migrateAutomationSettings(uint256 _circleId, address _newMember) external override {
+    address _oldMember = msg.sender;
+    if (_newMember == address(0) || _newMember == _oldMember) revert ISavingCircles.InvalidMemberAddress();
+
+    if (automaticDepositsEnabled[_circleId][_oldMember]) {
+      automaticDepositsEnabled[_circleId][_oldMember] = false;
+      automaticDepositsEnabled[_circleId][_newMember] = true;
+      emit AutomaticDepositsToggled(_circleId, _oldMember, false);
+      emit AutomaticDepositsToggled(_circleId, _newMember, true);
+    }
+
+    if (automaticClaimsEnabled[_circleId][_oldMember]) {
+      automaticClaimsEnabled[_circleId][_oldMember] = false;
+      automaticClaimsEnabled[_circleId][_newMember] = true;
+      emit AutomaticClaimsToggled(_circleId, _oldMember, false);
+      emit AutomaticClaimsToggled(_circleId, _newMember, true);
+    }
+  }
+
+  /// @inheritdoc IAutomaticSavingCircles
   function setAutomationExecutor(address _automationExecutor) external override onlyOwner {
     address previousExecutor = automationExecutor;
     automationExecutor = _automationExecutor;
