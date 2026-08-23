@@ -291,6 +291,59 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
+  function migrateMember(
+    uint256 _id,
+    address _newMember
+  ) external override nonReentrant onlyExisting(_id) onlyMember(_id, msg.sender) {
+    address _oldMember = msg.sender;
+    Circle storage _circle = circles[_id];
+
+    if (_newMember == address(0) || _newMember == _oldMember) revert InvalidMemberAddress();
+    if (isMember[_id][_newMember]) revert AlreadyMember();
+
+    isMember[_id][_oldMember] = false;
+    isMember[_id][_newMember] = true;
+
+    // Replace in place so payout order (memberIndex) is preserved — unlike
+    // removeMember+addMembers, this works on an already-started circle
+    address[] storage _circleMembers = circleMembers[_id];
+    uint256 _index = _memberStates[_id][_oldMember].memberIndex;
+    _circleMembers[_index] = _newMember;
+
+    _memberStates[_id][_newMember] = _memberStates[_id][_oldMember];
+    delete _memberStates[_id][_oldMember];
+
+    balances[_id][_newMember] = balances[_id][_oldMember];
+    delete balances[_id][_oldMember];
+
+    // Carry over every round's deposit history; bounded by circleMembers.length
+    // (<= MAX_MEMBERS), same bound decommission's refund loop already relies on
+    uint256 _length = _circleMembers.length;
+    for (uint256 r = 0; r < _length; r++) {
+      uint256 _amount = roundDeposits[_id][r][_oldMember];
+      if (_amount == 0) continue;
+
+      roundDeposits[_id][r][_newMember] = _amount;
+      roundDeposits[_id][r][_oldMember] = 0;
+    }
+
+    if (_circle.owner == _oldMember) _circle.owner = _newMember;
+
+    // Drop the id from the old member's circle list (order is not meaningful here)
+    uint256[] storage _oldIds = memberCircles[_oldMember];
+    for (uint256 i = 0; i < _oldIds.length; i++) {
+      if (_oldIds[i] == _id) {
+        _oldIds[i] = _oldIds[_oldIds.length - 1];
+        _oldIds.pop();
+        break;
+      }
+    }
+    memberCircles[_newMember].push(_id);
+
+    emit MemberMigrated(_id, _oldMember, _newMember);
+  }
+
+  /// @inheritdoc ISavingCircles
   function getCircle(uint256 _id) external view override onlyExisting(_id) returns (Circle memory _circle) {
     _circle = circles[_id];
     _circle.currentIndex = _currentRoundIndex(_circle);
