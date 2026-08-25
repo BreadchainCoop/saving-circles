@@ -153,7 +153,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /// @inheritdoc ISavingCircles
-  function decommission(uint256 _id) external override nonReentrant onlyActive(_id) onlyMember(_id, msg.sender) {
+  function decommission(uint256 _id) external virtual override nonReentrant onlyActive(_id) onlyMember(_id, msg.sender) {
     if (!_isDecommissionable(_id)) revert NotDecommissionable();
 
     address token = circles[_id].token;
@@ -379,7 +379,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
    * @dev Make a withdrawal from a specified circle.
    *      Anyone can trigger the payout for a valid member whose turn is withdrawable.
    */
-  function _withdraw(uint256 _id, address _member) internal onlyMember(_id, _member) {
+  function _withdraw(uint256 _id, address _member) internal virtual onlyMember(_id, _member) {
     Circle storage _circle = circles[_id];
 
     if (!_claimable(_id, _member)) revert NotWithdrawable();
@@ -406,7 +406,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     uint256 _id,
     uint256 _value,
     address _member
-  ) internal onlyCommissioned(_id) onlyMember(_id, _member) {
+  ) internal virtual onlyCommissioned(_id) onlyMember(_id, _member) {
     Circle memory _circle = circles[_id];
 
     if (block.timestamp < circles[_id].effectiveCircleStartTime) {
