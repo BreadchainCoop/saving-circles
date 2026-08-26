@@ -2,7 +2,15 @@
   "contracts": [
     {
       "contract": "src/contracts/SavingCircles.sol:SavingCircles"
+    },
+    {
+      "contract": "src/contracts/AccumulatingSavingCircles.sol:AccumulatingSavingCircles"
+    },
+    {
+      "contract": "src/contracts/GoalSavingCircles.sol:GoalSavingCircles"
+    },
+    {
+      "contract": "src/contracts/CollectiveFundCircles.sol:CollectiveFundCircles"
     }
   ]
 }
-

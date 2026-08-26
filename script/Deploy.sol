@@ -8,7 +8,8 @@ contract Deploy is Common {
     address admin = vm.envAddress('ADMIN_ADDRESS');
     vm.startBroadcast();
 
-    _deployContracts(admin);
+    Deployment memory deployment = _deployAll(admin);
+    _allowlistToken(deployment, _tokenToAllowlist());
 
     vm.stopBroadcast();
   }
