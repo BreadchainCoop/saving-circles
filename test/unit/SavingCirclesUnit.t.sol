@@ -807,7 +807,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
     address invitee = STRANGER;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey, invitee);
 
     vm.prank(invitee);
     vm.expectEmit(true, true, true, true);
@@ -828,7 +828,8 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     uint256 circleId = _createInviteCircle();
     uint256 otherCircleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signatureForOtherCircle = _signInvite(address(savingCircles), otherCircleId, nonce, _ownerPrivateKey);
+    bytes memory signatureForOtherCircle =
+      _signInvite(address(savingCircles), otherCircleId, nonce, _ownerPrivateKey, STRANGER);
 
     vm.prank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidSigner.selector));
@@ -838,7 +839,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   function test_RedeemInvitePreventsNonceReplay() external {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey, STRANGER);
 
     vm.prank(STRANGER);
     savingCircles.redeemInvite(circleId, nonce, signature);
@@ -852,7 +853,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   function test_RedeemInviteRejectsExistingMember() external {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey, alice);
 
     vm.prank(alice);
     savingCircles.redeemInvite(circleId, nonce, signature);
@@ -860,7 +861,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     vm.prank(alice);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyMember.selector));
     savingCircles.redeemInvite(
-      circleId, nonce + 1, _signInvite(address(savingCircles), circleId, nonce + 1, _ownerPrivateKey)
+      circleId, nonce + 1, _signInvite(address(savingCircles), circleId, nonce + 1, _ownerPrivateKey, alice)
     );
   }
 
@@ -872,7 +873,7 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   function test_RedeemInviteRejectsActiveCircle() external {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey, alice);
 
     vm.prank(alice);
     savingCircles.redeemInvite(circleId, nonce, signature);
@@ -883,18 +884,49 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     vm.prank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.AlreadyActive.selector));
     savingCircles.redeemInvite(
-      circleId, nonce + 1, _signInvite(address(savingCircles), circleId, nonce + 1, _ownerPrivateKey)
+      circleId, nonce + 1, _signInvite(address(savingCircles), circleId, nonce + 1, _ownerPrivateKey, STRANGER)
     );
   }
 
   function test_RedeemInviteRejectsNonOwnerSignature() external {
     uint256 circleId = _createInviteCircle();
     uint256 nonce = 1;
-    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _nonOwnerPrivateKey);
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _nonOwnerPrivateKey, STRANGER);
 
     vm.prank(STRANGER);
     vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidSigner.selector));
     savingCircles.redeemInvite(circleId, nonce, signature);
+  }
+
+  /// @dev Address-bound invite: a signature issued for `alice` cannot be redeemed by a
+  ///      different address (STRANGER). The signature digest encodes the recipient, so
+  ///      recovering the signer from a mismatched sender yields a different address,
+  ///      triggering InvalidSigner.
+  function test_RedeemInviteRejectsWrongSender() external {
+    uint256 circleId = _createInviteCircle();
+    uint256 nonce = 1;
+    // Sign the invite specifically for alice
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey, alice);
+
+    // STRANGER attempts to redeem an invite that was bound to alice — must revert
+    vm.prank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(ISavingCircles.InvalidSigner.selector));
+    savingCircles.redeemInvite(circleId, nonce, signature);
+  }
+
+  /// @dev Address-bound invite: the correct recipient can always redeem their own invite.
+  function test_RedeemInviteAcceptsCorrectRecipient() external {
+    uint256 circleId = _createInviteCircle();
+    uint256 nonce = 1;
+    // Sign the invite specifically for alice
+    bytes memory signature = _signInvite(address(savingCircles), circleId, nonce, _ownerPrivateKey, alice);
+
+    vm.prank(alice);
+    vm.expectEmit(true, true, true, true);
+    emit ISavingCircles.InviteRedeemed(circleId, alice);
+    savingCircles.redeemInvite(circleId, nonce, signature);
+
+    assertTrue(savingCircles.isMember(circleId, alice));
   }
 
   function test_StartWhenMembersCountIsLessThanTwo() external {

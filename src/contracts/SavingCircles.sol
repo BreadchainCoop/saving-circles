@@ -31,7 +31,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   uint256 public constant MINIMUM_MEMBERS = 2;
   string private constant _EIP712_NAME = 'StacksInvite';
   string private constant _EIP712_VERSION = '1';
-  bytes32 private constant _INVITE_TYPEHASH = keccak256('Invite(uint256 id,uint256 nonce)');
+  bytes32 private constant _INVITE_TYPEHASH = keccak256('Invite(uint256 id,uint256 nonce,address recipient)');
 
   uint256 public nextId;
   mapping(uint256 id => Circle circle) public circles;
@@ -195,7 +195,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     if (isMember[_id][msg.sender]) revert AlreadyMember();
     if (isActive[_id]) revert AlreadyActive();
 
-    bytes32 _digest = _hashInvite(_id, _nonce);
+    bytes32 _digest = _hashInvite(_id, _nonce, msg.sender);
     address _signer = ECDSA.recover(_digest, _signature);
 
     if (_signer != _circle.owner) revert InvalidSigner();
@@ -534,11 +534,13 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   /**
-   * @dev Computes the EIP-712 hash for an invite
-   * @notice _INVITE_TYPEHASH is keccak256('Invite(uint256 id,uint256 nonce)')
+   * @dev Computes the EIP-712 hash for an address-bound invite
+   * @notice _INVITE_TYPEHASH is keccak256('Invite(uint256 id,uint256 nonce,address recipient)')
+   *         The recipient field binds the invite to a specific address, preventing front-running
+   *         or interception by a third party who obtains the signed invite.
    */
-  function _hashInvite(uint256 _id, uint256 _nonce) private view returns (bytes32) {
-    bytes32 _structHash = keccak256(abi.encode(_INVITE_TYPEHASH, _id, _nonce));
+  function _hashInvite(uint256 _id, uint256 _nonce, address _recipient) private view returns (bytes32) {
+    bytes32 _structHash = keccak256(abi.encode(_INVITE_TYPEHASH, _id, _nonce, _recipient));
     return _hashTypedDataV4(_structHash);
   }
 }

@@ -27,10 +27,12 @@ abstract contract SavingCirclesTestBase is Test {
     address _savingCircles,
     uint256 _circleId,
     uint256 _nonce,
-    uint256 _signerKey
+    uint256 _signerKey,
+    address _recipient
   ) internal view returns (bytes memory) {
-    bytes32 inviteTypehash = 0xd86e498a74dbfe863d870d4811dddab9c7f3922d6c0d6656504984bd9a8607a3;
-    bytes32 structHash = keccak256(abi.encode(inviteTypehash, _circleId, _nonce));
+    // keccak256('Invite(uint256 id,uint256 nonce,address recipient)')
+    bytes32 inviteTypehash = keccak256('Invite(uint256 id,uint256 nonce,address recipient)');
+    bytes32 structHash = keccak256(abi.encode(inviteTypehash, _circleId, _nonce, _recipient));
     bytes32 eip712DomainTypehash = 0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f;
     bytes32 inviteDomainNameHash = 0xf50d3e48fa87e894899f86eba14c57c836bc6ffddd68251a158269ffdadc0cb1;
     bytes32 inviteDomainVersionHash = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6;
@@ -56,7 +58,7 @@ abstract contract SavingCirclesTestBase is Test {
       address member = _members[i];
       if (member == _owner) continue;
 
-      bytes memory signature = _signInvite(address(_savingCircles), _circleId, nonce, _ownerKey);
+      bytes memory signature = _signInvite(address(_savingCircles), _circleId, nonce, _ownerKey, member);
       vm.prank(member);
       _savingCircles.redeemInvite(_circleId, nonce, signature);
       nonce++;
