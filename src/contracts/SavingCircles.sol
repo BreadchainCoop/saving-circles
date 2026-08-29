@@ -541,4 +541,12 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     bytes32 _structHash = keccak256(abi.encode(_INVITE_TYPEHASH, _id, _nonce));
     return _hashTypedDataV4(_structHash);
   }
+
+  /**
+   * @dev Reserved storage gap for future upgrades.
+   *      Follows the OpenZeppelin upgradeable contract convention of reserving
+   *      50 storage slots so that new state variables can be added in future
+   *      implementation versions without shifting existing storage layout.
+   */
+  uint256[50] private __gap;
 }
