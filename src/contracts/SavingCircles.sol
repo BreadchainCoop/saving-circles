@@ -163,19 +163,24 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     isActive[_id] = false;
     isDecommissioned[_id] = true;
 
-    // Return all funds still held by the contract to the members who deposited them.
+    // Aggregate refunds per depositor across all unclaimed rounds to minimise
+    // external calls. Each safeTransfer costs ~20k gas, so batching is significant. (#120)
+    uint256[] memory refunds = new uint256[](membersLength);
+
     for (uint256 r = 0; r < membersLength; r++) {
-      address recipient = members[r];
-      if (_memberStates[_id][recipient].hasClaimed) continue; // round already paid out
+      if (_memberStates[_id][members[r]].hasClaimed) continue; // round already paid out
 
       for (uint256 i = 0; i < membersLength; i++) {
-        address member = members[i];
-        uint256 amount = roundDeposits[_id][r][member];
+        uint256 amount = roundDeposits[_id][r][members[i]];
         if (amount == 0) continue;
+        refunds[i] += amount;
+      }
+    }
 
-        roundDeposits[_id][r][member] = 0;
-
-        IERC20(token).safeTransfer(member, amount);
+    // Single transfer per member
+    for (uint256 i = 0; i < membersLength; i++) {
+      if (refunds[i] > 0) {
+        IERC20(token).safeTransfer(members[i], refunds[i]);
       }
     }
 
