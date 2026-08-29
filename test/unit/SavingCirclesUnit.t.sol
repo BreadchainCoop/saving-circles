@@ -9,6 +9,7 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SavingCircles} from 'src/contracts/SavingCircles.sol';
 import {ISavingCircles} from 'src/interfaces/ISavingCircles.sol';
 import {MockERC20} from 'test/mocks/MockERC20.sol';
+import {MockFeeOnTransferERC20} from 'test/mocks/MockFeeOnTransferERC20.sol';
 import {SavingCirclesTestBase} from 'test/utils/SavingCirclesTestBase.t.sol';
 
 contract SavingCirclesUnit is SavingCirclesTestBase {
@@ -177,10 +178,11 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   }
 
   function test_DepositWhenParametersAreValid() external {
-    vm.startPrank(alice);
+    // Use real token transfers to work with balance-before/after pattern
+    token.mint(alice, DEPOSIT_AMOUNT);
 
-    // Mock token transfer
-    vm.mockCall(address(token), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
+    vm.startPrank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
 
     // Expect deposit event
     vm.expectEmit(true, true, true, true);
@@ -193,6 +195,33 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
     assertEq(balance, DEPOSIT_AMOUNT);
 
     vm.stopPrank();
+  }
+
+  function test_DepositFeeOnTransferTokenCreditsNetAmount() external {
+    // Deploy a fee-on-transfer token (1% fee)
+    MockFeeOnTransferERC20 feeToken = new MockFeeOnTransferERC20('Fee Token', 'FEE', 100);
+
+    // Create a circle with the fee token
+    vm.prank(owner);
+    savingCircles.setTokenAllowed(address(feeToken), true);
+
+    ISavingCircles.Circle memory feeCircle = _defaultCircle(alice, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(feeToken));
+    uint256 feeCircleId = _createCircleWithMembers(savingCircles, feeCircle, members, _alicePrivateKey);
+
+    // Mint enough tokens (need extra to cover the fee)
+    uint256 sendAmount = DEPOSIT_AMOUNT; // 1 ether, but 1% fee means only 0.99 ether received
+    feeToken.mint(alice, sendAmount);
+
+    vm.startPrank(alice);
+    feeToken.approve(address(savingCircles), sendAmount);
+    savingCircles.deposit(feeCircleId, sendAmount);
+    vm.stopPrank();
+
+    // The contract should credit only the net received amount (99% of 1 ether)
+    uint256 expectedNet = sendAmount - (sendAmount * 100 / 10_000); // 0.99 ether
+    uint256 balance = savingCircles.balances(feeCircleId, alice);
+    assertEq(balance, expectedNet, 'Balance should reflect net received after fee');
+    assertLt(balance, DEPOSIT_AMOUNT, 'Balance should be less than nominal deposit for fee tokens');
   }
 
   function test_DepositWhenDepositPeriodHasPassed() external {
@@ -487,18 +516,23 @@ contract SavingCirclesUnit is SavingCirclesTestBase {
   }
 
   function test_WithdrawWhenUserHasAlreadyClaimed() external {
-    // Complete deposits
-    vm.mockCall(address(token), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
+    // Complete deposits with real token transfers
+    token.mint(alice, DEPOSIT_AMOUNT);
+    token.mint(bob, DEPOSIT_AMOUNT);
+    token.mint(carol, DEPOSIT_AMOUNT);
 
     vm.startPrank(alice);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
     savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     vm.startPrank(bob);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
     savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 
     vm.startPrank(carol);
+    token.approve(address(savingCircles), DEPOSIT_AMOUNT);
     savingCircles.deposit(baseCircleId, DEPOSIT_AMOUNT);
     vm.stopPrank();
 

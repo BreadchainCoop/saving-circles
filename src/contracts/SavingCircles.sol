@@ -427,18 +427,22 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
       }
     }
 
-    uint256 depositedSoFar = roundDeposits[_id][currentRound][_member];
-    if (depositedSoFar + _value > _circle.depositAmount) revert ExceedsDepositAmount();
+    // Use balance-before / balance-after to support fee-on-transfer tokens (#122).
+    // Only the net amount actually received is credited to the depositor.
+    uint256 balBefore = IERC20(_circle.token).balanceOf(address(this));
+    IERC20(_circle.token).safeTransferFrom(msg.sender, address(this), _value);
+    uint256 received = IERC20(_circle.token).balanceOf(address(this)) - balBefore;
 
-    uint256 newTotal = depositedSoFar + _value;
+    uint256 depositedSoFar = roundDeposits[_id][currentRound][_member];
+    if (depositedSoFar + received > _circle.depositAmount) revert ExceedsDepositAmount();
+
+    uint256 newTotal = depositedSoFar + received;
     roundDeposits[_id][currentRound][_member] = newTotal;
 
     _memberStates[_id][_member].lastDepositRound = currentRound;
     balances[_id][_member] = newTotal;
 
-    IERC20(_circle.token).safeTransferFrom(msg.sender, address(this), _value);
-
-    emit FundsDeposited(_id, _member, _value);
+    emit FundsDeposited(_id, _member, received);
   }
 
   /**
