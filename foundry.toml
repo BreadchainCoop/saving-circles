@@ -9,6 +9,8 @@ multiline_func_header = 'params_first_multi'
 sort_imports = true
 
 [profile.default]
+# Halmos cannot execute the vm.deployCode calls injected by dynamic test linking.
+dynamic_test_linking = false
 via_ir = true
 solc_version = '0.8.28'
 libs = ['node_modules', 'lib']
@@ -58,3 +60,9 @@ shrink_sequence = true
 gnosis = 'https://rpc.gnosis.gateway.fm'
 optimism = 'https://mainnet.optimism.io'
 sepolia = 'https://rpc.sepolia.io'
+celo = 'https://forno.celo.org'
+celo_sepolia = 'https://forno.celo-sepolia.celo-testnet.org'
+
+[etherscan]
+celo = {key = '${CELOSCAN_API_KEY}', chain = 42220, url = 'https://api.celoscan.io/api'}
+celo_sepolia = {key = '${ETHERSCAN_API_KEY}', chain = 11142220}

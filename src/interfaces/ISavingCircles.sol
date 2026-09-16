@@ -96,6 +96,20 @@ interface ISavingCircles {
    * @param redeemer The address of the redeemer
    */
   event InviteRedeemed(uint256 indexed id, address indexed redeemer);
+
+  /**
+   * @notice Emitted when the circle owner adds a member directly
+   * @param id The ID of the circle
+   * @param member The address of the added member
+   */
+  event MemberAdded(uint256 indexed id, address indexed member);
+
+  /**
+   * @notice Emitted when a member is removed from a circle before it starts
+   * @param id The ID of the circle
+   * @param member The address of the removed member
+   */
+  event MemberRemoved(uint256 indexed id, address indexed member);
   /**
    * @notice Emitted when a saving circle is started
    * @param id The ID of the circle
@@ -305,6 +319,25 @@ interface ISavingCircles {
    * @param signature The owner's EIP-712 signature
    */
   function redeemInvite(uint256 id, uint256 nonce, bytes calldata signature) external;
+
+  /**
+   * @notice Adds members to a circle directly, authorized by the caller being the circle owner
+   * @dev Signing-free alternative to redeemInvite for wallets without EIP-712 support (e.g. MiniPay).
+   *      Only callable by the circle owner while the circle has never started. Membership is
+   *      added WITHOUT the member's consent — members can decline via removeMember before start.
+   * @param id The ID of the Circle
+   * @param members The addresses to add as members
+   */
+  function addMembers(uint256 id, address[] calldata members) external;
+
+  /**
+   * @notice Removes a member from a circle that has never started
+   * @dev Callable by the circle owner (to undo a mistaken add) or by the member themselves
+   *      (to decline a pushed membership). The circle owner cannot be removed.
+   * @param id The ID of the Circle
+   * @param member The address to remove
+   */
+  function removeMember(uint256 id, address member) external;
 
   /**
    * @notice Get a single circle

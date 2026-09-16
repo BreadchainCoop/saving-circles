@@ -29,6 +29,9 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   }
 
   uint256 public constant MINIMUM_MEMBERS = 2;
+  /// @dev Total-member ceiling enforced on every join path (addMembers and
+  ///      redeemInvite), keeping the O(n^2) decommission refund loop bounded
+  uint256 public constant MAX_MEMBERS = 25;
   string private constant _EIP712_NAME = 'StacksInvite';
   string private constant _EIP712_VERSION = '1';
   bytes32 private constant _INVITE_TYPEHASH = keccak256('Invite(uint256 id,uint256 nonce)');
@@ -45,6 +48,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => mapping(address member => MemberState state)) internal _memberStates;
   mapping(uint256 id => mapping(uint256 round => mapping(address member => uint256 amount))) public roundDeposits;
   mapping(uint256 id => bool status) public override isDecommissioned;
+  /// @dev One-based reverse indexes for bounded history removal. Existing proxy memberships require migration.
+  mapping(address member => mapping(uint256 id => uint256 indexPlusOne)) private _memberCircleIndexPlusOne;
 
   /// @dev Requires circle exists and has not been decommissioned
   modifier onlyCommissioned(uint256 _id) {
@@ -104,6 +109,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     address owner = _circle.owner;
     isMember[_id][owner] = true;
     memberCircles[owner].push(_id);
+    _memberCircleIndexPlusOne[owner][_id] = memberCircles[owner].length;
     circleMembers[_id].push(owner);
     _memberStates[_id][owner].memberIndex = 0;
 
@@ -202,14 +208,93 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     usedNonces[_id][_nonce] = true;
 
-    // No max count validation, the owner issues a finite amount of invites
+    address[] storage _circleMembers = circleMembers[_id];
+    if (_circleMembers.length >= MAX_MEMBERS) revert InvalidMemberCount();
+
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
-    address[] storage _circleMembers = circleMembers[_id];
+    _memberCircleIndexPlusOne[msg.sender][_id] = memberCircles[msg.sender].length;
     _circleMembers.push(msg.sender);
     _memberStates[_id][msg.sender].memberIndex = _circleMembers.length - 1;
 
     emit InviteRedeemed(_id, msg.sender);
+  }
+
+  /// @inheritdoc ISavingCircles
+  function addMembers(uint256 _id, address[] calldata _members) external override nonReentrant onlyCommissioned(_id) {
+    Circle storage _circle = circles[_id];
+
+    // A direct call from the owner is the authorization — the signing-free
+    // counterpart to redeemInvite's EIP-712 check, for wallets (e.g. MiniPay)
+    // that cannot sign typed data.
+    if (msg.sender != _circle.owner) revert NotOwner();
+    // Never-started only: isActive alone would readmit finished circles
+    // (_withdraw resets it once everyone has claimed)
+    if (isActive[_id] || _circle.effectiveCircleStartTime != 0) revert AlreadyActive();
+    if (_members.length == 0) revert InvalidMemberCount();
+
+    address[] storage _circleMembers = circleMembers[_id];
+    if (_circleMembers.length + _members.length > MAX_MEMBERS) revert InvalidMemberCount();
+
+    for (uint256 i = 0; i < _members.length; i++) {
+      address _member = _members[i];
+
+      if (_member == address(0)) revert InvalidMemberAddress();
+      // Also catches duplicates within _members since isMember is set as we go
+      if (isMember[_id][_member]) revert AlreadyMember();
+
+      isMember[_id][_member] = true;
+      memberCircles[_member].push(_id);
+      _memberCircleIndexPlusOne[_member][_id] = memberCircles[_member].length;
+      _circleMembers.push(_member);
+      _memberStates[_id][_member].memberIndex = _circleMembers.length - 1;
+
+      emit MemberAdded(_id, _member);
+    }
+  }
+
+  /// @inheritdoc ISavingCircles
+  function removeMember(uint256 _id, address _member) external override nonReentrant onlyCommissioned(_id) {
+    Circle storage _circle = circles[_id];
+
+    // The owner can undo a mistaken add; the member themselves can decline a
+    // membership they never consented to. Pre-start only, so no deposits or
+    // payout accounting exist yet.
+    if (msg.sender != _circle.owner && msg.sender != _member) revert NotOwner();
+    if (isActive[_id] || _circle.effectiveCircleStartTime != 0) revert AlreadyActive();
+    if (_member == _circle.owner) revert InvalidMemberAddress();
+    if (!isMember[_id][_member]) revert NotMember();
+
+    isMember[_id][_member] = false;
+
+    // Splice out of circleMembers preserving payout order; reindex the tail
+    address[] storage _circleMembers = circleMembers[_id];
+    uint256 _index = _memberStates[_id][_member].memberIndex;
+    uint256 _length = _circleMembers.length;
+
+    for (uint256 i = _index; i + 1 < _length; i++) {
+      address _moved = _circleMembers[i + 1];
+      _circleMembers[i] = _moved;
+      _memberStates[_id][_moved].memberIndex = i;
+    }
+
+    _circleMembers.pop();
+    delete _memberStates[_id][_member];
+
+    // Drop the id from the member's circle list (order is not meaningful here)
+    uint256[] storage _ids = memberCircles[_member];
+
+    uint256 _historyIndex = _memberCircleIndexPlusOne[_member][_id] - 1;
+    uint256 _lastIndex = _ids.length - 1;
+    if (_historyIndex != _lastIndex) {
+      uint256 _movedId = _ids[_lastIndex];
+      _ids[_historyIndex] = _movedId;
+      _memberCircleIndexPlusOne[_member][_movedId] = _historyIndex + 1;
+    }
+    _ids.pop();
+    delete _memberCircleIndexPlusOne[_member][_id];
+
+    emit MemberRemoved(_id, _member);
   }
 
   /// @inheritdoc ISavingCircles
