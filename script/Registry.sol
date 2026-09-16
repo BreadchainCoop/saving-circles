@@ -15,6 +15,9 @@ address constant CELO_USDT = 0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e;
 address constant CELO_USDC = 0xcebA9300f2b948710d2653dD7B07f33A8B32118C;
 address constant CELO_USDM = 0x765DE816845861e75A25fCA122bb6898B8B1282a;
 
+// Tokens (Celo Sepolia Testnet) — MiniPay stablecoins
+address constant CELO_SEPOLIA_USDC = 0x01C5C0122039549AD1493B8220cABEdD739BC44E;
+
 // Curve Factory (Gnosis Chain)
 address constant GNOSIS_CURVE_STABLE_SWAP_FACTORY = 0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8;
 

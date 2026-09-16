@@ -5,6 +5,12 @@
       "chain_id": 11155111,
       "blockscout_url": "https://eth-sepolia.blockscout.com",
       "environment": "testnet"
+    },
+    {
+      "name": "celo-sepolia",
+      "chain_id": 11142220,
+      "blockscout_url": "https://celo-sepolia.blockscout.com",
+      "environment": "testnet"
     }
   ]
 }

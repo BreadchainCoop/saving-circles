@@ -59,6 +59,8 @@ gnosis = 'https://rpc.gnosis.gateway.fm'
 optimism = 'https://mainnet.optimism.io'
 sepolia = 'https://rpc.sepolia.io'
 celo = 'https://forno.celo.org'
+celo_sepolia = 'https://forno.celo-sepolia.celo-testnet.org'
 
 [etherscan]
 celo = {key = '${CELOSCAN_API_KEY}', chain = 42220, url = 'https://api.celoscan.io/api'}
+celo_sepolia = {key = '${ETHERSCAN_API_KEY}', chain = 11142220}
