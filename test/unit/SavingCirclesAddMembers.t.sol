@@ -305,6 +305,91 @@ contract SavingCirclesAddMembers is SavingCirclesTestBase {
     assertEq(savingCircles.memberIndex(circleId, carol), 3);
   }
 
+  function test_RemoveMemberUpdatesSwappedHistoryEntry() external {
+    vm.startPrank(alice);
+    savingCircles.addMembers(circleId, _one(bob));
+    uint256 secondId = savingCircles.create(baseCircle);
+    savingCircles.addMembers(secondId, _one(bob));
+    uint256 thirdId = savingCircles.create(baseCircle);
+    vm.stopPrank();
+
+    bytes memory signature = _signInvite(address(savingCircles), thirdId, 1, _alicePrivateKey);
+    vm.prank(bob);
+    savingCircles.redeemInvite(thirdId, 1, signature);
+
+    // Removing the middle entry moves the invite-based membership into its slot.
+    vm.prank(alice);
+    savingCircles.removeMember(secondId, bob);
+    uint256[] memory ids = savingCircles.getMemberCircles(bob);
+    assertEq(ids.length, 2);
+    assertEq(ids[0], circleId);
+    assertEq(ids[1], thirdId);
+    assertFalse(savingCircles.isMember(secondId, bob));
+    assertTrue(savingCircles.isMember(circleId, bob));
+    assertTrue(savingCircles.isMember(thirdId, bob));
+
+    vm.prank(bob);
+    savingCircles.removeMember(circleId, bob);
+    ids = savingCircles.getMemberCircles(bob);
+    assertEq(ids.length, 1);
+    assertEq(ids[0], thirdId);
+
+    vm.prank(bob);
+    savingCircles.removeMember(thirdId, bob);
+    assertEq(savingCircles.getMemberCircles(bob).length, 0);
+    assertFalse(savingCircles.isMember(circleId, bob));
+    assertFalse(savingCircles.isMember(thirdId, bob));
+  }
+
+  function test_RemoveMemberAfterRejoiningThroughEitherPath() external {
+    vm.prank(alice);
+    savingCircles.addMembers(circleId, _one(bob));
+    vm.prank(bob);
+    savingCircles.removeMember(circleId, bob);
+
+    bytes memory signature = _signInvite(address(savingCircles), circleId, 1, _alicePrivateKey);
+    vm.prank(bob);
+    savingCircles.redeemInvite(circleId, 1, signature);
+    assertEq(savingCircles.getMemberCircles(bob).length, 1);
+    vm.prank(bob);
+    savingCircles.removeMember(circleId, bob);
+    assertEq(savingCircles.getMemberCircles(bob).length, 0);
+
+    vm.prank(alice);
+    savingCircles.addMembers(circleId, _one(bob));
+    assertEq(savingCircles.getMemberCircles(bob).length, 1);
+    vm.prank(alice);
+    savingCircles.removeMember(circleId, bob);
+    assertEq(savingCircles.getMemberCircles(bob).length, 0);
+    assertFalse(savingCircles.isMember(circleId, bob));
+  }
+
+  function test_RemoveMemberWithInflatedOwnerHistoryUsesBoundedGas() external {
+    uint256 historyLength = 1024;
+    ISavingCircles.Circle memory spamCircle = _defaultCircle(bob, DEPOSIT_AMOUNT, DEPOSIT_INTERVAL, address(token));
+    uint256[] memory expectedIds = new uint256[](historyLength);
+
+    // An unrelated caller can grow bob's history without his consent or deposits.
+    vm.startPrank(STRANGER);
+    for (uint256 i = 0; i < historyLength; i++) {
+      expectedIds[i] = savingCircles.create(spamCircle);
+    }
+    vm.stopPrank();
+
+    vm.prank(alice);
+    savingCircles.addMembers(circleId, _one(bob));
+
+    // Bound execution gas, not refunded gas. A linear history scan exceeds this budget.
+    vm.prank(bob);
+    savingCircles.removeMember{gas: 200_000}(circleId, bob);
+
+    assertFalse(savingCircles.isMember(circleId, bob));
+    assertEq(savingCircles.getMemberCircles(bob), expectedIds);
+    assertEq(savingCircles.getCircleMembers(circleId).length, 1);
+    assertTrue(savingCircles.isMember(expectedIds[0], bob));
+    assertTrue(savingCircles.isMember(expectedIds[historyLength - 1], bob));
+  }
+
   function test_RemoveMemberByMemberThemselves() external {
     vm.prank(alice);
     savingCircles.addMembers(circleId, _one(bob));

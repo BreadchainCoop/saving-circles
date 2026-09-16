@@ -48,6 +48,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
   mapping(uint256 id => mapping(address member => MemberState state)) internal _memberStates;
   mapping(uint256 id => mapping(uint256 round => mapping(address member => uint256 amount))) public roundDeposits;
   mapping(uint256 id => bool status) public override isDecommissioned;
+  /// @dev One-based reverse indexes for bounded history removal. Existing proxy memberships require migration.
+  mapping(address member => mapping(uint256 id => uint256 indexPlusOne)) private _memberCircleIndexPlusOne;
 
   /// @dev Requires circle exists and has not been decommissioned
   modifier onlyCommissioned(uint256 _id) {
@@ -107,6 +109,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     address owner = _circle.owner;
     isMember[_id][owner] = true;
     memberCircles[owner].push(_id);
+    _memberCircleIndexPlusOne[owner][_id] = memberCircles[owner].length;
     circleMembers[_id].push(owner);
     _memberStates[_id][owner].memberIndex = 0;
 
@@ -210,6 +213,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
     isMember[_id][msg.sender] = true;
     memberCircles[msg.sender].push(_id);
+    _memberCircleIndexPlusOne[msg.sender][_id] = memberCircles[msg.sender].length;
     _circleMembers.push(msg.sender);
     _memberStates[_id][msg.sender].memberIndex = _circleMembers.length - 1;
 
@@ -241,6 +245,7 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
 
       isMember[_id][_member] = true;
       memberCircles[_member].push(_id);
+      _memberCircleIndexPlusOne[_member][_id] = memberCircles[_member].length;
       _circleMembers.push(_member);
       _memberStates[_id][_member].memberIndex = _circleMembers.length - 1;
 
@@ -279,13 +284,15 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     // Drop the id from the member's circle list (order is not meaningful here)
     uint256[] storage _ids = memberCircles[_member];
 
-    for (uint256 i = 0; i < _ids.length; i++) {
-      if (_ids[i] == _id) {
-        _ids[i] = _ids[_ids.length - 1];
-        _ids.pop();
-        break;
-      }
+    uint256 _historyIndex = _memberCircleIndexPlusOne[_member][_id] - 1;
+    uint256 _lastIndex = _ids.length - 1;
+    if (_historyIndex != _lastIndex) {
+      uint256 _movedId = _ids[_lastIndex];
+      _ids[_historyIndex] = _movedId;
+      _memberCircleIndexPlusOne[_member][_movedId] = _historyIndex + 1;
     }
+    _ids.pop();
+    delete _memberCircleIndexPlusOne[_member][_id];
 
     emit MemberRemoved(_id, _member);
   }
