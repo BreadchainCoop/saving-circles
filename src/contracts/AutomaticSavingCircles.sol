@@ -259,10 +259,9 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     // Check opt-in before fetching members while retaining the specific error for an invalid circle.
     if (!automaticClaimsEnabled[_circleId][_member]) revert AutomaticClaimsDisabled();
 
-    address[] memory members = SAVING_CIRCLES.getCircleMembers(_circleId);
-    (bool isMember, uint256 memberIndex) = _getMemberIndex(members, _member);
-
-    if (!isMember) revert ISavingCircles.NotMember();
+    // A non-member resolves to index 0 here, but `isMemberWithdrawable` inside the eligibility check
+    // rejects them, so no separate membership lookup is needed.
+    uint256 memberIndex = SAVING_CIRCLES.memberIndex(_circleId, _member);
     if (!_isEligibleForAutomatedClaim(_circleId, _circle, _member, memberIndex)) {
       revert ISavingCircles.NotWithdrawable();
     }
@@ -510,23 +509,6 @@ contract AutomaticSavingCircles is IAutomaticSavingCircles, Ownable, ReentrancyG
     for (uint256 i = 0; i < _members.length; i++) {
       if (_members[i] != _member) continue;
       return (true, _balances[i]);
-    }
-  }
-
-  /**
-   * @dev Looks up whether a member belongs to the supplied member snapshot and returns their index
-   * @param _members Snapshot of circle members
-   * @param _member Member being searched for
-   * @return isMember Whether the member was found in the snapshot
-   * @return memberIndex The member's zero-based index in the circle
-   */
-  function _getMemberIndex(
-    address[] memory _members,
-    address _member
-  ) internal pure returns (bool isMember, uint256 memberIndex) {
-    for (uint256 i = 0; i < _members.length; i++) {
-      if (_members[i] != _member) continue;
-      return (true, i);
     }
   }
 }
