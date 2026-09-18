@@ -623,6 +623,29 @@ contract AutomaticSavingCirclesUnit is SavingCirclesTestBase {
     assertFalse(savingCircles.hasClaimed(baseCircleId, alice));
   }
 
+  function test_BatchExecuteAutomatedClaims_ReportsNotWithdrawableForNonMember() external {
+    address outsider = makeAddr('outsider');
+    _depositRound(baseCircleId);
+    _enableAutomaticClaim(baseCircleId, outsider);
+
+    ISavingCircles.Circle memory circle = savingCircles.getCircle(baseCircleId);
+    vm.warp(circle.effectiveCircleStartTime + DEPOSIT_INTERVAL);
+
+    uint256[] memory circleIds = new uint256[](1);
+    address[] memory targetMembers = new address[](1);
+    circleIds[0] = baseCircleId;
+    targetMembers[0] = outsider;
+
+    vm.prank(automationExecutor);
+    vm.expectEmit(true, true, false, true, address(automaticSavingCircles));
+    emit IAutomaticSavingCircles.AutomatedClaimFailed(
+      baseCircleId, outsider, abi.encodeWithSelector(ISavingCircles.NotWithdrawable.selector)
+    );
+    automaticSavingCircles.batchExecuteAutomatedClaims(circleIds, targetMembers);
+
+    assertEq(token.balanceOf(outsider), 0);
+  }
+
   function test_BatchExecuteAutomatedClaims_ReportsUnknownCircleBeforeDisabledClaim() external {
     uint256 invalidCircleId = savingCircles.nextId();
     uint256[] memory circleIds = new uint256[](1);

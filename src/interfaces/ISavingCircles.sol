@@ -426,6 +426,16 @@ interface ISavingCircles {
   function isMemberWithdrawable(uint256 id, address member) external view returns (bool withdrawable);
 
   /**
+   * @notice Get a member's zero-based payout round in a circle
+   * @dev Returns 0 for addresses that are not members, indistinguishable from the first member.
+   *      Callers that need to tell them apart must also check membership.
+   * @param id The ID of the circle
+   * @param member The member to look up
+   * @return index The member's zero-based position in the payout order
+   */
+  function memberIndex(uint256 id, address member) external view returns (uint256 index);
+
+  /**
    * @notice Get the address of the withdrawable by
    * @param id The ID of the circle
    * @return currentRoundWithdrawer The address of the current round withdrawer

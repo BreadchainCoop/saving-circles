@@ -376,7 +376,8 @@ contract SavingCircles is ISavingCircles, ReentrancyGuardUpgradeable, OwnableUpg
     return _memberStates[_id][_member].lastDepositRound;
   }
 
-  function memberIndex(uint256 _id, address _member) external view returns (uint256 index) {
+  /// @inheritdoc ISavingCircles
+  function memberIndex(uint256 _id, address _member) external view override returns (uint256 index) {
     return _memberStates[_id][_member].memberIndex;
   }
 
