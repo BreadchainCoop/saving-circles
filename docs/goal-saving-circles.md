@@ -41,7 +41,10 @@ otherwise  → Funding            (locked, accepting deposits)
   deposits, so latecomers can still help overshoot.
 - **Success with a beneficiary**: `release` is permissionless once Funded, forever (no time
   limit), and pays the whole pot to the pre-agreed beneficiary. Contributions are left untouched
-  as historical receipts.
+  as historical receipts. `create` rejects this contract and the goal token as beneficiary, since a
+  release to either would strand the pot. A beneficiary whose transfer reverts (e.g. a token
+  denylist) blocks `release`, and once Funded there is no other exit; members should vet the
+  beneficiary before joining.
 - **Success without a beneficiary** (commitment-savings mode): each member simply `withdraw`s
   exactly what they put in. The `goalReached` latch never clears, even if withdrawals drop the
   live pot below `goalAmount` — "the goal was achieved" is a historical fact, and re-locking

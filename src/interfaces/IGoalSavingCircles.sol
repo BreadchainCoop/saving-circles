@@ -130,6 +130,10 @@ interface IGoalSavingCircles {
   /// @notice Thrown when creating a goal with deadline <= block.timestamp.
   error InvalidDeadline();
 
+  /// @notice Thrown when creating a goal whose beneficiary is this contract or the goal token,
+  ///         where a release would strand the pot with no way to recover it.
+  error InvalidBeneficiary();
+
   /// @notice Thrown when the goal id does not exist.
   error GoalNotFound();
 
@@ -195,7 +199,8 @@ interface IGoalSavingCircles {
    * @param goalAmount Funding target, must be > 0. Overshooting deposits are allowed.
    * @param deadline Unix timestamp, must be > block.timestamp. Deposits close at the deadline.
    * @param beneficiary Pot recipient on success, or address(0) for commitment-savings mode
-   *        (members reclaim their own contributions on success).
+   *        (members reclaim their own contributions on success). Must not be this contract or the
+   *        token itself.
    * @return id The id of the new goal.
    */
   function create(

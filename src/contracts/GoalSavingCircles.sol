@@ -90,6 +90,7 @@ contract GoalSavingCircles is IGoalSavingCircles, ReentrancyGuardUpgradeable, Ow
     if (!allowedTokens[_token]) revert TokenNotAllowed();
     if (_goalAmount == 0) revert InvalidGoalAmount();
     if (_deadline <= block.timestamp) revert InvalidDeadline();
+    if (_beneficiary == address(this) || _beneficiary == _token) revert InvalidBeneficiary();
 
     _id = nextId++;
 

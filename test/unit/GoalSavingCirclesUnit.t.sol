@@ -229,6 +229,18 @@ contract GoalSavingCirclesUnit is Test {
     goalCircles.create(address(token), GOAL_AMOUNT, block.timestamp, beneficiary);
   }
 
+  function test_CreateGoalWhenBeneficiaryIsGoalContract() public {
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.InvalidBeneficiary.selector));
+    goalCircles.create(address(token), GOAL_AMOUNT, block.timestamp + DURATION, address(goalCircles));
+  }
+
+  function test_CreateGoalWhenBeneficiaryIsToken() public {
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.InvalidBeneficiary.selector));
+    goalCircles.create(address(token), GOAL_AMOUNT, block.timestamp + DURATION, address(token));
+  }
+
   function test_CreateGoalWithZeroBeneficiary() public {
     uint256 id = _createGoal(address(0));
     assertEq(goalCircles.getGoal(id).beneficiary, address(0));
