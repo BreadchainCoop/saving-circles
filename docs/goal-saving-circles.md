@@ -12,11 +12,12 @@ produced it; this is the short version for reviewers.
 ## 0. What problem it solves
 
 Saving alone is hard; the commitment device of a group with a shared, visible target makes it
-easier. The organizer creates the goal and invites members with the same signed `StacksInvite`
-links the app already uses for `SavingCircles`. Members deposit whatever they can, whenever they
-can. Until the goal resolves, the money is locked — that lock IS the product. This is deliberately
-the simplest stack type: no credit, no interest, no auctions, no rounds, and **no division
-anywhere** — the contract only ever adds and subtracts exact deposit amounts.
+easier. The organizer creates the goal and brings members in either with the same signed
+`StacksInvite` links the app already uses for `SavingCircles`, or by adding them directly with
+`addMembers`. Members deposit whatever they can, whenever they can. Until the goal resolves, the
+money is locked — that lock IS the product. This is deliberately the simplest stack type: no
+credit, no interest, no auctions, no rounds, and **no division anywhere** — the contract only ever
+adds and subtracts exact deposit amounts.
 
 ## 1. The mechanism
 
@@ -39,6 +40,17 @@ otherwise  → Funding            (locked, accepting deposits)
   nonce)` typehash — identical to `SavingCircles`, differing only by `verifyingContract`, so the
   app's invite flow ports unchanged. Nonces are per-goal. Joins share the same "open" predicate as
   deposits, so latecomers can still help overshoot.
+- **Direct adds** (`addMembers(id, members)`): the goal owner adds a batch of members in one
+  transaction, with no signature involved. It is the counterpart to `redeemInvite` for flows where
+  the owner shares a single link, visitors ask to join off-chain, and the owner then adds them
+  on-chain. It writes exactly what `redeemInvite` writes, so `isMember`, `getGoalMembers`,
+  `getMemberGoals` and `getMemberContributions` cannot tell the two paths apart, and it emits
+  `MemberAdded(id, member)` per added member. It requires the same "open" predicate as
+  `redeemInvite` and deposits (`GoalNotFound` / `GoalNotOpen`), the caller to be the goal owner
+  (`NotOwner`), and every address to be non-zero (`InvalidMemberAddress`) and not already a member
+  (`AlreadyMember`, which also rejects duplicates within the batch). Any violation reverts the
+  whole batch. **Signed invites remain fully supported**: `redeemInvite`, per-goal nonces and the
+  EIP-712 domain are unchanged, and both paths can be mixed on the same goal.
 - **Success with a beneficiary**: `release` is permissionless once Funded, forever (no time
   limit), and pays the whole pot to the pre-agreed beneficiary. Contributions are left untouched
   as historical receipts. `create` rejects this contract and the goal token as beneficiary, since a
@@ -73,14 +85,22 @@ Failed and deposits/joins revert.
   locked until the deadline, then fully refundable).
 - **Latch monotonicity:** `goalReached`, `cancelled`, `released` transition false→true only;
   Cancelled and Released are terminal; Failed is terminal because deposits close at the deadline.
-- **No custody for anyone:** the goal owner can only sign invites and cancel (which never
-  redirects funds); the registry admin only gates which tokens NEW goals may use (allowlist
+- **No custody for anyone:** the goal owner can only sign invites, add members and cancel (none of
+  which redirects funds: an added member starts at zero contribution and nothing is pulled from
+  them); the registry admin only gates which tokens NEW goals may use (allowlist
   changes never affect existing goals, which store their token).
 
 ## 3. Decisions worth defending
 
 - **`msg.sender` is the goal owner** (no `owner` parameter at create): the owner's only powers
-  are invites and cancel; third-party appointment adds checks for zero product value.
+  are invites, direct member adds and cancel; third-party appointment adds checks for zero product
+  value.
+- **`addMembers` needs no consent and has no cap or removal:** added members are not asked, but
+  joining costs them nothing (no tokens move, and they can only ever withdraw their own
+  contributions), so the only effect is their address appearing on the roster. There is no member
+  cap, matching `redeemInvite`: no state-changing function loops over the roster, only the
+  `getMemberContributions` view does. Unlike `SavingCircles`, there is no `removeMember`; an added member who does not want to
+  participate simply never deposits.
 - **Overshoot allowed** rather than clamping the crossing deposit: clamping needs a
   partial-refund branch or exact-remainder UX; overshoot is strictly simpler, strictly better for
   the beneficiary, and harmless in no-beneficiary mode.
@@ -95,9 +115,10 @@ Failed and deposits/joins revert.
 
 ## 4. Implementation scope (v1)
 
-Implemented: invite-only membership, flexible deposits with the `GoalReached` latch, both success
-modes (beneficiary release / commitment-savings withdrawal), failure refunds, owner cancellation,
-and the full view surface — behind an OZ v5 `TransparentUpgradeableProxy`, with ~80 unit tests in
+Implemented: owner-controlled membership (signed invites and direct `addMembers`), flexible
+deposits with the `GoalReached` latch, both success modes (beneficiary release /
+commitment-savings withdrawal), failure refunds, owner cancellation, and the full view surface —
+behind an OZ v5 `TransparentUpgradeableProxy`, with ~100 unit tests in
 `test/unit/GoalSavingCirclesUnit.t.sol` covering every revert branch, state transition, and
 boundary.
 

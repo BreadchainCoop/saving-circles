@@ -121,6 +121,26 @@ contract GoalSavingCircles is IGoalSavingCircles, ReentrancyGuardUpgradeable, Ow
   }
 
   /// @inheritdoc IGoalSavingCircles
+  function addMembers(
+    uint256 _id,
+    address[] calldata _members
+  ) external override nonReentrant onlyExisting(_id) onlyOpen(_id) {
+    if (msg.sender != goals[_id].owner) revert NotOwner();
+
+    for (uint256 _i = 0; _i < _members.length; _i++) {
+      address _member = _members[_i];
+
+      if (_member == address(0)) revert InvalidMemberAddress();
+      // Also catches duplicates within _members since isMember is set as we go
+      if (isMember[_id][_member]) revert AlreadyMember();
+
+      _addMember(_id, _member);
+
+      emit MemberAdded(_id, _member);
+    }
+  }
+
+  /// @inheritdoc IGoalSavingCircles
   function deposit(uint256 _id, uint256 _value) external override nonReentrant {
     _deposit(_id, msg.sender, _value);
   }

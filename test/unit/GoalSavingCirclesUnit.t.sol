@@ -360,6 +360,312 @@ contract GoalSavingCirclesUnit is Test {
   }
 
   // ==========================================================================
+  // addMembers
+  // ==========================================================================
+
+  function test_AddMembersWhenAddingOneMember() public {
+    uint256 id = _createGoal(beneficiary);
+    address[] memory members = new address[](1);
+    members[0] = bob;
+
+    vm.expectEmit(true, true, true, true);
+    emit IGoalSavingCircles.MemberAdded(id, bob);
+    vm.prank(alice);
+    goalCircles.addMembers(id, members);
+
+    assertTrue(goalCircles.isMember(id, bob));
+    address[] memory roster = goalCircles.getGoalMembers(id);
+    assertEq(roster.length, 2);
+    assertEq(roster[0], alice);
+    assertEq(roster[1], bob);
+    uint256[] memory ids = goalCircles.getMemberGoals(bob);
+    assertEq(ids.length, 1);
+    assertEq(ids[0], id);
+    (address[] memory listed, uint256[] memory amounts) = goalCircles.getMemberContributions(id);
+    assertEq(listed[1], bob);
+    assertEq(amounts[1], 0);
+  }
+
+  function test_AddMembersWhenAddingSeveralMembers() public {
+    uint256 id = _createGoal(beneficiary);
+    address[] memory members = new address[](3);
+    members[0] = bob;
+    members[1] = carol;
+    members[2] = dave;
+
+    vm.expectEmit(true, true, true, true);
+    emit IGoalSavingCircles.MemberAdded(id, bob);
+    vm.expectEmit(true, true, true, true);
+    emit IGoalSavingCircles.MemberAdded(id, carol);
+    vm.expectEmit(true, true, true, true);
+    emit IGoalSavingCircles.MemberAdded(id, dave);
+    vm.prank(alice);
+    goalCircles.addMembers(id, members);
+
+    address[] memory roster = goalCircles.getGoalMembers(id);
+    assertEq(roster.length, 4);
+    assertEq(roster[0], alice);
+    assertEq(roster[1], bob); // array order is preserved
+    assertEq(roster[2], carol);
+    assertEq(roster[3], dave);
+    for (uint256 i = 0; i < members.length; i++) {
+      assertTrue(goalCircles.isMember(id, members[i]));
+      uint256[] memory ids = goalCircles.getMemberGoals(members[i]);
+      assertEq(ids.length, 1);
+      assertEq(ids[0], id);
+    }
+  }
+
+  function test_AddMembersMatchesRedeemInviteStorage() public {
+    uint256 id = _createGoal(beneficiary);
+    _join(id, bob, 1);
+    address[] memory members = new address[](1);
+    members[0] = carol;
+    vm.prank(alice);
+    goalCircles.addMembers(id, members);
+
+    // An invited member and an added member are indistinguishable through the views
+    (address[] memory listed, uint256[] memory amounts) = goalCircles.getMemberContributions(id);
+    assertEq(listed.length, 3);
+    assertEq(listed[1], bob);
+    assertEq(listed[2], carol);
+    assertEq(amounts[1], amounts[2]);
+    assertEq(goalCircles.getMemberGoals(bob).length, goalCircles.getMemberGoals(carol).length);
+    assertEq(goalCircles.isMember(id, bob), goalCircles.isMember(id, carol));
+  }
+
+  function test_AddMembersWhenCallerIsNotGoalOwner() public {
+    uint256 id = _createGoalWithMembers(beneficiary);
+    address[] memory members = new address[](1);
+    members[0] = dave;
+
+    // Neither a plain member nor a stranger can add
+    vm.prank(bob);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.NotOwner.selector));
+    goalCircles.addMembers(id, members);
+
+    vm.prank(dave);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.NotOwner.selector));
+    goalCircles.addMembers(id, members);
+
+    // The registry admin has no say over a goal's roster
+    vm.prank(owner);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.NotOwner.selector));
+    goalCircles.addMembers(id, members);
+
+    assertFalse(goalCircles.isMember(id, dave));
+  }
+
+  function test_AddMembersWhenGoalDoesNotExist() public {
+    address[] memory members = new address[](1);
+    members[0] = bob;
+
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.GoalNotFound.selector));
+    goalCircles.addMembers(999, members);
+  }
+
+  function test_AddMembersWhenGoalFailed() public {
+    uint256 id = _createGoal(beneficiary);
+    vm.warp(block.timestamp + DURATION);
+    assertEq(uint8(goalCircles.goalState(id)), uint8(IGoalSavingCircles.GoalState.Failed));
+
+    address[] memory members = new address[](1);
+    members[0] = bob;
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.GoalNotOpen.selector));
+    goalCircles.addMembers(id, members);
+  }
+
+  function test_AddMembersWhenCancelled() public {
+    uint256 id = _createGoal(beneficiary);
+    vm.prank(alice);
+    goalCircles.cancel(id);
+
+    address[] memory members = new address[](1);
+    members[0] = bob;
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.GoalNotOpen.selector));
+    goalCircles.addMembers(id, members);
+  }
+
+  function test_AddMembersWhenReleased() public {
+    uint256 id = _createGoal(beneficiary);
+    _deposit(id, alice, GOAL_AMOUNT);
+    goalCircles.release(id);
+
+    address[] memory members = new address[](1);
+    members[0] = bob;
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.GoalNotOpen.selector));
+    goalCircles.addMembers(id, members);
+  }
+
+  function test_AddMembersWhenFundedPastDeadline() public {
+    uint256 id = _createGoal(beneficiary);
+    _deposit(id, alice, GOAL_AMOUNT);
+    vm.warp(block.timestamp + DURATION);
+    assertEq(uint8(goalCircles.goalState(id)), uint8(IGoalSavingCircles.GoalState.Funded));
+
+    address[] memory members = new address[](1);
+    members[0] = bob;
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.GoalNotOpen.selector));
+    goalCircles.addMembers(id, members);
+  }
+
+  function test_AddMembersWhenFundedBeforeDeadline() public {
+    uint256 id = _createGoal(beneficiary);
+    _deposit(id, alice, GOAL_AMOUNT);
+    assertEq(uint8(goalCircles.goalState(id)), uint8(IGoalSavingCircles.GoalState.Funded));
+
+    address[] memory members = new address[](1);
+    members[0] = bob;
+    vm.prank(alice);
+    goalCircles.addMembers(id, members);
+
+    assertTrue(goalCircles.isMember(id, bob));
+  }
+
+  function test_AddMembersWhenAlreadyMember() public {
+    uint256 id = _createGoalWithMembers(beneficiary);
+    address[] memory members = new address[](1);
+    members[0] = bob;
+
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.AlreadyMember.selector));
+    goalCircles.addMembers(id, members);
+  }
+
+  function test_AddMembersWhenOwnerIsInList() public {
+    uint256 id = _createGoal(beneficiary);
+    address[] memory members = new address[](1);
+    members[0] = alice;
+
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.AlreadyMember.selector));
+    goalCircles.addMembers(id, members);
+  }
+
+  function test_AddMembersWhenDuplicateInArray() public {
+    uint256 id = _createGoal(beneficiary);
+    address[] memory members = new address[](3);
+    members[0] = bob;
+    members[1] = carol;
+    members[2] = bob;
+
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.AlreadyMember.selector));
+    goalCircles.addMembers(id, members);
+
+    // The whole batch reverted, so bob and carol were not added either
+    assertFalse(goalCircles.isMember(id, bob));
+    assertFalse(goalCircles.isMember(id, carol));
+    assertEq(goalCircles.getGoalMembers(id).length, 1);
+  }
+
+  function test_AddMembersWhenZeroAddress() public {
+    uint256 id = _createGoal(beneficiary);
+    address[] memory members = new address[](2);
+    members[0] = bob;
+    members[1] = address(0);
+
+    vm.prank(alice);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.InvalidMemberAddress.selector));
+    goalCircles.addMembers(id, members);
+
+    assertFalse(goalCircles.isMember(id, bob));
+    assertFalse(goalCircles.isMember(id, address(0)));
+  }
+
+  function test_AddMembersAlongsideRedeemedInvites() public {
+    uint256 id = _createGoal(beneficiary);
+    _join(id, bob, 1);
+
+    // Signed invites keep working alongside addMembers, on the same roster
+    address[] memory members = new address[](1);
+    members[0] = carol;
+    vm.prank(alice);
+    goalCircles.addMembers(id, members);
+    _join(id, dave, 2);
+
+    assertEq(goalCircles.getGoalMembers(id).length, 4);
+    assertTrue(goalCircles.usedNonces(id, 1));
+    assertTrue(goalCircles.usedNonces(id, 2));
+  }
+
+  function test_AddMembersThenInviteRedeemWhenAlreadyAdded() public {
+    uint256 id = _createGoal(beneficiary);
+    address[] memory members = new address[](1);
+    members[0] = bob;
+    vm.prank(alice);
+    goalCircles.addMembers(id, members);
+
+    bytes memory signature = _signGoalInvite(id, 1, _alicePrivateKey);
+    vm.prank(bob);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.AlreadyMember.selector));
+    goalCircles.redeemInvite(id, 1, signature);
+  }
+
+  function test_AddMembersThenAddedMemberCanDepositAndWithdraw() public {
+    uint256 id = _createGoal(address(0));
+    address[] memory members = new address[](2);
+    members[0] = bob;
+    members[1] = carol;
+    vm.prank(alice);
+    goalCircles.addMembers(id, members);
+
+    _deposit(id, bob, 4 ether);
+    vm.prank(dave);
+    goalCircles.depositFor(id, carol, 2 ether);
+    assertEq(goalCircles.contributions(id, bob), 4 ether);
+    assertEq(goalCircles.contributions(id, carol), 2 ether);
+    assertEq(goalCircles.totalDeposited(id), 6 ether);
+
+    // Fail the goal, then each added member reclaims exactly their own contributions
+    vm.warp(block.timestamp + DURATION);
+    vm.prank(bob);
+    goalCircles.withdraw(id);
+    vm.prank(carol);
+    goalCircles.withdraw(id);
+
+    assertEq(token.balanceOf(bob), START_BAL);
+    assertEq(token.balanceOf(carol), START_BAL + 2 ether);
+    assertEq(token.balanceOf(dave), START_BAL - 2 ether);
+    assertEq(goalCircles.totalDeposited(id), 0);
+  }
+
+  function test_AddMembersThenAddedMemberCanCompleteGoalWithBeneficiary() public {
+    uint256 id = _createGoal(beneficiary);
+    address[] memory members = new address[](1);
+    members[0] = bob;
+    vm.prank(alice);
+    goalCircles.addMembers(id, members);
+
+    _deposit(id, bob, GOAL_AMOUNT);
+    assertTrue(goalCircles.goalReached(id));
+    goalCircles.release(id);
+
+    assertEq(token.balanceOf(beneficiary), GOAL_AMOUNT);
+  }
+
+  function test_AddMembersWhenNonMemberDepositsBeforeBeingAdded() public {
+    uint256 id = _createGoal(beneficiary);
+
+    vm.prank(bob);
+    vm.expectRevert(abi.encodeWithSelector(IGoalSavingCircles.NotMember.selector));
+    goalCircles.deposit(id, 1 ether);
+
+    address[] memory members = new address[](1);
+    members[0] = bob;
+    vm.prank(alice);
+    goalCircles.addMembers(id, members);
+
+    _deposit(id, bob, 1 ether);
+    assertEq(goalCircles.contributions(id, bob), 1 ether);
+  }
+
+  // ==========================================================================
   // deposit / depositFor
   // ==========================================================================
 

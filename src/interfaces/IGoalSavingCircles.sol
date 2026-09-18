@@ -80,6 +80,13 @@ interface IGoalSavingCircles {
   event InviteRedeemed(uint256 indexed id, address indexed redeemer);
 
   /**
+   * @notice Emitted when the goal owner adds a member directly.
+   * @param id The id of the goal.
+   * @param member The address of the added member.
+   */
+  event MemberAdded(uint256 indexed id, address indexed member);
+
+  /**
    * @notice Emitted when a member's contribution is credited (deposit or depositFor).
    * @param id The id of the goal.
    * @param member The member credited with the contribution.
@@ -146,6 +153,9 @@ interface IGoalSavingCircles {
 
   /// @notice Thrown when the caller is already a member of the goal.
   error AlreadyMember();
+
+  /// @notice Thrown when adding the zero address as a member.
+  error InvalidMemberAddress();
 
   /// @notice Thrown when an invite nonce has already been used for this goal.
   error InviteAlreadyUsed();
@@ -220,6 +230,16 @@ interface IGoalSavingCircles {
    * @param signature The goal owner's EIP-712 signature over (id, nonce).
    */
   function redeemInvite(uint256 id, uint256 nonce, bytes calldata signature) external;
+
+  /**
+   * @notice Add members to a goal directly, authorized by the caller being the goal owner.
+   * @dev Signing-free alternative to redeemInvite; signed invites remain supported. Callable
+   *      whenever the goal is open (same predicate as redeemInvite). Members are added WITHOUT
+   *      their consent; an added member has no contribution and nothing is pulled from them.
+   * @param id The id of the goal.
+   * @param members The addresses to add as members.
+   */
+  function addMembers(uint256 id, address[] calldata members) external;
 
   /**
    * @notice Deposit tokens toward the goal. Any amount, any number of times, while the goal is
