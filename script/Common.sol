@@ -6,6 +6,7 @@ import {Script} from 'forge-std/Script.sol';
 import {console2} from 'forge-std/console2.sol';
 
 import {AutomaticSavingCircles} from '../src/contracts/AutomaticSavingCircles.sol';
+import {GoalSavingCircles} from '../src/contracts/GoalSavingCircles.sol';
 import {SavingCircles} from '../src/contracts/SavingCircles.sol';
 import {SavingCirclesViewer} from '../src/contracts/SavingCirclesViewer.sol';
 
@@ -39,9 +40,15 @@ contract Common is Script {
     AutomaticSavingCircles automaticSavingCircles = new AutomaticSavingCircles(address(proxy), _admin);
     SavingCirclesViewer savingCirclesViewer = new SavingCirclesViewer(address(proxy));
 
+    // Deploy the goal savings registry behind its own transparent proxy
+    TransparentUpgradeableProxy goalProxy = _deployTransparentProxy(
+      address(new GoalSavingCircles()), _admin, abi.encodeWithSelector(GoalSavingCircles.initialize.selector, _admin)
+    );
+
     console2.log('SavingCircles proxy:', address(proxy));
     console2.log('AutomaticSavingCircles:', address(automaticSavingCircles));
     console2.log('SavingCirclesViewer:', address(savingCirclesViewer));
+    console2.log('GoalSavingCircles proxy:', address(goalProxy));
 
     return proxy;
   }
