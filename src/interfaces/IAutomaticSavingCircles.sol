@@ -96,6 +96,15 @@ interface IAutomaticSavingCircles {
   function setAutomaticClaimsEnabled(uint256 circleId, bool enabled) external;
 
   /**
+   * @notice Move the caller's automation settings for a circle to a new address
+   * @dev Self-authorized: callable only by the address being migrated away from. Mirrors
+   * `SavingCircles.migrateMember`. No-ops for any flag that is not currently enabled for the caller.
+   * @param circleId The circle whose automation settings should move
+   * @param newMember The address that should inherit the caller's automation settings
+   */
+  function migrateAutomationSettings(uint256 circleId, address newMember) external;
+
+  /**
    * @notice Configure the dedicated `msg.sender` allowed to execute automated batches
    * @param automationExecutor The dedicated automation executor address for this network
    */

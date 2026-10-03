@@ -111,6 +111,13 @@ interface ISavingCircles {
    */
   event MemberRemoved(uint256 indexed id, address indexed member);
   /**
+   * @notice Emitted when a member migrates their membership to a new address
+   * @param id The ID of the circle
+   * @param oldMember The address migrated away from
+   * @param newMember The address migrated to
+   */
+  event MemberMigrated(uint256 indexed id, address indexed oldMember, address indexed newMember);
+  /**
    * @notice Emitted when a saving circle is started
    * @param id The ID of the circle
    */
@@ -338,6 +345,16 @@ interface ISavingCircles {
    * @param member The address to remove
    */
   function removeMember(uint256 id, address member) external;
+
+  /**
+   * @notice Moves the caller's membership in a circle to a new address, preserving payout
+   *         order, deposit history, and (if applicable) circle ownership
+   * @dev Self-authorized only: msg.sender must be the current member. Works at any circle
+   *      lifecycle stage, unlike removeMember+addMembers which are pre-launch only.
+   * @param id The ID of the Circle
+   * @param newMember The address to migrate membership to; must not already be a member
+   */
+  function migrateMember(uint256 id, address newMember) external;
 
   /**
    * @notice Get a single circle
