@@ -53,6 +53,18 @@
   <li>For more specific details, checkout `https://www.conventionalcommits.org/en/v1.0.0/`</li>
 </dl>
 
+## Versioning
+
+Releases follow [Semantic Versioning](https://semver.org/) and are tagged `vX.Y.Z` on `dev`. For these contracts the version means:
+
+| Bump      | When                                                                                                                                                                                                             |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MAJOR** | An existing function, event or error signature changes or is removed; behavior integrators rely on changes; or a storage layout change rules out an in-place proxy upgrade (needs a new proxy or a migration). |
+| **MINOR** | New contracts, functions, events or errors; upgrade-safe storage appends; new deploy targets.                                                                                                                   |
+| **PATCH** | Bug or security fixes with no ABI change, gas optimizations, docs, tests and scripts.                                                                                                                           |
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please): every push to `dev` updates a release PR that bumps `package.json`, writes `CHANGELOG.md` and, once merged, tags the release. `feat:` commits bump MINOR and `fix:`/`perf:` bump PATCH. Breaking changes are **not** detected automatically: mark them with `feat!:` / `fix!:` or a `BREAKING CHANGE:` footer, especially ABI or storage layout breaks.
+
 <div align="center">End of Breadchain Notes</div>
 <div align="center">Continue Reading Wonderland Outline</div>
 
