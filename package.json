@@ -1,14 +1,14 @@
 {
-  "name": "solidity-foundry-boilerplate",
+  "name": "saving-circles",
   "version": "1.0.0",
-  "description": "Production ready Solidity boilerplate with Foundry",
-  "homepage": "https://github.com/defi-wonderland/solidity-foundry-boilerplate#readme",
+  "description": "Rotating and goal-based group savings contracts by Breadchain",
+  "homepage": "https://github.com/BreadchainCoop/saving-circles#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/defi-wonderland/solidity-foundry-boilerplate.git"
+    "url": "git+https://github.com/BreadchainCoop/saving-circles.git"
   },
   "license": "MIT",
-  "author": "Wonderland",
+  "author": "Breadchain Collective",
   "scripts": {
     "build": "forge build",
     "build:optimized": "FOUNDRY_PROFILE=optimized forge build",
