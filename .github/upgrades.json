@@ -2,6 +2,9 @@
   "contracts": [
     {
       "contract": "src/contracts/SavingCircles.sol:SavingCircles"
+    },
+    {
+      "contract": "src/contracts/GoalSavingCircles.sol:GoalSavingCircles"
     }
   ]
 }
