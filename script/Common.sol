@@ -32,7 +32,16 @@ contract Common is Script {
   }
 
   function _deployContracts(address _admin) internal returns (TransparentUpgradeableProxy) {
-    TransparentUpgradeableProxy proxy = _deployTransparentProxy(
+    (TransparentUpgradeableProxy proxy,) = _deployAllContracts(_admin);
+    return proxy;
+  }
+
+  /// @dev Same as _deployContracts, but also returns the GoalSavingCircles proxy
+  function _deployAllContracts(address _admin)
+    internal
+    returns (TransparentUpgradeableProxy proxy, TransparentUpgradeableProxy goalProxy)
+  {
+    proxy = _deployTransparentProxy(
       address(_deploySavingCircles()), _admin, abi.encodeWithSelector(SavingCircles.initialize.selector, _admin)
     );
 
@@ -41,7 +50,7 @@ contract Common is Script {
     SavingCirclesViewer savingCirclesViewer = new SavingCirclesViewer(address(proxy));
 
     // Deploy the goal savings registry behind its own transparent proxy
-    TransparentUpgradeableProxy goalProxy = _deployTransparentProxy(
+    goalProxy = _deployTransparentProxy(
       address(new GoalSavingCircles()), _admin, abi.encodeWithSelector(GoalSavingCircles.initialize.selector, _admin)
     );
 
@@ -49,7 +58,5 @@ contract Common is Script {
     console2.log('AutomaticSavingCircles:', address(automaticSavingCircles));
     console2.log('SavingCirclesViewer:', address(savingCirclesViewer));
     console2.log('GoalSavingCircles proxy:', address(goalProxy));
-
-    return proxy;
   }
 }
