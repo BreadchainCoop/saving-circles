@@ -37,11 +37,27 @@ contract ConditionalGrants is IConditionalGrants, ReentrancyGuardUpgradeable, Ow
   /// @inheritdoc IConditionalGrants
   uint256 public nextId;
 
+  /**
+   * @dev GrantTerms as stored. The agreement lives in _agreements, and the last field keeps the slot of
+   *      the terms hash earlier versions stored, so upgrading a deployed proxy keeps existing grants.
+   */
+  struct StoredTerms {
+    address token;
+    uint256 advance;
+    uint256 grant;
+    uint256 fee;
+    uint256 acceptBy;
+    uint256 payBackPeriod;
+    bytes32 legacyTermsHash;
+  }
+
   mapping(address token => bool status) internal _allowedTokens;
-  mapping(uint256 id => GrantTerms terms) internal _terms;
+  mapping(uint256 id => StoredTerms terms) internal _terms;
   mapping(uint256 id => GrantStatus status) internal _status;
   mapping(address grantor => uint256[] ids) internal _grantorGrants;
   mapping(address grantee => uint256[] ids) internal _granteeGrants;
+  // Append new storage below this line only
+  mapping(uint256 id => string agreement) internal _agreements;
 
   /// @dev Requires the conditional grant exists
   modifier onlyExisting(uint256 _id) {
@@ -96,7 +112,16 @@ contract ConditionalGrants is IConditionalGrants, ReentrancyGuardUpgradeable, Ow
     if (_grantee == msg.sender) revert InvalidGrantee();
 
     _id = nextId++;
-    _terms[_id] = _grantTerms;
+    _terms[_id] = StoredTerms({
+      token: _grantTerms.token,
+      advance: _grantTerms.advance,
+      grant: _grantTerms.grant,
+      fee: _grantTerms.fee,
+      acceptBy: _grantTerms.acceptBy,
+      payBackPeriod: _grantTerms.payBackPeriod,
+      legacyTermsHash: bytes32(0)
+    });
+    if (bytes(_grantTerms.agreement).length != 0) _agreements[_id] = _grantTerms.agreement;
     _status[_id].grantor = msg.sender;
     _grantorGrants[msg.sender].push(_id);
     if (_grantee != address(0)) {
@@ -193,7 +218,7 @@ contract ConditionalGrants is IConditionalGrants, ReentrancyGuardUpgradeable, Ow
   /// @inheritdoc IConditionalGrants
   function accept(uint256 _id) external override nonReentrant onlyExisting(_id) {
     GrantStatus storage _st = _status[_id];
-    GrantTerms storage _t = _terms[_id];
+    StoredTerms storage _t = _terms[_id];
     if (msg.sender != _st.grantee) revert NotGrantee();
     if (_state(_id) != GrantState.Offered) revert InvalidState();
 
@@ -211,7 +236,7 @@ contract ConditionalGrants is IConditionalGrants, ReentrancyGuardUpgradeable, Ow
   function payBack(uint256 _id, uint256 _amount) external override nonReentrant onlyExisting(_id) {
     if (_amount == 0) revert InvalidAmount();
     GrantStatus storage _st = _status[_id];
-    GrantTerms storage _t = _terms[_id];
+    StoredTerms storage _t = _terms[_id];
     uint256 _total = _t.advance + _t.fee;
     // A reclaim closes the grant: the rest of the advance and fee is written off
     if (_st.acceptedAt == 0 || _st.grantReclaimed || _st.paidBack >= _total) revert InvalidState();
@@ -234,7 +259,7 @@ contract ConditionalGrants is IConditionalGrants, ReentrancyGuardUpgradeable, Ow
     if (_state(_id) != GrantState.PaidBack) revert InvalidState();
 
     GrantStatus storage _st = _status[_id];
-    GrantTerms storage _t = _terms[_id];
+    StoredTerms storage _t = _terms[_id];
     // Whatever fee is still unpaid comes out of the grant. Reaching PaidBack guarantees it fits.
     uint256 _feeFromGrant = _t.advance + _t.fee - _st.paidBack;
     if (_feeFromGrant > 0 && msg.sender != _st.grantee) revert NotGrantee();
@@ -260,7 +285,16 @@ contract ConditionalGrants is IConditionalGrants, ReentrancyGuardUpgradeable, Ow
     onlyExisting(_id)
     returns (GrantTerms memory _grantTerms, GrantStatus memory _grantStatus)
   {
-    _grantTerms = _terms[_id];
+    StoredTerms storage _t = _terms[_id];
+    _grantTerms = GrantTerms({
+      token: _t.token,
+      advance: _t.advance,
+      grant: _t.grant,
+      fee: _t.fee,
+      acceptBy: _t.acceptBy,
+      payBackPeriod: _t.payBackPeriod,
+      agreement: _agreements[_id]
+    });
     _grantStatus = _status[_id];
   }
 
@@ -309,7 +343,7 @@ contract ConditionalGrants is IConditionalGrants, ReentrancyGuardUpgradeable, Ow
   /// @dev What must be paid in cash to unlock the grant: the advance, plus any part of the fee the
   ///      grant is too small to cover. With no grant, that is the whole advance + fee.
   function _unlockAmount(uint256 _id) internal view returns (uint256 _amount) {
-    GrantTerms storage _t = _terms[_id];
+    StoredTerms storage _t = _terms[_id];
     _amount = _t.advance + (_t.fee > _t.grant ? _t.fee - _t.grant : 0);
   }
 
