@@ -20,8 +20,8 @@ bytes32 constant ERC1967_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6
 error UnsupportedChain();
 /// @notice The grant token has no code on this chain
 error GrantTokenHasNoCode();
-/// @notice On mainnet the admin must be a contract (a Safe) other than the deployer
-error AdminMustBeAContract();
+/// @notice On mainnet the admin must be a contract or an account that has already sent a transaction
+error AdminLooksUnused();
 /// @notice A role did not end up with ADMIN_ADDRESS, or the token was not allowed
 error DeployCheckFailed(string check);
 
@@ -32,8 +32,9 @@ error DeployCheckFailed(string check);
  *         overrides either default.
  *         Any key can broadcast. The broadcaster owns the contract only long enough to allow the
  *         token, then ownership moves to ADMIN_ADDRESS, which also owns the ProxyAdmin from the
- *         start. Both moves are single-step, so on mainnet ADMIN_ADDRESS must be a contract (a
- *         Safe) other than the broadcaster: a typo'd EOA would lose admin control for good.
+ *         start. ADMIN_ADDRESS can be a Safe or an EOA. Both moves are single-step, so on mainnet
+ *         it must be a contract or an account that has already sent a transaction: a typo'd
+ *         address would lose admin control for good.
  */
 contract DeployConditionalGrantsCelo is Script {
   function run() public {
@@ -46,9 +47,7 @@ contract DeployConditionalGrantsCelo is Script {
 
     vm.startBroadcast();
     (, address deployer,) = vm.readCallers();
-    if (_mainnet) {
-      if (admin.code.length == 0 || admin == deployer) revert AdminMustBeAContract();
-    }
+    if (_mainnet && admin.code.length == 0 && vm.getNonce(admin) == 0) revert AdminLooksUnused();
 
     TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
       address(new ConditionalGrants()), admin, abi.encodeWithSelector(ConditionalGrants.initialize.selector, deployer)

@@ -102,9 +102,12 @@ through an upgrade if a better yield source appears.
 - **Upgrade key.** The contract is upgradeable: whoever controls the ProxyAdmin can replace the
   implementation, so they have custody of everything in escrow, and of any token allowance users
   have left on the proxy. The app therefore approves only the exact amount each action pulls, so
-  no allowance is left over. The deploy script requires the admin to be a contract (a Safe) on
-  mainnet and checks both roles landed on it. Putting a `TimelockController` between the Safe and
-  the ProxyAdmin would give users time to react to a malicious upgrade.
+  no allowance is left over. The admin can be a Safe or a single wallet (EOA). A single wallet is
+  simpler but means one key can upgrade the contract; a Safe spreads that across signers. On
+  mainnet the deploy script refuses an admin address that has no code and has never sent a
+  transaction, which catches a typo, and checks both roles landed on it. Putting a
+  `TimelockController` in front of the ProxyAdmin would give users time to react to a malicious
+  upgrade.
 - **Bounds.** `advance + fee` must fit in a uint256, and no deadline can be set more than
   `MAX_PAY_BACK_PERIOD` ahead, so a typo can't lock a grant through an overflow.
 - **Re-entrancy.** Every token-moving function is `nonReentrant` and updates state before
