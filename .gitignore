@@ -24,3 +24,6 @@ crytic-export
 
 # Echidna corpus
 test/invariants/fuzz/echidna_coverage
+
+# Slither reports: generated, large, and full of local absolute paths
+slither*.json
